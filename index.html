@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phone 2 - Hand Camera</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+      font-family: system-ui;
+    }
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    #video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    #status {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.9);
+      color: #0f0;
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 16px;
+      z-index: 10;
+    }
+    #connectBtn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #1E88E5;
+      color: white;
+      border: none;
+      padding: 20px 40px;
+      font-size: 24px;
+      border-radius: 12px;
+      cursor: pointer;
+      z-index: 100;
+      font-weight: bold;
+    }
+    #connectBtn:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+    .success { color: #0f0 !important; }
+    .error { color: #f00 !important; }
+    .warning { color: #ff0 !important; }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <video id="video" playsinline></video>
+    <canvas id="canvas"></canvas>
+    <button id="connectBtn">START CAMERA</button>
+    <div id="status">
+      <div><strong>📱 PHONE 2 - HAND CAMERA</strong></div>
+      <div id="statusCamera">Camera: Not started</div>
+      <div id="statusModel">Model: Not loaded</div>
+      <div id="statusHands">Hands: 0</div>
+      <div id="statusConnection">Connection: Not connected</div>
+      <div id="statusSending">Sending: No</div>
+      <div id="connectionId" style="margin-top:10px; font-size:12px;"></div>
+    </div>
+  </div>
+
+  <!-- MediaPipe Hands -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <!-- PeerJS for WebRTC -->
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const connectBtn = document.getElementById('connectBtn');
+
+    let hands, peer, connection;
+    let isReady = false;
+    let peerId = '';
+
+    // Generate simple peer ID
+    const myPeerId = 'hand-camera-' + Math.random().toString(36).substr(2, 9);
+
+    connectBtn.addEventListener('click', async () => {
+      connectBtn.disabled = true;
+      connectBtn.textContent = 'STARTING...';
+      await init();
+    });
+
+    async function init() {
+      try {
+        // Setup camera
+        updateStatus('statusCamera', 'Camera: Requesting...', 'warning');
+        
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { exact: 'environment' },
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          }
+        });
+
+        video.srcObject = stream;
+        await video.play();
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        updateStatus('statusCamera', `Camera: Active (${video.videoWidth}x${video.videoHeight})`, 'success');
+
+        // Setup PeerJS
+        updateStatus('statusConnection', 'Connection: Initializing...', 'warning');
+        
+        peer = new Peer(myPeerId);
+
+        peer.on('open', (id) => {
+          peerId = id;
+          updateStatus('statusConnection', 'Connection: Ready!', 'success');
+          document.getElementById('connectionId').innerHTML = 
+            `<strong>YOUR ID:</strong><br><span style="color:#0ff; font-size:20px;">${id}</span><br>Enter this on Moto G!`;
+          connectBtn.style.display = 'none';
+        });
+
+        peer.on('connection', (conn) => {
+          connection = conn;
+          updateStatus('statusConnection', 'Connection: Connected to Moto G!', 'success');
+          
+          conn.on('open', () => {
+            isReady = true;
+            updateStatus('statusSending', 'Sending: YES ✓', 'success');
+          });
+
+          conn.on('close', () => {
+            isReady = false;
+            updateStatus('statusConnection', 'Connection: Disconnected', 'error');
+            updateStatus('statusSending', 'Sending: No', 'error');
+          });
+        });
+
+        // Setup MediaPipe
+        updateStatus('statusModel', 'Model: Loading...', 'warning');
+
+        hands = new Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.7,
+          minTrackingConfidence: 0.5
+        });
+
+        hands.onResults(onHandResults);
+
+        updateStatus('statusModel', 'Model: Loaded ✓', 'success');
+
+        // Start sending frames
+        sendFrames();
+
+      } catch (error) {
+        console.error('Init error:', error);
+        updateStatus('statusCamera', `Error: ${error.message}`, 'error');
+        connectBtn.disabled = false;
+        connectBtn.textContent = 'RETRY';
+      }
+    }
+
+    async function sendFrames() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        await hands.send({image: video});
+      }
+      requestAnimationFrame(sendFrames);
+    }
+
+    function onHandResults(results) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const handsData = results.multiHandLandmarks || [];
+      updateStatus('statusHands', `Hands: ${handsData.length}`, handsData.length > 0 ? 'success' : 'warning');
+
+      if (handsData.length > 0) {
+        const landmarks = handsData[0];
+
+        // Draw skeleton
+        drawSkeleton(landmarks);
+
+        // Send data to Moto G
+        if (isReady && connection) {
+          try {
+            connection.send({
+              type: 'hand',
+              landmarks: landmarks
+            });
+          } catch (e) {
+            console.error('Send error:', e);
+          }
+        }
+      } else {
+        // Send "no hand" message
+        if (isReady && connection) {
+          connection.send({
+            type: 'hand',
+            landmarks: null
+          });
+        }
+      }
+    }
+
+    function drawSkeleton(landmarks) {
+      const connections = [
+        [0, 1], [1, 2], [2, 3], [3, 4],
+        [0, 5], [5, 6], [6, 7], [7, 8],
+        [0, 9], [9, 10], [10, 11], [11, 12],
+        [0, 13], [13, 14], [14, 15], [15, 16],
+        [0, 17], [17, 18], [18, 19], [19, 20],
+        [5, 9], [9, 13], [13, 17]
+      ];
+
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+
+      for (const [s, e] of connections) {
+        const x1 = landmarks[s].x * canvas.width;
+        const y1 = landmarks[s].y * canvas.height;
+        const x2 = landmarks[e].x * canvas.width;
+        const y2 = landmarks[e].y * canvas.height;
+
+        const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+        gradient.addColorStop(0, 'rgba(255, 150, 200, 0.8)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0.6)');
+
+        ctx.strokeStyle = gradient;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+
+      for (let j = 0; j < landmarks.length; j++) {
+        const x = landmarks[j].x * canvas.width;
+        const y = landmarks[j].y * canvas.height;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fill();
+      }
+    }
+
+    function updateStatus(id, text, className) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = className;
+    }
+  </script>
+</body>
+</html>
