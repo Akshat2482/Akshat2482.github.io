@@ -167,7 +167,7 @@
         });
 
         hands.setOptions({
-          maxNumHands: 1,
+          maxNumHands: 2,  // Detect 2 hands now!
           modelComplexity: 1,
           minDetectionConfidence: 0.7,
           minTrackingConfidence: 0.5
@@ -201,30 +201,42 @@
       const handsData = results.multiHandLandmarks || [];
       updateStatus('statusHands', `Hands: ${handsData.length}`, handsData.length > 0 ? 'success' : 'warning');
 
-      if (handsData.length > 0) {
-        const landmarks = handsData[0];
-
-        // Draw skeleton
+      // Draw all detected hands
+      handsData.forEach(landmarks => {
         drawSkeleton(landmarks);
+      });
 
-        // Send data to Moto G
-        if (isReady && connection) {
-          try {
-            connection.send({
-              type: 'hand',
-              landmarks: landmarks
-            });
-          } catch (e) {
-            console.error('Send error:', e);
-          }
-        }
-      } else {
-        // Send "no hand" message
-        if (isReady && connection) {
+      // Calculate two-hand pinch distance (for resizing)
+      let twoHandDistance = null;
+      if (handsData.length === 2) {
+        // Distance between right hand index tip and left hand index tip
+        const hand1Index = handsData[0][8]; // Index finger tip
+        const hand2Index = handsData[1][8];
+        
+        const dx = (hand1Index.x - hand2Index.x) * canvas.width;
+        const dy = (hand1Index.y - hand2Index.y) * canvas.height;
+        twoHandDistance = Math.sqrt(dx*dx + dy*dy);
+        
+        // Draw line between hands
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(hand1Index.x * canvas.width, hand1Index.y * canvas.height);
+        ctx.lineTo(hand2Index.x * canvas.width, hand2Index.y * canvas.height);
+        ctx.stroke();
+      }
+
+      // Send data to Moto G
+      if (isReady && connection) {
+        try {
           connection.send({
             type: 'hand',
-            landmarks: null
+            landmarks: handsData.length > 0 ? handsData : null,
+            twoHandDistance: twoHandDistance,
+            handCount: handsData.length
           });
+        } catch (e) {
+          console.error('Send error:', e);
         }
       }
     }
