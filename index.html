@@ -5,12 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Phone 2 - Hand Camera</title>
   <style>
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       padding: 0;
       overflow: hidden;
-      background: #000;
       font-family: system-ui;
+      background-color: #0b0c0d;
+      background-image: url('bg.webp');
+      background-size: cover;
+      background-position: center;
     }
     #container {
       position: relative;
@@ -19,54 +23,71 @@
     }
     #video {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
       object-fit: cover;
     }
     #canvas {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
       pointer-events: none;
     }
     #status {
       position: absolute;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      background: rgba(0,0,0,0.9);
-      color: #0f0;
+      top: 10px; left: 10px; right: 10px;
+      border: 3px solid hsla(0,0%,100%,0.3);
+      background: hsla(0,0%,100%,0.2);
+      backdrop-filter: blur(12px);
+      box-shadow: inset 0 0 8px 1px hsla(0,0%,100%,0.6);
+      color: #fff;
       padding: 15px;
-      border-radius: 8px;
-      font-size: 16px;
+      border-radius: 1em;
+      font-size: 15px;
       z-index: 10;
     }
     #connectBtn {
       position: absolute;
-      top: 50%;
-      left: 50%;
+      top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      background: #1E88E5;
+      padding: 0.6em 1.4em;
+      font: 700 20px system-ui;
       color: white;
-      border: none;
-      padding: 20px 40px;
-      font-size: 24px;
-      border-radius: 12px;
       cursor: pointer;
       z-index: 100;
-      font-weight: bold;
+      border: 3px solid hsla(0,0%,100%,0.3);
+      background: hsla(0,0%,100%,0.2);
+      backdrop-filter: blur(2px);
+      box-shadow: inset 0 0 8px 1px hsla(0,0%,100%,0.6);
+      border-radius: 1em;
+      letter-spacing: 0.04em;
+      transition: background 0.18s, box-shadow 0.18s;
+    }
+    #connectBtn:hover {
+      background: hsla(0,0%,100%,0.32);
+      box-shadow: inset 0 0 14px 2px hsla(0,0%,100%,0.8);
     }
     #connectBtn:disabled {
-      background: #666;
+      opacity: 0.5;
       cursor: not-allowed;
     }
-    .success { color: #0f0 !important; }
-    .error { color: #f00 !important; }
-    .warning { color: #ff0 !important; }
+    #codeDisplay {
+      display: none;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      padding: 1.4em 2em;
+      border-radius: 1em;
+      border: 3px solid hsla(0,0%,100%,0.3);
+      background: hsla(0,0%,100%,0.2);
+      backdrop-filter: blur(12px);
+      box-shadow: inset 0 0 8px 1px hsla(0,0%,100%,0.6);
+      color: #fff;
+      z-index: 50;
+    }
+    #codeDisplay p { margin: 0 0 0.4em; font-size: 14px; opacity: 0.7; }
+    #codeDisplay span { font-size: 2em; font-weight: 700; letter-spacing: 0.12em; color: #fff; }
   </style>
 </head>
 <body>
@@ -74,6 +95,10 @@
     <video id="video" playsinline></video>
     <canvas id="canvas"></canvas>
     <button id="connectBtn">START CAMERA</button>
+    <div id="codeDisplay">
+      <p>Enter this code on Phone 1</p>
+      <span id="codeText"></span>
+    </div>
     <div id="status">
       <div><strong>📱 PHONE 2 - HAND CAMERA</strong></div>
       <div id="statusCamera">Camera: Not started</div>
@@ -85,9 +110,7 @@
     </div>
   </div>
 
-  <!-- MediaPipe Hands -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-  <!-- PeerJS for WebRTC -->
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
   <script>
@@ -100,18 +123,23 @@
     let isReady = false;
     let peerId = '';
 
-    // Generate simple peer ID
     const myPeerId = 'hand-camera-' + Math.random().toString(36).substr(2, 9);
 
     connectBtn.addEventListener('click', async () => {
       connectBtn.disabled = true;
       connectBtn.textContent = 'STARTING...';
+      document.getElementById('status').style.display = 'none';
+
+      const el = document.documentElement;
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
+
       await init();
     });
 
     async function init() {
       try {
-        // Setup camera
         updateStatus('statusCamera', 'Camera: Requesting...', 'warning');
         
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -130,22 +158,21 @@
 
         updateStatus('statusCamera', `Camera: Active (${video.videoWidth}x${video.videoHeight})`, 'success');
 
-        // Setup PeerJS
         updateStatus('statusConnection', 'Connection: Initializing...', 'warning');
         
         peer = new Peer(myPeerId);
 
         peer.on('open', (id) => {
           peerId = id;
-          updateStatus('statusConnection', 'Connection: Ready!', 'success');
-          document.getElementById('connectionId').innerHTML = 
-            `<strong>YOUR ID:</strong><br><span style="color:#0ff; font-size:20px;">${id}</span><br>Enter this on Moto G!`;
           connectBtn.style.display = 'none';
+          const codeDisplay = document.getElementById('codeDisplay');
+          document.getElementById('codeText').textContent = id;
+          codeDisplay.style.display = 'block';
         });
 
         peer.on('connection', (conn) => {
           connection = conn;
-          updateStatus('statusConnection', 'Connection: Connected to Moto G!', 'success');
+          document.getElementById('codeDisplay').style.display = 'none';
           
           conn.on('open', () => {
             isReady = true;
@@ -159,7 +186,6 @@
           });
         });
 
-        // Setup MediaPipe
         updateStatus('statusModel', 'Model: Loading...', 'warning');
 
         hands = new Hands({
@@ -167,7 +193,7 @@
         });
 
         hands.setOptions({
-          maxNumHands: 2,  // Detect 2 hands now!
+          maxNumHands: 2,
           modelComplexity: 1,
           minDetectionConfidence: 0.7,
           minTrackingConfidence: 0.5
@@ -177,7 +203,6 @@
 
         updateStatus('statusModel', 'Model: Loaded ✓', 'success');
 
-        // Start sending frames
         sendFrames();
 
       } catch (error) {
@@ -201,23 +226,17 @@
       const handsData = results.multiHandLandmarks || [];
       updateStatus('statusHands', `Hands: ${handsData.length}`, handsData.length > 0 ? 'success' : 'warning');
 
-      // Draw all detected hands
       handsData.forEach(landmarks => {
         drawSkeleton(landmarks);
       });
 
-      // Calculate two-hand pinch distance (for resizing)
       let twoHandDistance = null;
       if (handsData.length === 2) {
-        // Distance between right hand index tip and left hand index tip
-        const hand1Index = handsData[0][8]; // Index finger tip
+        const hand1Index = handsData[0][8];
         const hand2Index = handsData[1][8];
-        
         const dx = (hand1Index.x - hand2Index.x) * canvas.width;
         const dy = (hand1Index.y - hand2Index.y) * canvas.height;
         twoHandDistance = Math.sqrt(dx*dx + dy*dy);
-        
-        // Draw line between hands
         ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
         ctx.lineWidth = 4;
         ctx.beginPath();
@@ -226,7 +245,6 @@
         ctx.stroke();
       }
 
-      // Send data to Moto G
       if (isReady && connection) {
         try {
           connection.send({
@@ -243,12 +261,12 @@
 
     function drawSkeleton(landmarks) {
       const connections = [
-        [0, 1], [1, 2], [2, 3], [3, 4],
-        [0, 5], [5, 6], [6, 7], [7, 8],
-        [0, 9], [9, 10], [10, 11], [11, 12],
-        [0, 13], [13, 14], [14, 15], [15, 16],
-        [0, 17], [17, 18], [18, 19], [19, 20],
-        [5, 9], [9, 13], [13, 17]
+        [0,1],[1,2],[2,3],[3,4],
+        [0,5],[5,6],[6,7],[7,8],
+        [0,9],[9,10],[10,11],[11,12],
+        [0,13],[13,14],[14,15],[15,16],
+        [0,17],[17,18],[18,19],[19,20],
+        [5,9],[9,13],[13,17]
       ];
 
       ctx.lineWidth = 2;
@@ -259,11 +277,9 @@
         const y1 = landmarks[s].y * canvas.height;
         const x2 = landmarks[e].x * canvas.width;
         const y2 = landmarks[e].y * canvas.height;
-
         const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
-        gradient.addColorStop(0, 'rgba(255, 150, 200, 0.8)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0.6)');
-
+        gradient.addColorStop(0, 'rgba(255,150,200,0.8)');
+        gradient.addColorStop(1, 'rgba(255,255,255,0.6)');
         ctx.strokeStyle = gradient;
         ctx.beginPath();
         ctx.moveTo(x1, y1);
@@ -276,7 +292,7 @@
         const y = landmarks[j].y * canvas.height;
         ctx.beginPath();
         ctx.arc(x, y, 3, 0, 2 * Math.PI);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.fill();
       }
     }
