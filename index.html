@@ -194,9 +194,9 @@
 
         hands.setOptions({
           maxNumHands: 2,
-          modelComplexity: 1,
-          minDetectionConfidence: 0.7,
-          minTrackingConfidence: 0.5
+          modelComplexity: 0,        // 0 = lite model, fastest
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.4
         });
 
         hands.onResults(onHandResults);
