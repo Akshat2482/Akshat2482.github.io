@@ -1,307 +1,184 @@
-﻿<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Phone 2 - Hand Camera</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hand Tracking</title>
   <style>
+    :root {
+      --bg: radial-gradient(circle at 20% 20%, #1f2937, #0f172a 45%, #020617);
+      --accent: #38bdf8;
+      --text: #e5e7eb;
+    }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
       overflow: hidden;
-      font-family: system-ui;
-      background-color: #0b0c0d;
-      background-image: url('bg.webp');
-      background-size: cover;
-      background-position: center;
     }
-    #container {
+    #start-btn {
+      padding: 1rem 2.6rem;
+      border: none;
+      border-radius: 999px;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #0f172a;
+      background: linear-gradient(120deg, #a5f3fc, #38bdf8 40%, #0ea5e9);
+      box-shadow: 0 18px 45px rgba(14, 165, 233, 0.35);
+      cursor: pointer;
+      transition: transform 140ms ease, box-shadow 140ms ease;
+    }
+    #start-btn:hover { transform: translateY(-2px); }
+    #start-btn:active { transform: translateY(1px); box-shadow: 0 10px 28px rgba(14,165,233,0.45); }
+    #stage {
       position: relative;
       width: 100vw;
       height: 100vh;
-    }
-    #video {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
-    }
-    #canvas {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      pointer-events: none;
-    }
-    #status {
-      position: absolute;
-      top: 10px; left: 10px; right: 10px;
-      border: 3px solid hsla(0,0%,100%,0.3);
-      background: hsla(0,0%,100%,0.2);
-      backdrop-filter: blur(12px);
-      box-shadow: inset 0 0 8px 1px hsla(0,0%,100%,0.6);
-      color: #fff;
-      padding: 15px;
-      border-radius: 1em;
-      font-size: 15px;
-      z-index: 10;
-    }
-    #connectBtn {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 0.6em 1.4em;
-      font: 700 20px system-ui;
-      color: white;
-      cursor: pointer;
-      z-index: 100;
-      border: 3px solid hsla(0,0%,100%,0.3);
-      background: hsla(0,0%,100%,0.2);
-      backdrop-filter: blur(2px);
-      box-shadow: inset 0 0 8px 1px hsla(0,0%,100%,0.6);
-      border-radius: 1em;
-      letter-spacing: 0.04em;
-      transition: background 0.18s, box-shadow 0.18s;
-    }
-    #connectBtn:hover {
-      background: hsla(0,0%,100%,0.32);
-      box-shadow: inset 0 0 14px 2px hsla(0,0%,100%,0.8);
-    }
-    #connectBtn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    #codeDisplay {
       display: none;
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      padding: 1.4em 2em;
-      border-radius: 1em;
-      border: 3px solid hsla(0,0%,100%,0.3);
-      background: hsla(0,0%,100%,0.2);
-      backdrop-filter: blur(12px);
-      box-shadow: inset 0 0 8px 1px hsla(0,0%,100%,0.6);
-      color: #fff;
-      z-index: 50;
+      align-items: center;
+      justify-content: center;
     }
-    #codeDisplay p { margin: 0 0 0.4em; font-size: 14px; opacity: 0.7; }
-    #codeDisplay span { font-size: 2em; font-weight: 700; letter-spacing: 0.12em; color: #fff; }
+    video, canvas {
+      position: absolute;
+      max-width: 100vw;
+      max-height: 100vh;
+    }
+    #hint {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.65);
+      color: var(--text);
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 300ms ease;
+    }
+    #hint.show { opacity: 1; }
   </style>
 </head>
 <body>
-  <div id="container">
-    <video id="video" playsinline></video>
-    <canvas id="canvas"></canvas>
-    <button id="connectBtn">START CAMERA</button>
-    <div id="codeDisplay">
-      <p>Enter this code on Phone 1</p>
-      <span id="codeText"></span>
-    </div>
-    <div id="status">
-      <div><strong>📱 PHONE 2 - HAND CAMERA</strong></div>
-      <div id="statusCamera">Camera: Not started</div>
-      <div id="statusModel">Model: Not loaded</div>
-      <div id="statusHands">Hands: 0</div>
-      <div id="statusConnection">Connection: Not connected</div>
-      <div id="statusSending">Sending: No</div>
-      <div id="connectionId" style="margin-top:10px; font-size:12px;"></div>
-    </div>
+  <button id="start-btn">START</button>
+
+  <div id="stage">
+    <video id="video" playsinline style="display:none;"></video>
+    <canvas id="overlay"></canvas>
+    <div id="hint">Raise your hand to see landmarks</div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
   <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const connectBtn = document.getElementById('connectBtn');
+    const startBtn = document.getElementById("start-btn");
+    const stage = document.getElementById("stage");
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("overlay");
+    const ctx = canvas.getContext("2d");
+    const hint = document.getElementById("hint");
 
-    let hands, peer, connection;
-    let isReady = false;
-    let peerId = '';
+    let camera = null;
+    let hands = null;
 
-    const myPeerId = 'hand-camera-' + Math.random().toString(36).substr(2, 9);
+    function resizeCanvas() {
+      const { videoWidth: w, videoHeight: h } = video;
+      if (!w || !h) return;
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.width = "100vw";
+      canvas.style.height = `${(h / w) * 100}vw`;
+    }
 
-    connectBtn.addEventListener('click', async () => {
-      connectBtn.disabled = true;
-      connectBtn.textContent = 'STARTING...';
-      document.getElementById('status').style.display = 'none';
-
+    function enterFullscreen() {
       const el = document.documentElement;
-      if (el.requestFullscreen) el.requestFullscreen();
-      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-      else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
+      if (el.requestFullscreen) return el.requestFullscreen();
+      if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+      return Promise.resolve(); // fallback
+    }
 
-      await init();
-    });
+    async function startExperience() {
+      startBtn.style.display = "none";
+      stage.style.display = "flex";
+      hint.classList.add("show");
 
-    async function init() {
       try {
-        updateStatus('statusCamera', 'Camera: Requesting...', 'warning');
-        
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { exact: 'environment' },
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          }
-        });
+        await enterFullscreen();
+      } catch (_) {
+        // Ignore fullscreen errors (often blocked if not user-initiated).
+      }
 
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
         video.srcObject = stream;
         await video.play();
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        updateStatus('statusCamera', `Camera: Active (${video.videoWidth}x${video.videoHeight})`, 'success');
-
-        updateStatus('statusConnection', 'Connection: Initializing...', 'warning');
-        
-        peer = new Peer(myPeerId);
-
-        peer.on('open', (id) => {
-          peerId = id;
-          connectBtn.style.display = 'none';
-          const codeDisplay = document.getElementById('codeDisplay');
-          document.getElementById('codeText').textContent = id;
-          codeDisplay.style.display = 'block';
-        });
-
-        peer.on('connection', (conn) => {
-          connection = conn;
-          document.getElementById('codeDisplay').style.display = 'none';
-          
-          conn.on('open', () => {
-            isReady = true;
-            updateStatus('statusSending', 'Sending: YES ✓', 'success');
-          });
-
-          conn.on('close', () => {
-            isReady = false;
-            updateStatus('statusConnection', 'Connection: Disconnected', 'error');
-            updateStatus('statusSending', 'Sending: No', 'error');
-          });
-        });
-
-        updateStatus('statusModel', 'Model: Loading...', 'warning');
-
-        hands = new Hands({
-          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-        });
-
-        hands.setOptions({
-          maxNumHands: 2,
-          modelComplexity: 0,        // 0 = lite model, fastest
-          minDetectionConfidence: 0.6,
-          minTrackingConfidence: 0.4
-        });
-
-        hands.onResults(onHandResults);
-
-        updateStatus('statusModel', 'Model: Loaded ✓', 'success');
-
-        sendFrames();
-
-      } catch (error) {
-        console.error('Init error:', error);
-        updateStatus('statusCamera', `Error: ${error.message}`, 'error');
-        connectBtn.disabled = false;
-        connectBtn.textContent = 'RETRY';
+        resizeCanvas();
+        initHands();
+      } catch (err) {
+        alert("Camera access failed: " + err.message);
+        startBtn.style.display = "inline-block";
+        stage.style.display = "none";
       }
     }
 
-    async function sendFrames() {
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        await hands.send({image: video});
-      }
-      requestAnimationFrame(sendFrames);
+    function initHands() {
+      hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      });
+      hands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.6
+      });
+      hands.onResults(onResults);
+
+      camera = new Camera(video, {
+        onFrame: async () => { await hands.send({ image: video }); },
+        width: 1280,
+        height: 720
+      });
+      camera.start();
     }
 
-    function onHandResults(results) {
+    function onResults(results) {
+      if (!canvas.width || !canvas.height) resizeCanvas();
+
+      ctx.save();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const handsData = results.multiHandLandmarks || [];
-      updateStatus('statusHands', `Hands: ${handsData.length}`, handsData.length > 0 ? 'success' : 'warning');
+      // Mirror the feed for a more natural "selfie" view
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
 
-      handsData.forEach(landmarks => {
-        drawSkeleton(landmarks);
-      });
-
-      let twoHandDistance = null;
-      if (handsData.length === 2) {
-        const hand1Index = handsData[0][8];
-        const hand2Index = handsData[1][8];
-        const dx = (hand1Index.x - hand2Index.x) * canvas.width;
-        const dy = (hand1Index.y - hand2Index.y) * canvas.height;
-        twoHandDistance = Math.sqrt(dx*dx + dy*dy);
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(hand1Index.x * canvas.width, hand1Index.y * canvas.height);
-        ctx.lineTo(hand2Index.x * canvas.width, hand2Index.y * canvas.height);
-        ctx.stroke();
-      }
-
-      if (isReady && connection) {
-        try {
-          connection.send({
-            type: 'hand',
-            landmarks: handsData.length > 0 ? handsData : null,
-            twoHandDistance: twoHandDistance,
-            handCount: handsData.length
-          });
-        } catch (e) {
-          console.error('Send error:', e);
+      if (results.multiHandLandmarks) {
+        ctx.save();
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        for (const landmarks of results.multiHandLandmarks) {
+          drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: "#38bdf8", lineWidth: 4 });
+          drawLandmarks(ctx, landmarks, { color: "#e0f2fe", lineWidth: 2, radius: 4 });
         }
+        ctx.restore();
       }
     }
 
-    function drawSkeleton(landmarks) {
-      const connections = [
-        [0,1],[1,2],[2,3],[3,4],
-        [0,5],[5,6],[6,7],[7,8],
-        [0,9],[9,10],[10,11],[11,12],
-        [0,13],[13,14],[14,15],[15,16],
-        [0,17],[17,18],[18,19],[19,20],
-        [5,9],[9,13],[13,17]
-      ];
-
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-
-      for (const [s, e] of connections) {
-        const x1 = landmarks[s].x * canvas.width;
-        const y1 = landmarks[s].y * canvas.height;
-        const x2 = landmarks[e].x * canvas.width;
-        const y2 = landmarks[e].y * canvas.height;
-        const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
-        gradient.addColorStop(0, 'rgba(255,150,200,0.8)');
-        gradient.addColorStop(1, 'rgba(255,255,255,0.6)');
-        ctx.strokeStyle = gradient;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-      }
-
-      for (let j = 0; j < landmarks.length; j++) {
-        const x = landmarks[j].x * canvas.width;
-        const y = landmarks[j].y * canvas.height;
-        ctx.beginPath();
-        ctx.arc(x, y, 3, 0, 2 * Math.PI);
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.fill();
-      }
-    }
-
-    function updateStatus(id, text, className) {
-      const el = document.getElementById(id);
-      el.textContent = text;
-      el.className = className;
-    }
+    startBtn.addEventListener("click", startExperience);
+    window.addEventListener("resize", resizeCanvas);
   </script>
 </body>
 </html>
