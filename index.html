@@ -90,6 +90,11 @@
     let camera = null;
     let hands = null;
 
+    const CAM_FACING = "environment"; // rear camera
+    const CAM_WIDTH = 1280;
+    const CAM_HEIGHT = 720;
+    const MIRROR = CAM_FACING === "user";
+
     function resizeCanvas() {
       const { videoWidth: w, videoHeight: h } = video;
       if (!w || !h) return;
@@ -107,28 +112,29 @@
     }
 
     async function startExperience() {
-      startBtn.style.display = "none";
-      stage.style.display = "flex";
-      hint.classList.add("show");
+      startBtn.disabled = true;
+      initHands();
 
       try {
-        await enterFullscreen();
-      } catch (_) {
-        // Ignore fullscreen errors (often blocked if not user-initiated).
-      }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false
+        camera = new Camera(video, {
+          onFrame: async () => { await hands.send({ image: video }); },
+          width: CAM_WIDTH,
+          height: CAM_HEIGHT,
+          facingMode: CAM_FACING
         });
-        video.srcObject = stream;
-        await video.play();
+
+        await camera.start(); // prompts for camera permission
+
+        stage.style.display = "flex";
+        startBtn.style.display = "none";
+        hint.classList.add("show");
         resizeCanvas();
-        initHands();
+
+        try { await enterFullscreen(); } catch (_) { /* fullscreen may be declined */ }
+
       } catch (err) {
         alert("Camera access failed: " + err.message);
-        startBtn.style.display = "inline-block";
+        startBtn.disabled = false;
         stage.style.display = "none";
       }
     }
@@ -144,13 +150,6 @@
         minTrackingConfidence: 0.6
       });
       hands.onResults(onResults);
-
-      camera = new Camera(video, {
-        onFrame: async () => { await hands.send({ image: video }); },
-        width: 1280,
-        height: 720
-      });
-      camera.start();
     }
 
     function onResults(results) {
@@ -159,16 +158,19 @@
       ctx.save();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Mirror the feed for a more natural "selfie" view
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
+      if (MIRROR) {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
       ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
       ctx.restore();
 
       if (results.multiHandLandmarks) {
         ctx.save();
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
+        if (MIRROR) {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
         for (const landmarks of results.multiHandLandmarks) {
           drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: "#38bdf8", lineWidth: 4 });
           drawLandmarks(ctx, landmarks, { color: "#e0f2fe", lineWidth: 2, radius: 4 });
