@@ -91,8 +91,8 @@
     let hands = null;
 
     const CAM_FACING = "environment"; // rear camera
-    const CAM_WIDTH = 1280;
-    const CAM_HEIGHT = 720;
+    const CAM_WIDTH = 640;
+    const CAM_HEIGHT = 480;
     const MIRROR = CAM_FACING === "user";
 
     function resizeCanvas() {
@@ -144,10 +144,10 @@
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
       });
       hands.setOptions({
-        maxNumHands: 2,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.7,
-        minTrackingConfidence: 0.6
+        maxNumHands: 1,
+        modelComplexity: 0, // fastest
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
       });
       hands.onResults(onResults);
     }
@@ -172,11 +172,179 @@
           ctx.scale(-1, 1);
         }
         for (const landmarks of results.multiHandLandmarks) {
-          drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: "#38bdf8", lineWidth: 4 });
-          drawLandmarks(ctx, landmarks, { color: "#e0f2fe", lineWidth: 2, radius: 4 });
+          drawHand(ctx, landmarks);
         }
         ctx.restore();
       }
+    }
+
+    function drawHand(ctx, landmarks) {
+      // Style presets
+      const tipRadius = 7;
+      const jointRadius = 4;
+      const glow = "#7dd3fc";
+
+      // Blue silhouette (inspired by the reference hand)
+      drawSilhouette(ctx, landmarks);
+
+      // Connector stroke with gradient and glow
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 12;
+      ctx.lineWidth = 6;
+
+      // Draw each connection
+      for (const [start, end] of HAND_CONNECTIONS) {
+        const s = landmarks[start];
+        const e = landmarks[end];
+        const gx = canvas.width * (s.x + e.x) * 0.5;
+        const gy = canvas.height * (s.y + e.y) * 0.5;
+        const grad = ctx.createLinearGradient(s.x * canvas.width, s.y * canvas.height, e.x * canvas.width, e.y * canvas.height);
+        grad.addColorStop(0, "#22d3ee");
+        grad.addColorStop(1, "#0ea5e9");
+        ctx.strokeStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(s.x * canvas.width, s.y * canvas.height);
+        ctx.lineTo(e.x * canvas.width, e.y * canvas.height);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Aim line from index finger (Vision Pro–style)
+      drawAimLine(ctx, landmarks);
+
+      // Draw joints
+      for (let i = 0; i < landmarks.length; i++) {
+        const { x, y, z } = landmarks[i];
+        const isTip = [4, 8, 12, 16, 20].includes(i);
+        const r = isTip ? tipRadius : jointRadius;
+        const px = x * canvas.width;
+        const py = y * canvas.height;
+
+        const radial = ctx.createRadialGradient(px, py, 0, px, py, r * 1.3);
+        radial.addColorStop(0, "rgba(255,255,255,0.95)");
+        radial.addColorStop(1, isTip ? "rgba(34,211,238,0.8)" : "rgba(56,189,248,0.7)");
+
+        ctx.save();
+        ctx.shadowColor = glow;
+        ctx.shadowBlur = isTip ? 18 : 8;
+        ctx.fillStyle = radial;
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function drawAimLine(ctx, landmarks) {
+      const base = landmarks[5]; // index mcp
+      const tip = landmarks[8];  // index tip
+      if (!base || !tip) return;
+
+      const bx = base.x * canvas.width;
+      const by = base.y * canvas.height;
+      const tx = tip.x * canvas.width;
+      const ty = tip.y * canvas.height;
+
+      const dx = tx - bx;
+      const dy = ty - by;
+      const len2 = dx * dx + dy * dy;
+      if (len2 < 1e-6) return;
+
+      // Find intersection with canvas bounds
+      const tVals = [];
+      if (dx > 0) tVals.push((canvas.width - bx) / dx);
+      if (dx < 0) tVals.push(-bx / dx);
+      if (dy > 0) tVals.push((canvas.height - by) / dy);
+      if (dy < 0) tVals.push(-by / dy);
+      const t = Math.min(...tVals.filter(v => v > 0));
+      if (!isFinite(t)) return;
+
+      const ex = bx + dx * t;
+      const ey = by + dy * t;
+
+      ctx.save();
+      ctx.lineWidth = 3;
+      ctx.shadowColor = "#38bdf8";
+      ctx.shadowBlur = 18;
+
+      const grad = ctx.createLinearGradient(bx, by, ex, ey);
+      grad.addColorStop(0, "rgba(34,211,238,0.65)");
+      grad.addColorStop(1, "rgba(14,165,233,0.25)");
+      ctx.strokeStyle = grad;
+
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+
+      // End cap / pointer dot
+      const dot = ctx.createRadialGradient(ex, ey, 0, ex, ey, 10);
+      dot.addColorStop(0, "rgba(255,255,255,0.95)");
+      dot.addColorStop(1, "rgba(14,165,233,0.4)");
+      ctx.fillStyle = dot;
+      ctx.beginPath();
+      ctx.arc(ex, ey, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // Simple convex-hull silhouette for a soft, realistic hand mass
+    function drawSilhouette(ctx, landmarks) {
+      if (!landmarks || landmarks.length === 0) return;
+
+      const points = landmarks.map(p => ({ x: p.x * canvas.width, y: p.y * canvas.height }));
+      const hull = convexHull(points);
+      if (hull.length < 3) return;
+
+      const grad = ctx.createRadialGradient(
+        canvas.width * 0.45, canvas.height * 0.45, 10,
+        canvas.width * 0.45, canvas.height * 0.45, Math.max(canvas.width, canvas.height) * 0.6
+      );
+      grad.addColorStop(0, "rgba(56,189,248,0.35)");
+      grad.addColorStop(1, "rgba(14,116,144,0.05)");
+
+      ctx.save();
+      ctx.fillStyle = grad;
+      ctx.shadowColor = "#22d3ee";
+      ctx.shadowBlur = 25;
+
+      ctx.beginPath();
+      ctx.moveTo(hull[0].x, hull[0].y);
+      for (let i = 1; i < hull.length; i++) {
+        ctx.lineTo(hull[i].x, hull[i].y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Monotonic chain convex hull
+    function convexHull(points) {
+      if (points.length <= 3) return points.slice();
+      const pts = points.slice().sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+      const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+      const lower = [];
+      for (const p of pts) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+          lower.pop();
+        }
+        lower.push(p);
+      }
+      const upper = [];
+      for (let i = pts.length - 1; i >= 0; i--) {
+        const p = pts[i];
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+          upper.pop();
+        }
+        upper.push(p);
+      }
+      upper.pop();
+      lower.pop();
+      return lower.concat(upper);
     }
 
     startBtn.addEventListener("click", startExperience);
