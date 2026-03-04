@@ -73,12 +73,13 @@
   <div id="stage">
     <video id="video" playsinline style="display:none;"></video>
     <canvas id="overlay"></canvas>
-    <div id="hint">Raise your hand to see landmarks</div>
+    <div id="hint">Raise your hand for landmarks • Faces show boxes & info</div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/human@3.12.0/dist/human.js"></script>
   <script>
     const startBtn = document.getElementById("start-btn");
     const stage = document.getElementById("stage");
@@ -89,6 +90,10 @@
 
     let camera = null;
     let hands = null;
+    let human = null;
+    let faceDetections = [];
+    let smoothedBoxes = [];
+    let lastHumanResult = null;
 
     const CAM_FACING = "environment"; // rear camera
     const CAM_WIDTH = 640;
@@ -128,6 +133,7 @@
         stage.style.display = "flex";
         startBtn.style.display = "none";
         hint.classList.add("show");
+        await initHuman();
         resizeCanvas();
 
         try { await enterFullscreen(); } catch (_) { /* fullscreen may be declined */ }
@@ -152,6 +158,65 @@
       hands.onResults(onResults);
     }
 
+    async function initHuman() {
+      human = new Human({
+        modelBasePath: "https://cdn.jsdelivr.net/npm/@vladmandic/human@3.12.0/models",
+        backend: "webgl",
+        filter: { enabled: true },
+        face: {
+          enabled: true,
+          detector: { rotation: true, maxDetected: 3 },
+          mesh: { enabled: false },
+          iris: { enabled: false },
+          attention: { enabled: false },
+          emotion: { enabled: true },
+          description: { enabled: true },
+          antispoof: { enabled: true },
+          liveness: { enabled: true }
+        },
+        body: { enabled: false },
+        hand: { enabled: false },
+        gesture: { enabled: false },
+        segmentation: { enabled: false }
+      });
+      await human.load();
+      await human.warmup();
+      detectFacesLoop();
+    }
+
+    async function detectFacesLoop() {
+      if (!human || !video.videoWidth) {
+        requestAnimationFrame(detectFacesLoop);
+        return;
+      }
+      try {
+        const res = await human.detect(video);
+        lastHumanResult = res;
+        faceDetections = res?.face || [];
+        smoothFaceBoxes();
+      } catch (_) {
+        // ignore detection errors to keep loop alive
+      }
+      requestAnimationFrame(detectFacesLoop);
+    }
+
+    function smoothFaceBoxes() {
+      const alpha = 0.25; // smoothing factor
+      smoothedBoxes.length = faceDetections.length;
+      for (let i = 0; i < faceDetections.length; i++) {
+        const box = faceDetections[i].box;
+        if (!box) continue;
+        const prev = smoothedBoxes[i] || { x: box[0], y: box[1], w: box[2], h: box[3] };
+        const next = {
+          x: prev.x + (box[0] - prev.x) * alpha,
+          y: prev.y + (box[1] - prev.y) * alpha,
+          w: prev.w + (box[2] - prev.w) * alpha,
+          h: prev.h + (box[3] - prev.h) * alpha,
+        };
+        smoothedBoxes[i] = next;
+      }
+    }
+
     function onResults(results) {
       if (!canvas.width || !canvas.height) resizeCanvas();
 
@@ -174,6 +239,7 @@
         for (const landmarks of results.multiHandLandmarks) {
           drawHand(ctx, landmarks);
         }
+        drawFaces(ctx);
         ctx.restore();
       }
     }
@@ -320,6 +386,83 @@
       ctx.closePath();
       ctx.fill();
       ctx.restore();
+    }
+
+    function drawFaces(ctx) {
+      if (!faceDetections || !faceDetections.length) return;
+      ctx.save();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(14,165,233,0.8)";
+      ctx.fillStyle = "rgba(14,165,233,0.18)";
+      ctx.font = "16px Segoe UI";
+      ctx.textBaseline = "top";
+      for (let i = 0; i < faceDetections.length; i++) {
+        const face = faceDetections[i];
+        const smooth = smoothedBoxes[i];
+        const box = smooth || face.box;
+        if (!box) continue;
+        const x = box.x ?? box[0];
+        const y = box.y ?? box[1];
+        const w = box.w ?? box[2];
+        const h = box.h ?? box[3];
+        const cx = x + w * 0.5;
+        const cy = y + h * 0.5;
+        ctx.beginPath();
+        ctx.rect(x, y, w, h);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#e0f2fe";
+        const emotion = face.emotion?.[0]?.emotion;
+        const emoScore = face.emotion?.[0]?.score;
+        const gender = face.gender;
+        const age = face.age ? Math.round(face.age) : undefined;
+        const label = [
+          `face ${(face.score?.toFixed?.(2) || "")}`,
+          gender ? `gender:${gender} ${(face.genderScore?.toFixed?.(2) || "")}` : null,
+          age ? `age:${age}` : null,
+          emotion ? `${emotion}:${emoScore?.toFixed?.(2)}` : null,
+        ].filter(Boolean).join(" | ");
+        ctx.fillText(label, x + 6, y + 6);
+        ctx.fillStyle = "rgba(14,165,233,0.18)";
+
+        // Orientation lines (yaw, pitch, roll) in orange
+        const rot = face.rotation || {};
+        const len = Math.min(w, h) * 0.35;
+        ctx.strokeStyle = "#f97316";
+        ctx.lineWidth = 3;
+        ctx.beginPath(); // yaw (left/right)
+        const yawX = cx + Math.sin(rot.yaw || 0) * len;
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(yawX, cy);
+        ctx.stroke();
+
+        ctx.beginPath(); // pitch (up/down)
+        const pitchY = cy - Math.sin(rot.pitch || 0) * len;
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx, pitchY);
+        ctx.stroke();
+
+        ctx.beginPath(); // roll (tilt)
+        const roll = rot.roll || 0;
+        const rx = Math.cos(roll) * len * 0.6;
+        const ry = Math.sin(roll) * len * 0.6;
+        ctx.moveTo(cx - rx, cy - ry);
+        ctx.lineTo(cx + rx, cy + ry);
+        ctx.stroke();
+
+        ctx.fillStyle = "#f97316";
+        ctx.fillText(
+          `yaw:${deg(rot.yaw)} pitch:${deg(rot.pitch)} roll:${deg(rot.roll)}`,
+          x + 6,
+          y + 26
+        );
+      }
+      ctx.restore();
+    }
+
+    function deg(rad) {
+      if (rad === undefined || rad === null) return "--";
+      return (rad * 57.2958).toFixed(0);
     }
 
     // Monotonic chain convex hull
