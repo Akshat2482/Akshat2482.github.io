@@ -73,7 +73,7 @@
   <div id="stage">
     <video id="video" playsinline style="display:none;"></video>
     <canvas id="overlay"></canvas>
-    <div id="hint">Raise your hand for landmarks • Faces show boxes & info</div>
+    <div id="hint">Raise your hand for landmarks - Faces show boxes & info</div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
@@ -159,6 +159,11 @@
     }
 
     async function initHuman() {
+      // Fallback if the UMD global didn't load (some browsers block window globals)
+      if (typeof Human === "undefined") {
+        const mod = await import("https://cdn.jsdelivr.net/npm/@vladmandic/human@3.12.0/dist/human.esm.js");
+        window.Human = mod.Human || mod.default;
+      }
       human = new Human({
         modelBasePath: "https://cdn.jsdelivr.net/npm/@vladmandic/human@3.12.0/models",
         backend: "webgl",
