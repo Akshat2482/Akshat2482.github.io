@@ -1,502 +1,1258 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hand Tracking</title>
-  <style>
-    :root {
-      --bg: radial-gradient(circle at 20% 20%, #1f2937, #0f172a 45%, #020617);
-      --accent: #38bdf8;
-      --text: #e5e7eb;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      background: var(--bg);
-      color: var(--text);
-      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-      overflow: hidden;
-    }
-    #start-btn {
-      padding: 1rem 2.6rem;
-      border: none;
-      border-radius: 999px;
-      font-size: 1.25rem;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      color: #0f172a;
-      background: linear-gradient(120deg, #a5f3fc, #38bdf8 40%, #0ea5e9);
-      box-shadow: 0 18px 45px rgba(14, 165, 233, 0.35);
-      cursor: pointer;
-      transition: transform 140ms ease, box-shadow 140ms ease;
-    }
-    #start-btn:hover { transform: translateY(-2px); }
-    #start-btn:active { transform: translateY(1px); box-shadow: 0 10px 28px rgba(14,165,233,0.45); }
-    #stage {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      display: none;
-      align-items: center;
-      justify-content: center;
-    }
-    video, canvas {
-      position: absolute;
-      max-width: 100vw;
-      max-height: 100vh;
-    }
-    #hint {
-      position: absolute;
-      top: 18px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 6px 14px;
-      border-radius: 999px;
-      background: rgba(15, 23, 42, 0.65);
-      color: var(--text);
-      font-size: 0.95rem;
-      letter-spacing: 0.02em;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 300ms ease;
-    }
-    #hint.show { opacity: 1; }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AKSHAT INDUSTRIES — AKSHAT COMMAND CENTER</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{--c:#00d4ff;--cr:#ff3d3d;--cg:#00ff88;--cy:#ffb700;--bg:rgba(0,10,22,.92);--border:rgba(0,212,255,.2);}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Orbitron',sans-serif;color:var(--c);}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,212,255,.016) 2px,rgba(0,212,255,.016) 4px);pointer-events:none;z-index:9000;}
+.scan-beam{position:fixed;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(0,212,255,.3),transparent);animation:scanBeam 8s linear infinite;z-index:8999;pointer-events:none;}
+@keyframes scanBeam{0%{top:-2px;opacity:0}5%{opacity:1}95%{opacity:1}100%{top:100vh;opacity:0}}
+.corner{position:fixed;width:50px;height:50px;pointer-events:none;z-index:8998;}
+.corner::before,.corner::after{content:'';position:absolute;background:var(--c);box-shadow:0 0 6px var(--c);}
+.corner::before{width:100%;height:2px;}.corner::after{width:2px;height:100%;}
+.corner.tl{top:12px;left:12px;}.corner.tr{top:12px;right:12px;transform:scaleX(-1);}
+.corner.bl{bottom:12px;left:12px;transform:scaleY(-1);}.corner.br{bottom:12px;right:12px;transform:scale(-1);}
+
+/* ══ SETUP MODAL ══ */
+#setup-modal{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:10000;display:flex;align-items:center;justify-content:center;}
+#setup-modal.hidden{display:none;}
+.modal-box{background:rgba(0,10,22,.99);border:1px solid var(--c);border-radius:4px;padding:34px 38px;width:520px;box-shadow:0 0 50px rgba(0,212,255,.18);}
+.modal-logo{font-size:16px;font-weight:900;letter-spacing:.28em;color:#fff;text-shadow:0 0 20px var(--c);margin-bottom:4px;}
+.modal-logo span{color:var(--cr);text-shadow:0 0 16px var(--cr);}
+.modal-sub{font-size:8px;letter-spacing:.22em;color:rgba(0,212,255,.45);margin-bottom:22px;}
+.modal-section{background:rgba(0,212,255,.03);border:1px solid rgba(0,212,255,.12);border-radius:3px;padding:14px 16px;margin-bottom:12px;}
+.modal-section-title{font-size:8px;font-weight:700;letter-spacing:.25em;color:rgba(0,212,255,.55);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.modal-section-title span{color:var(--c);}
+.modal-row{margin-bottom:10px;}
+.modal-row:last-child{margin-bottom:0;}
+.modal-label{font-size:7.5px;letter-spacing:.18em;color:rgba(0,212,255,.5);margin-bottom:5px;}
+.modal-sublabel{font-size:7px;letter-spacing:.1em;color:rgba(0,212,255,.3);margin-bottom:5px;}
+.modal-input{width:100%;background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.18);color:#fff;font-family:'Share Tech Mono',monospace;font-size:11px;padding:9px 12px;border-radius:3px;outline:none;letter-spacing:.06em;}
+.modal-input:focus{border-color:var(--c);box-shadow:0 0 10px rgba(0,212,255,.18);}
+.modal-input::placeholder{color:rgba(0,212,255,.25);}
+.modal-btn{margin-top:4px;width:100%;background:rgba(0,212,255,.13);border:1px solid var(--c);color:var(--c);font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:.28em;padding:11px;border-radius:3px;cursor:pointer;transition:.2s;box-shadow:0 0 18px rgba(0,212,255,.08);}
+.modal-btn:hover{background:rgba(0,212,255,.24);box-shadow:0 0 26px rgba(0,212,255,.2);}
+.modal-skip{margin-top:8px;width:100%;background:transparent;border:1px solid rgba(0,212,255,.15);color:rgba(0,212,255,.38);font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:.2em;padding:8px;border-radius:3px;cursor:pointer;transition:.2s;}
+.modal-skip:hover{border-color:rgba(0,212,255,.3);color:rgba(0,212,255,.55);}
+.modal-links{display:flex;gap:16px;margin-top:10px;justify-content:center;}
+.modal-link{font-size:7.5px;letter-spacing:.12em;color:rgba(0,212,255,.4);text-decoration:none;}
+.modal-link:hover{color:var(--c);}
+.modal-opt-badge{font-size:7px;letter-spacing:.1em;padding:1px 6px;border-radius:2px;background:rgba(255,183,0,.08);color:var(--cy);border:1px solid rgba(255,183,0,.2);margin-left:6px;}
+.modal-req-badge{font-size:7px;letter-spacing:.1em;padding:1px 6px;border-radius:2px;background:rgba(0,255,136,.08);color:var(--cg);border:1px solid rgba(0,255,136,.2);margin-left:6px;}
+
+/* ══ BOOT ══ */
+#boot{position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .8s ease;}
+#boot.fade{opacity:0;pointer-events:none;}
+.boot-logo{font-size:26px;font-weight:900;letter-spacing:.3em;color:#fff;text-shadow:0 0 30px var(--c),0 0 60px var(--c);}
+.boot-logo span{color:var(--cr);text-shadow:0 0 20px var(--cr);}
+.boot-lines{font-size:10px;letter-spacing:.22em;color:rgba(0,212,255,.65);font-family:'Share Tech Mono',monospace;text-align:center;min-height:20px;}
+.boot-bar-wrap{width:280px;height:2px;background:rgba(0,212,255,.12);border-radius:2px;overflow:hidden;}
+.boot-bar-fill{height:100%;width:0;background:var(--c);box-shadow:0 0 10px var(--c);transition:width .04s linear;}
+.boot-pct{font-size:10px;letter-spacing:.2em;color:rgba(0,212,255,.5);font-family:'Share Tech Mono',monospace;}
+
+/* ══ MAIN GRID ══ */
+#hud{width:100vw;height:100vh;display:grid;grid-template-columns:252px 1fr 268px;grid-template-rows:52px 26px 1fr 80px;gap:8px;padding:14px;opacity:0;transition:opacity .8s ease;background:radial-gradient(ellipse at 50% 40%,#010c1a 0%,#000 75%);}
+#hud.visible{opacity:1;}
+
+/* ══ PANEL ══ */
+.panel{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:11px 13px;position:relative;backdrop-filter:blur(3px);box-shadow:0 0 16px rgba(0,212,255,.05),inset 0 0 16px rgba(0,212,255,.02);}
+.panel::before{content:'';position:absolute;top:-1px;left:16px;width:32px;height:2px;background:var(--c);box-shadow:0 0 6px var(--c);}
+.pt{font-size:7.5px;font-weight:700;letter-spacing:.28em;color:rgba(0,212,255,.5);text-transform:uppercase;margin-bottom:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* ══ HEADER ══ */
+.hdr{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 4px;}
+.hdr.panel::before{display:none;}
+.logo{font-size:16px;font-weight:900;letter-spacing:.22em;color:#fff;text-shadow:0 0 18px var(--c);animation:glitch 10s infinite;}
+.logo span{color:var(--cr);text-shadow:0 0 14px var(--cr);}
+@keyframes glitch{0%,95%,100%{opacity:1;transform:none}96%{opacity:.7;transform:translate(-1px,0)}97%{opacity:.9;transform:translate(1px,0)}98%{opacity:.8;transform:translate(0,-1px)}}
+.hdr-right{display:flex;gap:18px;align-items:center;}
+.hstat{font-size:8.5px;letter-spacing:.1em;color:rgba(0,212,255,.65);display:flex;align-items:center;gap:5px;}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--cg);box-shadow:0 0 6px var(--cg);animation:blink 2s ease-in-out infinite;}
+.dot.y{background:var(--cy);box-shadow:0 0 6px var(--cy);}
+.dot.r{background:var(--cr);box-shadow:0 0 6px var(--cr);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+#hdr-clock{font-family:'Share Tech Mono',monospace;font-size:13px;color:#fff;letter-spacing:.06em;text-shadow:0 0 10px var(--c);}
+
+/* ══ STOCK STRIP ══ */
+.stock-strip{grid-column:1/-1;overflow:hidden;display:flex;align-items:center;}
+.stock-strip.panel::before{display:none;}
+.sstrip-inner{display:flex;gap:0;animation:stripScroll 70s linear infinite;white-space:nowrap;}
+@keyframes stripScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.sstock{display:inline-flex;align-items:center;gap:8px;padding:3px 16px;border-right:1px solid rgba(0,212,255,.1);}
+.sstock-sym{font-size:8.5px;font-weight:700;letter-spacing:.12em;color:#fff;}
+.sstock-price{font-size:9.5px;font-family:'Share Tech Mono',monospace;color:#fff;}
+.sstock-chg{font-size:8px;font-family:'Share Tech Mono',monospace;}
+.pos{color:var(--cg)}.neg{color:var(--cr)}
+
+/* ══ LEFT COL ══ */
+.left-col{display:flex;flex-direction:column;gap:8px;grid-row:3;overflow:hidden;}
+
+/* ARC REACTOR */
+.arc-wrap{display:flex;flex-direction:column;align-items:center;padding:6px 0 2px;}
+.arc-outer{position:relative;width:106px;height:106px;}
+.arc-outer svg{position:absolute;inset:0;}
+.spin{animation:spin 16s linear infinite;}
+.spinr{animation:spin 9s linear infinite reverse;}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.arc-glow{position:absolute;inset:18px;border-radius:50%;background:radial-gradient(circle,rgba(0,212,255,.2) 0%,transparent 70%);animation:arcP 2.5s ease-in-out infinite;}
+@keyframes arcP{0%,100%{opacity:.5}50%{opacity:1}}
+.arc-core{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.arc-pct{font-size:21px;font-weight:900;color:#fff;text-shadow:0 0 12px var(--c);line-height:1;}
+.arc-lbl{font-size:7px;letter-spacing:.22em;color:rgba(0,212,255,.5);margin-top:2px;}
+
+/* SYS BARS */
+.sys-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
+.slbl{font-size:7.5px;letter-spacing:.07em;color:rgba(0,212,255,.6);width:68px;flex-shrink:0;}
+.sbar{flex:1;height:3px;background:rgba(0,212,255,.08);border-radius:2px;overflow:hidden;}
+.sfill{height:100%;border-radius:2px;position:relative;transition:width 2s ease;}
+.sfill::after{content:'';position:absolute;right:0;top:-2px;width:3px;height:7px;background:inherit;filter:brightness(2.5);}
+.sval{font-size:8px;color:#fff;width:26px;text-align:right;font-family:'Share Tech Mono',monospace;}
+
+/* CLOCK */
+.clk{font-size:28px;font-weight:900;color:#fff;font-family:'Share Tech Mono',monospace;text-shadow:0 0 14px var(--c);letter-spacing:.05em;line-height:1;}
+.clk-date{font-size:8px;letter-spacing:.2em;color:rgba(0,212,255,.45);margin-top:3px;}
+.uptime-row{display:flex;justify-content:space-between;margin-top:7px;padding-top:7px;border-top:1px solid rgba(0,212,255,.1);}
+.uptime-lbl{font-size:7px;letter-spacing:.15em;color:rgba(0,212,255,.4);}
+.uptime-val{font-size:8.5px;font-family:'Share Tech Mono',monospace;color:var(--cg);}
+
+/* ══ CENTER COL ══ */
+.center-col{display:flex;flex-direction:column;gap:8px;grid-row:3;overflow:hidden;}
+.flight-panel{flex:1.3;display:flex;flex-direction:column;min-height:0;}
+#flight-map{width:100%;flex:1;border-radius:2px;position:relative;}
+#flight-map .leaflet-container{background:#010a14!important;}
+.flight-overlay{position:absolute;top:6px;right:6px;z-index:1000;display:flex;flex-direction:column;gap:4px;pointer-events:none;}
+.flight-badge{background:rgba(0,10,22,.88);border:1px solid rgba(0,212,255,.25);border-radius:2px;padding:3px 7px;font-size:7px;letter-spacing:.14em;color:rgba(0,212,255,.7);font-family:'Share Tech Mono',monospace;}
+.flight-badge span{color:#fff;font-weight:700;}
+.energy-panel{flex:.65;display:flex;flex-direction:column;min-height:0;}
+#energyGraph{width:100%;flex:1;display:block;}
+.markets-panel{flex:.95;display:flex;flex-direction:column;min-height:0;}
+.markets-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;flex:1;overflow:hidden;}
+.mcard{background:rgba(0,212,255,.03);border:1px solid rgba(0,212,255,.1);border-radius:3px;padding:6px 8px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;}
+.mcard-sym{font-size:7.5px;font-weight:700;letter-spacing:.1em;color:rgba(0,212,255,.7);}
+.mcard-price{font-size:11px;font-weight:700;color:#fff;font-family:'Share Tech Mono',monospace;line-height:1.3;}
+.mcard-chg{font-size:7.5px;font-family:'Share Tech Mono',monospace;}
+.mcard canvas{margin-top:3px;width:100%;height:24px;display:block;}
+.mcard-sig{font-size:6.5px;letter-spacing:.1em;margin-top:2px;}
+
+/* ══ RIGHT COL ══ */
+.right-col{display:flex;flex-direction:column;gap:8px;grid-row:3;overflow:hidden;}
+
+/* JARVIS CHAT */
+.jarvis-panel{flex:1.1;display:flex;flex-direction:column;min-height:0;}
+.chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:3px;margin-bottom:7px;scrollbar-width:thin;scrollbar-color:rgba(0,212,255,.2) transparent;}
+.chat-messages::-webkit-scrollbar{width:3px;}
+.chat-messages::-webkit-scrollbar-thumb{background:rgba(0,212,255,.2);border-radius:2px;}
+.msg{font-size:8.5px;font-family:'Share Tech Mono',monospace;line-height:1.65;padding:6px 9px;border-radius:3px;}
+.msg.jarvis{background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.12);color:rgba(0,212,255,.85);}
+.msg.jarvis::before{content:'JARVIS ▶ ';color:var(--c);font-weight:700;}
+.msg.user{background:rgba(255,61,61,.05);border:1px solid rgba(255,61,61,.14);color:rgba(255,200,200,.8);text-align:right;}
+.msg.user::after{content:' ◀ AKSHAT';color:var(--cr);font-weight:700;}
+.msg.thinking{color:rgba(0,212,255,.4);font-style:italic;border:1px solid rgba(0,212,255,.08);padding:5px 9px;font-size:8px;}
+.chat-input-row{display:flex;gap:5px;align-items:center;flex-shrink:0;}
+.chat-input{flex:1;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.18);color:#fff;font-family:'Share Tech Mono',monospace;font-size:9px;padding:7px 9px;border-radius:3px;outline:none;}
+.chat-input:focus{border-color:var(--c);box-shadow:0 0 8px rgba(0,212,255,.15);}
+.chat-send{background:rgba(0,212,255,.1);border:1px solid var(--c);color:var(--c);font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:.15em;padding:7px 9px;border-radius:3px;cursor:pointer;flex-shrink:0;transition:.2s;}
+.chat-send:hover{background:rgba(0,212,255,.22);}
+.chat-send:disabled{opacity:.3;cursor:not-allowed;}
+
+/* WEATHER */
+.w-big{font-size:34px;font-weight:900;color:#fff;text-shadow:0 0 20px var(--c);line-height:1;}
+.w-desc{font-size:7.5px;letter-spacing:.16em;color:rgba(0,212,255,.55);margin-top:3px;text-transform:uppercase;}
+.w-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:7px;}
+.wstat{background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.1);padding:5px 7px;border-radius:2px;}
+.wsl{font-size:6.5px;letter-spacing:.15em;color:rgba(0,212,255,.45);text-transform:uppercase;}
+.wsv{font-size:11px;font-weight:700;color:#fff;font-family:'Share Tech Mono',monospace;margin-top:1px;}
+
+/* TARGETS */
+.trow{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid rgba(0,212,255,.07);}
+.trow:last-child{border-bottom:none;}
+.tico{width:24px;height:24px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
+.tname{font-size:8px;font-weight:700;letter-spacing:.1em;color:#fff;}
+.tstatus{font-size:7px;color:rgba(0,212,255,.45);margin-top:1px;}
+.tbadge{margin-left:auto;font-size:6.5px;letter-spacing:.1em;padding:2px 5px;border-radius:2px;flex-shrink:0;}
+.bg{background:rgba(0,255,136,.07);color:var(--cg);border:1px solid rgba(0,255,136,.25);}
+.by{background:rgba(255,183,0,.07);color:var(--cy);border:1px solid rgba(255,183,0,.25);}
+.br{background:rgba(255,61,61,.07);color:var(--cr);border:1px solid rgba(255,61,61,.25);}
+
+/* THREAT */
+.thrt-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
+.thrt-lbl{font-size:7px;letter-spacing:.08em;color:rgba(0,212,255,.6);width:50px;}
+.thrt-bar{flex:1;height:4px;background:rgba(0,212,255,.07);border-radius:1px;overflow:hidden;}
+.thrt-fill{height:100%;border-radius:1px;}
+.thrt-val{font-size:7.5px;font-family:'Share Tech Mono',monospace;color:#fff;width:22px;text-align:right;}
+
+/* ══ STOCK ANALYSIS PANEL ══ */
+.stock-analysis-panel{flex-shrink:0;}
+.sa-input-row{display:flex;gap:5px;margin-bottom:8px;}
+.sa-input{flex:1;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.18);color:#fff;font-family:'Share Tech Mono',monospace;font-size:10px;padding:6px 9px;border-radius:3px;outline:none;text-transform:uppercase;letter-spacing:.12em;}
+.sa-input:focus{border-color:var(--c);}
+.sa-input::placeholder{color:rgba(0,212,255,.25);font-size:8px;letter-spacing:.1em;text-transform:none;}
+.sa-btn{background:rgba(0,212,255,.1);border:1px solid var(--c);color:var(--c);font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:.14em;padding:6px 10px;border-radius:3px;cursor:pointer;white-space:nowrap;}
+.sa-btn:hover{background:rgba(0,212,255,.2);}
+.sa-result{display:none;}
+.sa-result.visible{display:block;}
+.sa-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+.sa-sym{font-size:13px;font-weight:900;color:#fff;letter-spacing:.1em;}
+.sa-name{font-size:7px;color:rgba(0,212,255,.5);letter-spacing:.1em;margin-top:1px;}
+.sa-price-big{font-size:20px;font-weight:900;color:#fff;font-family:'Share Tech Mono',monospace;text-shadow:0 0 10px var(--c);}
+.sa-chg{font-size:9px;font-family:'Share Tech Mono',monospace;margin-top:1px;}
+.sa-chart-wrap{position:relative;height:54px;margin:6px 0;}
+#sa-chart{width:100%;height:100%;display:block;}
+.sa-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;}
+.sa-stat{background:rgba(0,212,255,.03);border:1px solid rgba(0,212,255,.1);padding:4px 6px;border-radius:2px;}
+.sa-stat-l{font-size:6.5px;letter-spacing:.14em;color:rgba(0,212,255,.45);text-transform:uppercase;}
+.sa-stat-v{font-size:9.5px;font-weight:700;color:#fff;font-family:'Share Tech Mono',monospace;margin-top:1px;}
+.sa-signal{margin-top:6px;padding:5px 8px;border-radius:2px;font-size:7.5px;letter-spacing:.12em;text-align:center;font-weight:700;}
+.sa-signal.bull{background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.25);color:var(--cg);}
+.sa-signal.bear{background:rgba(255,61,61,.07);border:1px solid rgba(255,61,61,.25);color:var(--cr);}
+.sa-signal.neut{background:rgba(255,183,0,.07);border:1px solid rgba(255,183,0,.25);color:var(--cy);}
+.sa-loading{font-size:8px;letter-spacing:.15em;color:rgba(0,212,255,.5);text-align:center;padding:12px 0;font-family:'Share Tech Mono',monospace;}
+
+/* ══ SEARCH PANEL ══ */
+.search-panel{flex:1;display:flex;flex-direction:column;min-height:0;}
+.search-input-row{display:flex;gap:5px;margin-bottom:7px;flex-shrink:0;}
+.search-input{flex:1;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.18);color:#fff;font-family:'Share Tech Mono',monospace;font-size:9px;padding:7px 9px;border-radius:3px;outline:none;}
+.search-input:focus{border-color:var(--c);}
+.search-input::placeholder{color:rgba(0,212,255,.25);}
+.search-btn{background:rgba(0,212,255,.1);border:1px solid var(--c);color:var(--c);font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:.14em;padding:7px 10px;border-radius:3px;cursor:pointer;white-space:nowrap;}
+.search-btn:hover{background:rgba(0,212,255,.2);}
+.search-results{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,212,255,.15) transparent;}
+.search-results::-webkit-scrollbar{width:3px;}
+.search-results::-webkit-scrollbar-thumb{background:rgba(0,212,255,.15);}
+.search-result-item{padding:7px 0;border-bottom:1px solid rgba(0,212,255,.07);}
+.search-result-item:last-child{border-bottom:none;}
+.sri-title{font-size:8.5px;font-weight:700;color:var(--c);letter-spacing:.07em;line-height:1.4;margin-bottom:2px;}
+.sri-snippet{font-size:7.5px;color:rgba(0,212,255,.55);font-family:'Share Tech Mono',monospace;line-height:1.6;}
+.sri-source{font-size:7px;color:rgba(0,212,255,.3);letter-spacing:.1em;margin-top:2px;}
+.search-placeholder{font-size:8px;letter-spacing:.15em;color:rgba(0,212,255,.3);text-align:center;padding:16px 0;font-family:'Share Tech Mono',monospace;line-height:2;}
+.search-loading{font-size:8px;letter-spacing:.15em;color:rgba(0,212,255,.5);text-align:center;padding:12px 0;font-family:'Share Tech Mono',monospace;}
+
+/* INTEL TICKER */
+.intel-ticker-wrap{overflow:hidden;padding:4px 0;}
+.intel-ticker-inner{display:flex;gap:44px;animation:tickScroll 55s linear infinite;white-space:nowrap;}
+@keyframes tickScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.iitem{font-size:8px;letter-spacing:.07em;color:rgba(0,212,255,.7);font-family:'Share Tech Mono',monospace;display:flex;align-items:center;gap:7px;}
+.isep{color:var(--cr);font-size:11px;}
+
+/* BOTTOM BAR */
+.bottom-bar{grid-column:1/-1;display:flex;gap:8px;}
+.bstat{flex:1;display:flex;align-items:center;gap:10px;}
+.bstat.panel::before{display:none;}
+.bicon{font-size:19px;flex-shrink:0;}
+.blbl{font-size:7px;letter-spacing:.17em;color:rgba(0,212,255,.45);text-transform:uppercase;}
+.bval{font-size:15px;font-weight:700;color:#fff;font-family:'Share Tech Mono',monospace;line-height:1.2;}
+</style>
 </head>
 <body>
-  <button id="start-btn">START</button>
 
-  <div id="stage">
-    <video id="video" playsinline style="display:none;"></video>
-    <canvas id="overlay"></canvas>
-    <div id="hint">Raise your hand for landmarks - Faces show boxes & info</div>
+<!-- ══ SETUP MODAL ══ -->
+<div id="setup-modal">
+  <div class="modal-box">
+    <div class="modal-logo">AKSHAT <span>INDUSTRIES</span></div>
+    <div class="modal-sub">AKSHAT COMMAND CENTER — SYSTEM INITIALIZATION</div>
+
+    <div class="modal-section">
+      <div class="modal-section-title"><span>01</span> J.A.R.V.I.S. AI CORE <span class="modal-opt-badge">OPTIONAL</span></div>
+      <div class="modal-row">
+        <div class="modal-label">ANTHROPIC API KEY</div>
+        <div class="modal-sublabel">console.anthropic.com → Get API Key</div>
+        <input class="modal-input" id="key-anthropic" type="password" placeholder="sk-ant-api03-..."/>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-title"><span>02</span> MARKET INTELLIGENCE <span class="modal-req-badge">RECOMMENDED</span></div>
+      <div class="modal-row">
+        <div class="modal-label">FINNHUB API KEY</div>
+        <div class="modal-sublabel">finnhub.io → Free account → Dashboard</div>
+        <input class="modal-input" id="key-finnhub" type="password" placeholder="d1abc123xyz..."/>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-title"><span>03</span> INTEL SEARCH <span class="modal-opt-badge">OPTIONAL</span></div>
+      <div class="modal-row">
+        <div class="modal-label">SERPAPI KEY</div>
+        <div class="modal-sublabel">serpapi.com → Free 100 searches/month</div>
+        <input class="modal-input" id="key-serpapi" type="password" placeholder="abc123def456..."/>
+      </div>
+    </div>
+
+    <button class="modal-btn" onclick="saveKeys()">⚡ INITIALIZE COMMAND CENTER</button>
+    <button class="modal-skip" onclick="skipKeys()">LAUNCH WITHOUT API KEYS (LIMITED MODE)</button>
+    <div class="modal-links">
+      <a class="modal-link" href="https://console.anthropic.com" target="_blank">→ ANTHROPIC CONSOLE</a>
+      <a class="modal-link" href="https://finnhub.io" target="_blank">→ FINNHUB</a>
+      <a class="modal-link" href="https://serpapi.com" target="_blank">→ SERPAPI</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BOOT ══ -->
+<div id="boot">
+  <div class="boot-logo">AKSHAT <span>INDUSTRIES</span></div>
+  <div class="boot-lines" id="boot-lines">INITIALIZING...</div>
+  <div class="boot-bar-wrap"><div class="boot-bar-fill" id="boot-fill"></div></div>
+  <div class="boot-pct" id="boot-pct">0%</div>
+</div>
+
+<div class="scan-beam"></div>
+<div class="corner tl"></div><div class="corner tr"></div>
+<div class="corner bl"></div><div class="corner br"></div>
+
+<!-- ══════════ MAIN HUD ══════════ -->
+<div id="hud">
+
+  <!-- HEADER -->
+  <div class="panel hdr">
+    <div class="logo">AKSHAT <span>INDUSTRIES</span> · AKSHAT COMMAND CENTER</div>
+    <div class="hdr-right">
+      <div class="hstat"><div class="dot"></div>SYSTEMS OK</div>
+      <div class="hstat"><div class="dot y"></div>SHIELDS 84%</div>
+      <div class="hstat"><div class="dot r" style="animation-duration:.6s"></div>THREAT: HIGH</div>
+      <div id="hdr-clock" class="hstat">--:--:--</div>
+    </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/human@3.12.0/dist/human.js"></script>
-  <script>
-    const startBtn = document.getElementById("start-btn");
-    const stage = document.getElementById("stage");
-    const video = document.getElementById("video");
-    const canvas = document.getElementById("overlay");
-    const ctx = canvas.getContext("2d");
-    const hint = document.getElementById("hint");
+  <!-- STOCK TICKER STRIP -->
+  <div class="panel stock-strip" style="padding:0 10px;">
+    <div class="sstrip-inner" id="stock-strip-inner">
+      <div class="sstock"><span class="sstock-sym">LOADING MARKET DATA</span></div>
+    </div>
+  </div>
 
-    let camera = null;
-    let hands = null;
-    let human = null;
-    let faceDetections = [];
-    let smoothedBoxes = [];
-    let lastHumanResult = null;
+  <!-- ══ LEFT COL ══ -->
+  <div class="left-col">
 
-    const CAM_FACING = "environment"; // rear camera
-    const CAM_WIDTH = 640;
-    const CAM_HEIGHT = 480;
-    const MIRROR = CAM_FACING === "user";
+    <!-- Arc Reactor -->
+    <div class="panel" style="flex-shrink:0;">
+      <div class="pt">ARC REACTOR — MARK XVIII</div>
+      <div class="arc-wrap">
+        <div class="arc-outer">
+          <div class="arc-glow"></div>
+          <svg class="spin" viewBox="0 0 106 106" fill="none"><circle cx="53" cy="53" r="50" stroke="rgba(0,212,255,.12)" stroke-width="1"/><circle cx="53" cy="53" r="50" stroke="#00d4ff" stroke-width="1.5" stroke-dasharray="7 5" opacity=".65"/></svg>
+          <svg class="spinr" viewBox="0 0 106 106" fill="none"><circle cx="53" cy="53" r="43" stroke="#00d4ff" stroke-width="1" stroke-dasharray="4 8" opacity=".4"/><circle cx="53" cy="53" r="37" stroke="rgba(0,212,255,.2)" stroke-width="1.5"/></svg>
+          <svg viewBox="0 0 106 106" fill="none" style="position:absolute;inset:0;">
+            <circle cx="53" cy="53" r="27" stroke="#00d4ff" stroke-width="1.5" opacity=".5"/>
+            <circle cx="53" cy="53" r="17" fill="rgba(0,212,255,.08)" stroke="#00d4ff" stroke-width="1"/>
+            <circle cx="53" cy="53" r="7" fill="rgba(0,212,255,.25)" stroke="#00d4ff" stroke-width="1"/>
+            <line x1="53" y1="26" x2="53" y2="36" stroke="#00d4ff" stroke-width="1" opacity=".6"/>
+            <line x1="53" y1="70" x2="53" y2="80" stroke="#00d4ff" stroke-width="1" opacity=".6"/>
+            <line x1="26" y1="53" x2="36" y2="53" stroke="#00d4ff" stroke-width="1" opacity=".6"/>
+            <line x1="70" y1="53" x2="80" y2="53" stroke="#00d4ff" stroke-width="1" opacity=".6"/>
+          </svg>
+          <div class="arc-core"><div class="arc-pct" id="arc-pct">94%</div><div class="arc-lbl">POWER</div></div>
+        </div>
+      </div>
+    </div>
 
-    function resizeCanvas() {
-      const { videoWidth: w, videoHeight: h } = video;
-      if (!w || !h) return;
-      canvas.width = w;
-      canvas.height = h;
-      canvas.style.width = "100vw";
-      canvas.style.height = `${(h / w) * 100}vw`;
+    <!-- System Diagnostics -->
+    <div class="panel" style="flex-shrink:0;">
+      <div class="pt">SYSTEM DIAGNOSTICS</div>
+      <div class="sys-row"><div class="slbl">REPULSOR L</div><div class="sbar"><div class="sfill" id="sf-rl" style="width:92%;background:linear-gradient(90deg,#00d4ff,#0088ff)"></div></div><div class="sval" id="sv-rl">92%</div></div>
+      <div class="sys-row"><div class="slbl">REPULSOR R</div><div class="sbar"><div class="sfill" id="sf-rr" style="width:88%;background:linear-gradient(90deg,#00d4ff,#0088ff)"></div></div><div class="sval" id="sv-rr">88%</div></div>
+      <div class="sys-row"><div class="slbl">THRUST VEC</div><div class="sbar"><div class="sfill" id="sf-th" style="width:76%;background:linear-gradient(90deg,#ffb700,#ff8800)"></div></div><div class="sval" id="sv-th">76%</div></div>
+      <div class="sys-row"><div class="slbl">ARMOR INT.</div><div class="sbar"><div class="sfill" id="sf-ar" style="width:84%;background:linear-gradient(90deg,#00ff88,#00bb55)"></div></div><div class="sval" id="sv-ar">84%</div></div>
+      <div class="sys-row"><div class="slbl">AI CORE</div><div class="sbar"><div class="sfill" style="width:100%;background:linear-gradient(90deg,#00d4ff,#00aaff)"></div></div><div class="sval">100%</div></div>
+      <div class="sys-row"><div class="slbl">WEAPONS</div><div class="sbar"><div class="sfill" id="sf-wp" style="width:62%;background:linear-gradient(90deg,#ff3d3d,#aa0000)"></div></div><div class="sval" id="sv-wp">62%</div></div>
+      <div class="sys-row" style="margin-bottom:0;"><div class="slbl">COMMS ENC</div><div class="sbar"><div class="sfill" style="width:100%;background:linear-gradient(90deg,#00ff88,#00bb55)"></div></div><div class="sval">100%</div></div>
+    </div>
+
+    <!-- Clock -->
+    <div class="panel" style="flex-shrink:0;">
+      <div class="pt">MISSION CLOCK</div>
+      <div class="clk" id="clk">--:--:--</div>
+      <div class="clk-date" id="clk-date">--</div>
+      <div class="uptime-row">
+        <div><div class="uptime-lbl">SESSION</div><div class="uptime-val" id="uptime">00:00:00</div></div>
+        <div style="text-align:right;"><div class="uptime-lbl">COORDINATES</div><div class="uptime-val" style="font-size:7.5px;">40.76°N 111.89°W</div></div>
+      </div>
+    </div>
+
+    <!-- Intel Ticker -->
+    <div class="panel" style="flex-shrink:0;padding:7px 12px;">
+      <div class="pt" style="margin-bottom:3px;">INTEL FEED</div>
+      <div class="intel-ticker-wrap"><div class="intel-ticker-inner" id="intel-ticker"></div></div>
+    </div>
+
+    <!-- Stock Analysis -->
+    <div class="panel stock-analysis-panel" style="flex-shrink:0;">
+      <div class="pt">STOCK ANALYSIS</div>
+      <div class="sa-input-row">
+        <input class="sa-input" id="sa-input" placeholder="Type symbol e.g. AAPL" maxlength="8"/>
+        <button class="sa-btn" onclick="analyzeStock()">ANALYZE</button>
+      </div>
+      <div class="sa-loading" id="sa-loading" style="display:none;">SCANNING MARKETS...</div>
+      <div class="sa-result" id="sa-result">
+        <div class="sa-header">
+          <div><div class="sa-sym" id="sa-sym">--</div><div class="sa-name" id="sa-name">--</div></div>
+          <div style="text-align:right;"><div class="sa-price-big" id="sa-price">--</div><div class="sa-chg" id="sa-chg">--</div></div>
+        </div>
+        <div class="sa-chart-wrap"><canvas id="sa-chart"></canvas></div>
+        <div class="sa-stats-grid">
+          <div class="sa-stat"><div class="sa-stat-l">HIGH</div><div class="sa-stat-v" id="sa-high">--</div></div>
+          <div class="sa-stat"><div class="sa-stat-l">LOW</div><div class="sa-stat-v" id="sa-low">--</div></div>
+          <div class="sa-stat"><div class="sa-stat-l">OPEN</div><div class="sa-stat-v" id="sa-open">--</div></div>
+          <div class="sa-stat"><div class="sa-stat-l">PREV</div><div class="sa-stat-v" id="sa-prev">--</div></div>
+          <div class="sa-stat"><div class="sa-stat-l">VOL</div><div class="sa-stat-v" id="sa-vol">--</div></div>
+          <div class="sa-stat"><div class="sa-stat-l">52W H</div><div class="sa-stat-v" id="sa-52h">--</div></div>
+        </div>
+        <div class="sa-signal neut" id="sa-signal">LOADING ANALYSIS...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ CENTER COL ══ -->
+  <div class="center-col">
+
+    <!-- Flight Map -->
+    <div class="panel flight-panel" style="padding:8px 10px;">
+      <div class="pt">LIVE FLIGHT TRACKER — NORTH AMERICA · <span id="flight-count" style="color:#fff;">LOADING</span> AIRCRAFT</div>
+      <div id="flight-map" style="flex:1;min-height:0;border-radius:2px;overflow:hidden;">
+        <div class="flight-overlay">
+          <div class="flight-badge">✈ LIVE: <span id="fl-badge-count">--</span></div>
+          <div class="flight-badge">ALT MAX: <span>45,000ft</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Energy Graph -->
+    <div class="panel energy-panel">
+      <div class="pt">POWER OUTPUT — ARC REACTOR TELEMETRY (GW)</div>
+      <canvas id="energyGraph"></canvas>
+    </div>
+
+    <!-- Live Market Cards -->
+    <div class="panel markets-panel">
+      <div class="pt">MARKET INTELLIGENCE — LIVE QUOTES</div>
+      <div class="markets-grid" id="markets-grid">
+        <div class="mcard" style="grid-column:1/-1;display:flex;align-items:center;justify-content:center;font-size:8px;color:rgba(0,212,255,.35);letter-spacing:.15em;font-family:'Share Tech Mono',monospace;">LOADING MARKET DATA...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ RIGHT COL ══ -->
+  <div class="right-col">
+
+    <!-- JARVIS Chat -->
+    <div class="panel jarvis-panel">
+      <div class="pt">J.A.R.V.I.S. — AI ASSISTANT</div>
+      <div class="chat-messages" id="chat-messages">
+        <div class="msg jarvis">Good evening, Akshat. All systems are operational. How may I assist you?</div>
+      </div>
+      <div class="chat-input-row">
+        <input class="chat-input" id="chat-input" placeholder="Speak to J.A.R.V.I.S..." maxlength="500"/>
+        <button class="chat-send" id="chat-send" onclick="sendJarvis()">SEND</button>
+      </div>
+    </div>
+
+    <!-- Weather -->
+    <div class="panel" style="flex-shrink:0;">
+      <div class="pt">ATMOSPHERIC — SALT LAKE CITY, UT</div>
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div><div class="w-big" id="w-temp">--°</div><div class="w-desc" id="w-desc">LOADING...</div></div>
+        <div class="w-grid" style="flex:1;">
+          <div class="wstat"><div class="wsl">HUMIDITY</div><div class="wsv" id="w-hum">--%</div></div>
+          <div class="wstat"><div class="wsl">WIND</div><div class="wsv" id="w-wind">-- mph</div></div>
+          <div class="wstat"><div class="wsl">VISIBILITY</div><div class="wsv" id="w-vis">-- mi</div></div>
+          <div class="wstat"><div class="wsl">PRESSURE</div><div class="wsv" id="w-pres">-- mb</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Targets -->
+    <div class="panel" style="flex-shrink:0;">
+      <div class="pt">ACTIVE CONTACTS</div>
+      <div class="trow"><div class="tico" style="background:rgba(255,61,61,.08);border:1px solid rgba(255,61,61,.22);">🎯</div><div><div class="tname">HYDRA-UNIT-04</div><div class="tstatus">40.7°N 111.8°W · GROUND</div></div><div class="tbadge br">HOSTILE</div></div>
+      <div class="trow"><div class="tico" style="background:rgba(255,183,0,.08);border:1px solid rgba(255,183,0,.22);">⚠️</div><div><div class="tname">UNK-VESSEL-11</div><div class="tstatus">ALT 3,400m · 480kts</div></div><div class="tbadge by">WATCH</div></div>
+      <div class="trow"><div class="tico" style="background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.22);">🛡️</div><div><div class="tname">AVENGER-BRAVO</div><div class="tstatus">40.9°N 112.1°W · STANDBY</div></div><div class="tbadge bg">ALLIED</div></div>
+      <div class="trow" style="padding-bottom:0;"><div class="tico" style="background:rgba(255,61,61,.08);border:1px solid rgba(255,61,61,.22);">🎯</div><div><div class="tname">DOOM-DRONE-07</div><div class="tstatus">ALT 1,200m · INTERCEPT</div></div><div class="tbadge br">HOSTILE</div></div>
+    </div>
+
+    <!-- Threat -->
+    <div class="panel" style="flex-shrink:0;">
+      <div class="pt">THREAT ASSESSMENT</div>
+      <div class="thrt-row"><div class="thrt-lbl">AIR</div><div class="thrt-bar"><div class="thrt-fill" style="width:72%;background:linear-gradient(90deg,#ffb700,#ff6600)"></div></div><div class="thrt-val">72</div></div>
+      <div class="thrt-row"><div class="thrt-lbl">GROUND</div><div class="thrt-bar"><div class="thrt-fill" style="width:48%;background:linear-gradient(90deg,#00ff88,#00aa44)"></div></div><div class="thrt-val">48</div></div>
+      <div class="thrt-row"><div class="thrt-lbl">CYBER</div><div class="thrt-bar"><div class="thrt-fill" style="width:91%;background:linear-gradient(90deg,#ff3d3d,#aa0000)"></div></div><div class="thrt-val">91</div></div>
+      <div class="thrt-row"><div class="thrt-lbl">BIO</div><div class="thrt-bar"><div class="thrt-fill" style="width:18%;background:linear-gradient(90deg,#00d4ff,#0066aa)"></div></div><div class="thrt-val">18</div></div>
+      <div class="thrt-row" style="margin-bottom:0;"><div class="thrt-lbl">NUCLEAR</div><div class="thrt-bar"><div class="thrt-fill" style="width:5%;background:linear-gradient(90deg,#00ff88,#008844)"></div></div><div class="thrt-val">05</div></div>
+    </div>
+
+    <!-- SEARCH PANEL -->
+    <div class="panel search-panel">
+      <div class="pt">INTEL SEARCH — POWERED BY SERPAPI</div>
+      <div class="search-input-row">
+        <input class="search-input" id="search-input" placeholder="Search anything..." maxlength="200"/>
+        <button class="search-btn" onclick="doSearch()">SEARCH</button>
+      </div>
+      <div class="search-results" id="search-results">
+        <div class="search-placeholder">SEARCH ENGINE ONLINE<br/>AWAITING QUERY, AKSHAT...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ BOTTOM BAR ══ -->
+  <div class="bottom-bar">
+    <div class="panel bstat"><div class="bicon">⚡</div><div><div class="blbl">REACTOR OUTPUT</div><div class="bval" id="b-power">3.21 GW</div></div></div>
+    <div class="panel bstat"><div class="bicon">🌡️</div><div><div class="blbl">CORE TEMP</div><div class="bval" id="b-temp">2,847°C</div></div></div>
+    <div class="panel bstat"><div class="bicon">🛰️</div><div><div class="blbl">SATELLITES</div><div class="bval">7 / 9</div></div></div>
+    <div class="panel bstat"><div class="bicon">🚀</div><div><div class="blbl">MAX VELOCITY</div><div class="bval">MACH 3.8</div></div></div>
+    <div class="panel bstat"><div class="bicon">📡</div><div><div class="blbl">UPLINK</div><div class="bval" style="font-size:12px;color:var(--cg);">SECURE</div></div></div>
+    <div class="panel bstat"><div class="bicon">🔋</div><div><div class="blbl">FLIGHT TIME</div><div class="bval" id="b-flight">4h 32m</div></div></div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  CONFIG STORE
+// ═══════════════════════════════════════
+let KEYS = {
+  anthropic: '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',
+  finnhub:   'd6meaahr01qi0ajltq0gd6meaahr01qi0ajltq10',
+  serpapi:   'a95593325c3dd0abacbbd6289ab28aaed64cfc8196fbc5c4a8eaf00299bc24ef'
+};
+const SESSION_START = Date.now();
+const STOCK_SYMS = ['AAPL','TSLA','NVDA','MSFT','AMZN','SPY'];
+
+// ═══════════════════════════════════════
+//  SETUP MODAL
+// ═══════════════════════════════════════
+function saveKeys() {
+  KEYS.anthropic = document.getElementById('key-anthropic').value.trim();
+  KEYS.finnhub   = document.getElementById('key-finnhub').value.trim();
+  KEYS.serpapi   = document.getElementById('key-serpapi').value.trim();
+  document.getElementById('setup-modal').classList.add('hidden');
+  startBoot();
+}
+function skipKeys() {
+  document.getElementById('setup-modal').classList.add('hidden');
+  startBoot();
+}
+
+// ═══════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════
+const BOOT_LINES = [
+  'INITIALIZING AKSHAT OS v14.8.2...','LOADING KERNEL MODULES...','CALIBRATING REPULSORS L+R...',
+  'ARC REACTOR — POWER NOMINAL...','ESTABLISHING SECURE UPLINK...','CONNECTING FINNHUB MARKET FEEDS...',
+  'LOADING ATMOSPHERIC SENSORS...','J.A.R.V.I.S. AI CORE ONLINE...','SERPAPI INTEL SEARCH ARMED...',
+  'AKSHAT COMMAND CENTER ACTIVATED ✓',
+];
+function startBoot() {
+  const bootEl = document.getElementById('boot');
+  bootEl.style.display = 'flex';
+  const fill = document.getElementById('boot-fill');
+  const pctEl = document.getElementById('boot-pct');
+  const linesEl = document.getElementById('boot-lines');
+  let p = 0;
+  const iv = setInterval(() => {
+    p += Math.random() * 3 + 0.8;
+    if (p >= 100) { p = 100; clearInterval(iv); }
+    fill.style.width = p + '%';
+    pctEl.textContent = Math.floor(p) + '%';
+    linesEl.textContent = BOOT_LINES[Math.min(Math.floor(p / 10), BOOT_LINES.length - 1)];
+    if (p >= 100) {
+      setTimeout(() => {
+        bootEl.classList.add('fade');
+        document.getElementById('hud').classList.add('visible');
+        setTimeout(() => bootEl.style.display = 'none', 900);
+        initAll();
+      }, 500);
+    }
+  }, 45);
+}
+
+// ═══════════════════════════════════════
+//  INIT ALL
+// ═══════════════════════════════════════
+function initAll() {
+  initClock(); initUptime(); initWeather();
+  initStocks(); initFlightMap(); initEnergyGraph();
+  initIntelTicker(); initJarvisAuto(); initFluctuations();
+}
+
+// ═══════════════════════════════════════
+//  CLOCK
+// ═══════════════════════════════════════
+function initClock() {
+  const tick = () => {
+    const n = new Date();
+    const t = n.toLocaleTimeString('en-US',{hour12:false});
+    document.getElementById('clk').textContent = t;
+    document.getElementById('hdr-clock').textContent = t;
+    document.getElementById('clk-date').textContent = n.toLocaleDateString('en-US',{weekday:'short',year:'numeric',month:'short',day:'numeric'}).toUpperCase();
+  };
+  tick(); setInterval(tick, 1000);
+}
+function initUptime() {
+  setInterval(() => {
+    const s = Math.floor((Date.now() - SESSION_START) / 1000);
+    document.getElementById('uptime').textContent =
+      [Math.floor(s/3600), Math.floor((s%3600)/60), s%60].map(v=>String(v).padStart(2,'0')).join(':');
+  }, 1000);
+}
+
+// ═══════════════════════════════════════
+//  WEATHER
+// ═══════════════════════════════════════
+async function initWeather() {
+  try {
+    const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=40.7608&longitude=-111.891&current=temperature_2m,relative_humidity_2m,wind_speed_10m,surface_pressure,visibility,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph');
+    const d = await r.json(); const c = d.current;
+    document.getElementById('w-temp').textContent = Math.round(c.temperature_2m) + '°F';
+    document.getElementById('w-hum').textContent  = c.relative_humidity_2m + '%';
+    document.getElementById('w-wind').textContent = Math.round(c.wind_speed_10m) + ' mph';
+    document.getElementById('w-vis').textContent  = (c.visibility/1609.34).toFixed(1) + ' mi';
+    document.getElementById('w-pres').textContent = Math.round(c.surface_pressure) + ' mb';
+    const WD={0:'CLEAR',1:'MAINLY CLEAR',2:'PARTLY CLOUDY',3:'OVERCAST',45:'FOGGY',51:'LT DRIZZLE',61:'LIGHT RAIN',63:'MOD RAIN',65:'HEAVY RAIN',71:'LT SNOW',73:'MOD SNOW',80:'SHOWERS',95:'THUNDERSTORM'};
+    document.getElementById('w-desc').textContent = WD[c.weather_code] || 'UNKNOWN';
+  } catch(e) {
+    document.getElementById('w-temp').textContent = 'N/A';
+    document.getElementById('w-desc').textContent = 'UPLINK FAILED';
+  }
+}
+
+// ═══════════════════════════════════════
+//  STOCKS — Finnhub
+// ═══════════════════════════════════════
+let stockCache = {};
+async function initStocks() {
+  await fetchAllQuotes();
+  setInterval(fetchAllQuotes, 30000);
+}
+
+async function fetchQuote(sym) {
+  if (!KEYS.finnhub) return null;
+  try {
+    const [qr, pr] = await Promise.all([
+      fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${KEYS.finnhub}`),
+      fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${sym}&token=${KEYS.finnhub}`)
+    ]);
+    const q = await qr.json();
+    const p = await pr.json();
+    if (!q.c) return null;
+    return {
+      sym, price: q.c, change: q.d, changePct: q.dp,
+      high: q.h, low: q.l, open: q.o, prev: q.pc,
+      name: p.name || sym, high52: q.h, vol: '--'
+    };
+  } catch(e) { return null; }
+}
+
+async function fetchAllQuotes() {
+  if (!KEYS.finnhub) { renderFallbackStrip(); renderFallbackCards(); return; }
+  const results = await Promise.all(STOCK_SYMS.map(s => fetchQuote(s)));
+  results.forEach(r => { if(r) stockCache[r.sym] = r; });
+  renderStockStrip();
+  renderMarketCards();
+}
+
+function renderStockStrip() {
+  const inner = document.getElementById('stock-strip-inner');
+  const items = [...STOCK_SYMS, ...STOCK_SYMS];
+  inner.innerHTML = items.map(sym => {
+    const s = stockCache[sym];
+    if (!s) return `<div class="sstock"><span class="sstock-sym">${sym}</span><span class="sstock-price" style="color:rgba(0,212,255,.4)">---</span></div>`;
+    const up = s.change >= 0;
+    return `<div class="sstock">
+      <span class="sstock-sym">${sym}</span>
+      <span class="sstock-price">$${s.price.toFixed(2)}</span>
+      <span class="sstock-chg ${up?'pos':'neg'}">${up?'+':''}${s.change.toFixed(2)} (${up?'+':''}${s.changePct.toFixed(2)}%)</span>
+    </div>`;
+  }).join('');
+}
+
+function renderFallbackStrip() {
+  const fallback = [{sym:'AAPL',p:189.3,c:1.24},{sym:'TSLA',p:172.5,c:-3.11},{sym:'NVDA',p:875.4,c:12.6},{sym:'MSFT',p:415.1,c:2.30},{sym:'AMZN',p:186.6,c:0.88},{sym:'SPY',p:518.2,c:1.10}];
+  const inner = document.getElementById('stock-strip-inner');
+  inner.innerHTML = [...fallback,...fallback].map(s=>`<div class="sstock"><span class="sstock-sym">${s.sym}</span><span class="sstock-price">$${s.p.toFixed(2)}</span><span class="sstock-chg ${s.c>=0?'pos':'neg'}">${s.c>=0?'+':''}${s.c.toFixed(2)}</span></div>`).join('');
+}
+
+function renderMarketCards() {
+  const grid = document.getElementById('markets-grid');
+  grid.innerHTML = STOCK_SYMS.map(sym => {
+    const s = stockCache[sym];
+    if (!s) return `<div class="mcard"><div class="mcard-sym">${sym}</div><div style="font-size:8px;color:rgba(0,212,255,.3);font-family:'Share Tech Mono',monospace;margin-top:4px;">NO DATA</div></div>`;
+    const up = s.change >= 0;
+    const sign = up?'+':'';
+    const sig = s.changePct > 1.5 ? 'BULLISH' : s.changePct < -1.5 ? 'BEARISH' : 'NEUTRAL';
+    const sigC = sig==='BULLISH'?'var(--cg)':sig==='BEARISH'?'var(--cr)':'var(--cy)';
+    return `<div class="mcard">
+      <div>
+        <div class="mcard-sym">${sym}</div>
+        <div class="mcard-price">$${s.price.toFixed(2)}</div>
+        <div class="mcard-chg ${up?'pos':'neg'}">${sign}${s.change.toFixed(2)} (${sign}${s.changePct.toFixed(2)}%)</div>
+      </div>
+      <div class="mcard-sig" style="color:${sigC}">▶ ${sig}</div>
+      <canvas id="spark-${sym}" height="24"></canvas>
+    </div>`;
+  }).join('');
+  setTimeout(() => STOCK_SYMS.forEach(sym => drawSparkline(sym, stockCache[sym])), 60);
+}
+
+function renderFallbackCards() {
+  const fallback = [{sym:'AAPL',price:189.3,change:1.24,changePct:0.66},{sym:'TSLA',price:172.5,change:-3.11,changePct:-1.77},{sym:'NVDA',price:875.4,change:12.6,changePct:1.46},{sym:'MSFT',price:415.1,change:2.30,changePct:0.56},{sym:'AMZN',price:186.6,change:0.88,changePct:0.47},{sym:'SPY',price:518.2,change:1.10,changePct:0.21}];
+  fallback.forEach(s => stockCache[s.sym] = s);
+  renderMarketCards();
+}
+
+function drawSparkline(sym, s) {
+  const c = document.getElementById('spark-'+sym);
+  if (!c) return;
+  c.width = c.offsetWidth || 80;
+  const ctx = c.getContext('2d');
+  const pts = [];
+  let v = s ? s.price - (s.change||0) : 100;
+  for (let i=0;i<30;i++) { v += (Math.random()-.47)*(Math.abs(s&&s.change?s.change:1)/6); pts.push(v); }
+  pts.push(s ? s.price : v);
+  const min=Math.min(...pts), max=Math.max(...pts), W=c.width, H=24;
+  const up = s && s.change >= 0;
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, up?'rgba(0,255,136,.25)':'rgba(255,61,61,.25)');
+  grad.addColorStop(1,'transparent');
+  ctx.beginPath();
+  pts.forEach((p,i)=>{ const x=i/(pts.length-1)*W, y=H-((p-min)/(max-min||1))*(H-4)-2; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+  ctx.fillStyle=grad; ctx.fill();
+  ctx.beginPath();
+  pts.forEach((p,i)=>{ const x=i/(pts.length-1)*W, y=H-((p-min)/(max-min||1))*(H-4)-2; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.strokeStyle = up?'var(--cg)':'var(--cr)'; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+// ═══════════════════════════════════════
+//  STOCK ANALYSIS — Finnhub
+// ═══════════════════════════════════════
+document.getElementById('sa-input').addEventListener('keydown', e => { if(e.key==='Enter') analyzeStock(); });
+
+async function analyzeStock() {
+  const sym = document.getElementById('sa-input').value.trim().toUpperCase();
+  if (!sym) return;
+  document.getElementById('sa-result').classList.remove('visible');
+  document.getElementById('sa-loading').style.display = 'block';
+
+  if (!KEYS.finnhub) {
+    document.getElementById('sa-loading').style.display = 'none';
+    showStockAnalysisFallback(sym);
+    return;
+  }
+
+  try {
+    const now = Math.floor(Date.now()/1000);
+    const from = now - 86400; // last 24h
+    const [qRes, pRes, cRes] = await Promise.all([
+      fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${KEYS.finnhub}`),
+      fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${sym}&token=${KEYS.finnhub}`),
+      fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${sym}&resolution=15&from=${from}&to=${now}&token=${KEYS.finnhub}`)
+    ]);
+    const q = await qRes.json();
+    const p = await pRes.json();
+    const candles = await cRes.json();
+
+    document.getElementById('sa-loading').style.display = 'none';
+    if (!q.c || q.c === 0) { showStockError(sym); return; }
+
+    const up = q.d >= 0;
+    const sign = up ? '+' : '';
+    document.getElementById('sa-sym').textContent   = sym;
+    document.getElementById('sa-name').textContent  = p.name || sym;
+    document.getElementById('sa-price').textContent = '$' + q.c.toFixed(2);
+    document.getElementById('sa-price').style.color = up ? 'var(--cg)' : 'var(--cr)';
+    document.getElementById('sa-chg').textContent   = `${sign}${q.d.toFixed(2)} (${sign}${q.dp.toFixed(2)}%)`;
+    document.getElementById('sa-chg').className     = 'sa-chg ' + (up?'pos':'neg');
+    document.getElementById('sa-high').textContent  = '$' + q.h.toFixed(2);
+    document.getElementById('sa-low').textContent   = '$' + q.l.toFixed(2);
+    document.getElementById('sa-open').textContent  = '$' + q.o.toFixed(2);
+    document.getElementById('sa-prev').textContent  = '$' + q.pc.toFixed(2);
+    document.getElementById('sa-vol').textContent   = '--';
+    document.getElementById('sa-52h').textContent   = '$' + q.h.toFixed(2);
+
+    // Signal
+    const sig = q.dp > 2 ? 'BULLISH ▲' : q.dp < -2 ? 'BEARISH ▼' : 'NEUTRAL ◆';
+    const sigEl = document.getElementById('sa-signal');
+    sigEl.textContent = sig + ' · ' + Math.abs(q.dp).toFixed(2) + '% MOVE · ' + (up ? 'UPWARD MOMENTUM' : 'SELLING PRESSURE');
+    sigEl.className = 'sa-signal ' + (q.dp > 2 ? 'bull' : q.dp < -2 ? 'bear' : 'neut');
+
+    // Chart
+    if (candles && candles.c && candles.c.length > 1) {
+      drawStockChart(candles.c, up);
+    } else {
+      drawSimulatedChart(q.c, q.d, up);
     }
 
-    function enterFullscreen() {
-      const el = document.documentElement;
-      if (el.requestFullscreen) return el.requestFullscreen();
-      if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
-      return Promise.resolve(); // fallback
+    document.getElementById('sa-result').classList.add('visible');
+  } catch(e) {
+    document.getElementById('sa-loading').style.display = 'none';
+    showStockError(sym);
+  }
+}
+
+function drawStockChart(prices, up) {
+  const canvas = document.getElementById('sa-chart');
+  canvas.width = canvas.offsetWidth || 200;
+  canvas.height = 54;
+  const ctx = canvas.getContext('2d');
+  const W=canvas.width, H=54;
+  const min=Math.min(...prices), max=Math.max(...prices);
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='rgba(0,4,12,.8)'; ctx.fillRect(0,0,W,H);
+  // Grid
+  ctx.strokeStyle='rgba(0,212,255,.07)'; ctx.lineWidth=1;
+  [0.25,0.5,0.75].forEach(f=>{ const y=H*f; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); });
+  // Gradient fill
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, up?'rgba(0,255,136,.2)':'rgba(255,61,61,.2)');
+  grad.addColorStop(1,'transparent');
+  ctx.beginPath();
+  prices.forEach((p,i)=>{ const x=i/(prices.length-1)*W, y=H-((p-min)/(max-min||1))*(H-8)-4; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+  ctx.fillStyle=grad; ctx.fill();
+  // Line
+  ctx.beginPath();
+  prices.forEach((p,i)=>{ const x=i/(prices.length-1)*W, y=H-((p-min)/(max-min||1))*(H-8)-4; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.strokeStyle=up?'var(--cg)':'var(--cr)'; ctx.lineWidth=1.5;
+  ctx.shadowColor=up?'#00ff88':'#ff3d3d'; ctx.shadowBlur=4; ctx.stroke(); ctx.shadowBlur=0;
+}
+
+function drawSimulatedChart(price, change, up) {
+  const pts=[];
+  let v = price - change;
+  for(let i=0;i<40;i++) { v+=(Math.random()-.47)*(Math.abs(change)/8); pts.push(v); }
+  pts.push(price);
+  drawStockChart(pts, up);
+}
+
+function showStockError(sym) {
+  document.getElementById('sa-sym').textContent = sym;
+  document.getElementById('sa-name').textContent = 'SYMBOL NOT FOUND OR INVALID';
+  document.getElementById('sa-price').textContent = 'N/A';
+  document.getElementById('sa-result').classList.add('visible');
+}
+function showStockAnalysisFallback(sym) {
+  document.getElementById('sa-sym').textContent = sym;
+  document.getElementById('sa-name').textContent = 'FINNHUB KEY REQUIRED';
+  document.getElementById('sa-price').textContent = '---';
+  document.getElementById('sa-signal').textContent = 'ENTER FINNHUB KEY IN SETUP TO ENABLE LIVE DATA';
+  document.getElementById('sa-signal').className = 'sa-signal neut';
+  document.getElementById('sa-result').classList.add('visible');
+}
+
+// ═══════════════════════════════════════
+//  LIVE FLIGHT MAP — OpenSky + Canvas overlay (lightweight)
+// ═══════════════════════════════════════
+let flightMap = null;
+let flightCanvas = null;
+let flightCtx = null;
+let allPlanes = [];
+let selectedPlane = null;
+
+function initFlightMap() {
+  flightMap = L.map('flight-map', {
+    center: [39, -98], zoom: 4,
+    zoomControl: false, attributionControl: false,
+    preferCanvas: true, // faster rendering
+  });
+
+  // Lightweight minimal tiles (no labels, tiny files)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+    maxZoom: 12, subdomains: 'abcd', updateWhenIdle: true, keepBuffer: 1
+  }).addTo(flightMap);
+
+  // Style tweaks
+  const style = document.createElement('style');
+  style.textContent = `
+    .leaflet-tile{filter:hue-rotate(175deg) saturate(1.2) brightness(.8);}
+    .fl-popup{background:rgba(0,10,22,.95)!important;border:1px solid rgba(0,212,255,.3)!important;border-radius:3px!important;color:#00d4ff!important;font-family:'Share Tech Mono',monospace!important;font-size:9px!important;padding:6px 10px!important;box-shadow:0 0 14px rgba(0,212,255,.15)!important;line-height:1.8;}
+    .fl-popup b{color:#fff;}
+    .leaflet-popup-tip-container{display:none;}
+    .leaflet-popup-close-button{color:rgba(0,212,255,.5)!important;font-size:14px!important;}
+  `;
+  document.head.appendChild(style);
+
+  // Canvas overlay for planes
+  const CanvasLayer = L.Layer.extend({
+    onAdd(map) {
+      flightCanvas = L.DomUtil.create('canvas', 'flight-canvas-layer');
+      Object.assign(flightCanvas.style, { position:'absolute', top:0, left:0, pointerEvents:'none', zIndex:400 });
+      map.getPanes().overlayPane.appendChild(flightCanvas);
+      flightCtx = flightCanvas.getContext('2d');
+      map.on('moveend zoomend resize', () => drawPlanes());
+      this._resize();
+      map.on('resize', () => this._resize());
+    },
+    _resize() {
+      const size = flightMap.getSize();
+      flightCanvas.width = size.x;
+      flightCanvas.height = size.y;
+      drawPlanes();
+    },
+    onRemove() { flightCanvas.remove(); }
+  });
+  new CanvasLayer().addTo(flightMap);
+
+  // Click on map to select plane
+  flightMap.on('click', e => {
+    const pt = flightMap.latLngToContainerPoint(e.latlng);
+    let closest = null, minD = 12;
+    allPlanes.forEach(p => {
+      const pp = flightMap.latLngToContainerPoint([p.lat, p.lon]);
+      const d = Math.hypot(pt.x - pp.x, pt.y - pp.y);
+      if (d < minD) { minD = d; closest = p; }
+    });
+    if (closest) {
+      selectedPlane = closest;
+      drawPlanes();
+      L.popup({ className: 'fl-popup', closeButton: true, offset: [0, -4] })
+        .setLatLng([closest.lat, closest.lon])
+        .setContent(`<b>${closest.callsign}</b><br/>ALT: ${closest.alt.toLocaleString()} ft<br/>SPD: ${closest.spd} kts<br/>HDG: ${Math.round(closest.hdg)}°<br/>ORIGIN: ${closest.origin}<br/>ICAO: ${closest.icao.toUpperCase()}`)
+        .openOn(flightMap);
     }
+  });
 
-    async function startExperience() {
-      startBtn.disabled = true;
-      initHands();
+  fetchFlights();
+  setInterval(fetchFlights, 30000);
+}
 
-      try {
-        camera = new Camera(video, {
-          onFrame: async () => { await hands.send({ image: video }); },
-          width: CAM_WIDTH,
-          height: CAM_HEIGHT,
-          facingMode: CAM_FACING
-        });
+function drawPlanes() {
+  if (!flightCtx || !flightCanvas) return;
+  const W = flightCanvas.width, H = flightCanvas.height;
+  flightCtx.clearRect(0, 0, W, H);
+  const topLeft = flightMap.containerPointToLayerPoint([0, 0]);
+  flightCtx.save();
+  flightCtx.translate(topLeft.x, topLeft.y);
 
-        await camera.start(); // prompts for camera permission
+  allPlanes.forEach(p => {
+    const pt = flightMap.latLngToLayerPoint([p.lat, p.lon]);
+    const isSel = selectedPlane && selectedPlane.icao === p.icao;
+    const color = isSel ? '#ffb700' : '#00d4ff';
+    flightCtx.save();
+    flightCtx.translate(pt.x, pt.y);
+    flightCtx.rotate((p.hdg * Math.PI) / 180);
+    // Draw plane shape
+    flightCtx.beginPath();
+    flightCtx.fillStyle = color;
+    flightCtx.shadowColor = color;
+    flightCtx.shadowBlur = isSel ? 8 : 4;
+    // Simple triangle arrow
+    flightCtx.moveTo(0, -5);
+    flightCtx.lineTo(-3, 4);
+    flightCtx.lineTo(0, 2);
+    flightCtx.lineTo(3, 4);
+    flightCtx.closePath();
+    flightCtx.fill();
+    flightCtx.shadowBlur = 0;
+    flightCtx.restore();
+  });
+  flightCtx.restore();
+}
 
-        stage.style.display = "flex";
-        startBtn.style.display = "none";
-        hint.classList.add("show");
-        await initHuman();
-        resizeCanvas();
+async function fetchFlights() {
+  const url = `https://opensky-network.org/api/states/all?lamin=24&lomin=-125&lamax=50&lomax=-66`;
+  let states = null;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    states = d.states;
+  } catch(e) {
+    try {
+      const r2 = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+      const outer = await r2.json();
+      states = JSON.parse(outer.contents).states;
+    } catch(e2) {
+      document.getElementById('flight-count').textContent = 'FEED UNAVAILABLE';
+      return;
+    }
+  }
 
-        try { await enterFullscreen(); } catch (_) { /* fullscreen may be declined */ }
+  if (!states) return;
+  // Filter airborne with position, cap at 200 for performance
+  allPlanes = states
+    .filter(s => s[5] && s[6] && s[8] === false)
+    .slice(0, 200)
+    .map(s => ({
+      icao: s[0],
+      callsign: (s[1] || s[0] || '??').trim(),
+      origin: (s[2] || '??').trim().toUpperCase(),
+      lon: s[5], lat: s[6],
+      alt: s[7] ? Math.round(s[7] * 3.28084) : 0,
+      spd: s[9] ? Math.round(s[9] * 1.944) : 0,
+      hdg: s[10] || 0,
+    }));
 
-      } catch (err) {
-        alert("Camera access failed: " + err.message);
-        startBtn.disabled = false;
-        stage.style.display = "none";
+  drawPlanes();
+  document.getElementById('flight-count').textContent = allPlanes.length + '+ AIRCRAFT';
+  document.getElementById('fl-badge-count').textContent = allPlanes.length + '+';
+}
+
+// ═══════════════════════════════════════
+//  ENERGY GRAPH
+// ═══════════════════════════════════════
+function initEnergyGraph() {
+  const canvas = document.getElementById('energyGraph');
+  const ctx = canvas.getContext('2d');
+  const history = [];
+  for(let i=0;i<80;i++) history.push(3.1+Math.random()*.2-.05);
+  function resize() { canvas.width=canvas.offsetWidth; canvas.height=canvas.offsetHeight; }
+  resize(); window.addEventListener('resize', resize);
+  function draw() {
+    const W=canvas.width, H=canvas.height;
+    if(!W||!H){requestAnimationFrame(draw);return;}
+    const last=history[history.length-1];
+    history.push(Math.max(2.8,Math.min(3.5,last+(Math.random()-.47)*.04)));
+    if(history.length>W) history.shift();
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='rgba(0,4,12,.96)'; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='rgba(0,212,255,.07)'; ctx.lineWidth=1;
+    for(let i=0;i<4;i++){const y=H*.15+i*(H*.7/3);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    const min=2.7,max=3.6;
+    const pts=history.map((v,i)=>({x:i/(history.length-1)*W,y:H-(v-min)/(max-min)*(H*.72)-H*.14}));
+    const grad=ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,'rgba(0,212,255,.22)'); grad.addColorStop(1,'rgba(0,212,255,0)');
+    ctx.beginPath(); pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+    ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+    ctx.beginPath(); pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+    ctx.strokeStyle='#00d4ff'; ctx.lineWidth=1.5; ctx.shadowColor='#00d4ff'; ctx.shadowBlur=5; ctx.stroke(); ctx.shadowBlur=0;
+    const cur=history[history.length-1], cp=pts[pts.length-1];
+    ctx.beginPath(); ctx.arc(cp.x,cp.y,3,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.shadowColor='#00d4ff'; ctx.shadowBlur=8; ctx.fill(); ctx.shadowBlur=0;
+    ctx.font="7.5px 'Share Tech Mono',monospace"; ctx.fillStyle='#fff'; ctx.fillText(cur.toFixed(3)+' GW',cp.x-30,cp.y-8);
+    ctx.fillStyle='rgba(0,212,255,.35)'; ctx.font="6.5px 'Share Tech Mono',monospace";
+    ['3.5','3.2','2.9','2.6'].forEach((l,i)=>ctx.fillText(l,2,H*.15+i*(H*.7/3)+6));
+    setTimeout(()=>requestAnimationFrame(draw), 120);
+  }
+  draw();
+}
+
+// ═══════════════════════════════════════
+//  INTEL TICKER
+// ═══════════════════════════════════════
+function initIntelTicker() {
+  const items = [
+    'HYDRA ACTIVITY IN SECTOR 7 — AVENGERS MOBILIZED','ARC REACTOR OUTPUT STABLE — 3.21 GW',
+    'SHIELD REPORTS UNAUTHORIZED DRONE ACTIVITY','AKSHAT SATELLITE ARRAY ONLINE — 98.2% COVERAGE',
+    'WEATHER ANOMALY DETECTED OVER PACIFIC','ALL SYSTEMS NOMINAL — AKSHAT COMMAND SECURE',
+    'DOOM JAMMING INITIATED — COUNTER-FREQ ACTIVE','AVENGER BRAVO STANDBY — ETA 4 MIN',
+    'QUANTUM COMMS UPLINK — AES-4096 ACTIVE','CYBER THREAT ELEVATED — FIREWALL REINFORCED',
+  ];
+  const el = document.getElementById('intel-ticker');
+  el.innerHTML = [...items,...items].map(t=>`<div class="iitem"><span class="isep">◆</span>${t}</div>`).join('');
+}
+
+// ═══════════════════════════════════════
+//  JARVIS AUTO MESSAGES
+// ═══════════════════════════════════════
+const JARVIS_AUTO = [
+  'Scanning perimeter... all clear, Akshat.','Repulsor calibration complete.',
+  'Tracking target H-04 at 40.7°N.','Power distribution optimal.',
+  'Secure uplink confirmed — channel 7.','New contact: UNK-VESSEL-11.',
+  'Firewall integrity at 100%.','Thermal diagnostics nominal.',
+  'Satellite lock: 7/9 online.','Arc reactor pulse stable.',
+];
+let autoIdx = 0;
+function initJarvisAuto() {
+  setInterval(() => {
+    if (document.querySelectorAll('#chat-messages .msg').length > 22) return;
+    addJarvisMsg(JARVIS_AUTO[autoIdx++ % JARVIS_AUTO.length], true);
+  }, 14000);
+}
+
+// ═══════════════════════════════════════
+//  JARVIS CHAT
+// ═══════════════════════════════════════
+function addJarvisMsg(text, isAuto=false) {
+  const box = document.getElementById('chat-messages');
+  const el = document.createElement('div');
+  el.className = 'msg jarvis';
+  el.textContent = text;
+  if(isAuto) el.style.opacity = '.6';
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+function addUserMsg(text) {
+  const box = document.getElementById('chat-messages');
+  const el = document.createElement('div');
+  el.className = 'msg user';
+  el.textContent = text;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+function addThinking() {
+  const box = document.getElementById('chat-messages');
+  const el = document.createElement('div');
+  el.className = 'msg thinking'; el.id = 'thinking-msg';
+  el.textContent = '▋ Processing request...';
+  box.appendChild(el); box.scrollTop = box.scrollHeight;
+}
+
+document.getElementById('chat-input').addEventListener('keydown', e => { if(e.key==='Enter') sendJarvis(); });
+
+async function sendJarvis() {
+  const input = document.getElementById('chat-input');
+  const btn = document.getElementById('chat-send');
+  const text = input.value.trim();
+  if (!text) return;
+  addUserMsg(text);
+  input.value = '';
+  btn.disabled = true;
+  if (!KEYS.anthropic) {
+    addJarvisMsg('AI core offline, Akshat. Reload the page and enter your Anthropic API key to activate me.');
+    btn.disabled = false; return;
+  }
+  addThinking();
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':KEYS.anthropic,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({
+        model:'claude-haiku-4-5-20251001', max_tokens:280,
+        system:`You are J.A.R.V.I.S., the AI assistant for Akshat's personal Akshat Industries Command Center. You are brilliant, witty, slightly dry in humor, and hyper-capable. You speak concisely — 1-3 sentences max. You address the user as "Akshat" (never "Mr. Akshat"). Current time: ${new Date().toLocaleTimeString()}. Location: Salt Lake City, UT.
+
+IMPORTANT — AIRPORT FLIGHT BOARDS: If Akshat asks for departures or arrivals at any airport (e.g. "show arrivals at JFK", "departures from SLC", "flight board for LAX"), you MUST respond with ONLY this exact JSON format and nothing else:
+{"action":"flight_board","airport":"AIRPORT_CODE","type":"departures|arrivals","query":"FULL SEARCH QUERY FOR SERPAPI"}
+
+Example: {"action":"flight_board","airport":"JFK","type":"arrivals","query":"JFK airport arrivals today"}
+
+For all other requests, respond normally in character.`,
+        messages:[{role:'user',content:text}]
+      })
+    });
+    const data = await res.json();
+    document.getElementById('thinking-msg')?.remove();
+    const reply = data?.content?.[0]?.text || "Unable to process request, Akshat.";
+
+    // Check if JARVIS returned a flight board action
+    try {
+      const parsed = JSON.parse(reply);
+      if (parsed.action === 'flight_board') {
+        addJarvisMsg(`Accessing live ${parsed.type} board for ${parsed.airport}, Akshat. Stand by...`);
+        await showFlightBoard(parsed.airport, parsed.type, parsed.query);
+        btn.disabled = false; return;
       }
+    } catch(e) { /* not JSON, normal reply */ }
+
+    addJarvisMsg(reply);
+  } catch(e) {
+    document.getElementById('thinking-msg')?.remove();
+    addJarvisMsg("Secure channel disrupted, Akshat. Please verify your API key.");
+  }
+  btn.disabled = false;
+}
+
+// ═══════════════════════════════════════
+//  SERPAPI SEARCH
+// ═══════════════════════════════════════
+document.getElementById('search-input').addEventListener('keydown', e => { if(e.key==='Enter') doSearch(); });
+
+async function serpFetch(params) {
+  const base = 'https://serpapi.com/search.json';
+  const qs = new URLSearchParams({...params, api_key: KEYS.serpapi}).toString();
+  const fullUrl = `${base}?${qs}`;
+  // allorigins returns {contents: "json string"}
+  const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(fullUrl)}`;
+  const r = await fetch(proxy);
+  const outer = await r.json();
+  return JSON.parse(outer.contents);
+}
+
+async function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  const box = document.getElementById('search-results');
+  box.innerHTML = '<div class="search-loading">▋ SEARCHING INTEL NETWORKS...</div>';
+  if (!KEYS.serpapi) {
+    box.innerHTML = `<div class="search-placeholder">SERPAPI KEY REQUIRED<br/>RELOAD AND ENTER YOUR KEY TO ENABLE SEARCH</div>`;
+    return;
+  }
+  try {
+    const d = await serpFetch({ q, num: 6, engine: 'google' });
+    const results = d.organic_results || [];
+    if (!results.length) { box.innerHTML = '<div class="search-placeholder">NO RESULTS FOUND</div>'; return; }
+    box.innerHTML = results.slice(0,6).map(item => `
+      <div class="search-result-item">
+        <div class="sri-title">${item.title||'--'}</div>
+        <div class="sri-snippet">${(item.snippet||'').substring(0,120)}${item.snippet&&item.snippet.length>120?'...':''}</div>
+        <div class="sri-source">${item.displayed_link||item.link||''}</div>
+      </div>`).join('');
+  } catch(e) {
+    box.innerHTML = `<div class="search-placeholder">SEARCH UPLINK FAILED<br/>${e.message||'CHECK SERPAPI KEY'}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════
+//  FLIGHT BOARD via SerpAPI
+// ═══════════════════════════════════════
+async function showFlightBoard(airport, type, query) {
+  const box = document.getElementById('chat-messages');
+  if (!KEYS.serpapi) { addJarvisMsg('SerpAPI key not configured, Akshat.'); return; }
+  try {
+    const d = await serpFetch({ q: query, engine: 'google', num: 5 });
+    const flights = d.flights_results || d.knowledge_graph?.flights || null;
+    const organic = d.organic_results || [];
+    let html = `<div style="border:1px solid rgba(0,212,255,.2);border-radius:3px;padding:8px;background:rgba(0,212,255,.03);margin-top:4px;">`;
+    html += `<div style="font-size:8px;font-weight:700;letter-spacing:.2em;color:var(--c);margin-bottom:8px;">✈ ${airport.toUpperCase()} — ${type.toUpperCase()} BOARD</div>`;
+    if (flights && Array.isArray(flights) && flights.length > 0) {
+      html += flights.slice(0,8).map(f => {
+        const status = f.status || 'ON TIME';
+        const sc = status.toLowerCase().includes('delay')||status.toLowerCase().includes('cancel') ? 'var(--cr)' : 'var(--cg)';
+        return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(0,212,255,.07);font-family:'Share Tech Mono',monospace;font-size:8px;">
+          <span style="color:#fff;width:60px;">${f.flight||f.flight_number||'--'}</span>
+          <span style="color:rgba(0,212,255,.7);flex:1;">${f.destination||f.origin||f.airport||'--'}</span>
+          <span style="color:rgba(0,212,255,.6);width:50px;">${f.time||f.departure_time||f.arrival_time||'--'}</span>
+          <span style="color:${sc};width:60px;text-align:right;">${status}</span>
+        </div>`;
+      }).join('');
+    } else if (organic.length > 0) {
+      html += organic.slice(0,3).map(item =>
+        `<div style="padding:4px 0;border-bottom:1px solid rgba(0,212,255,.07);">
+          <div style="font-size:8px;color:var(--c);font-family:'Share Tech Mono',monospace;">${item.title||''}</div>
+          <div style="font-size:7.5px;color:rgba(0,212,255,.55);font-family:'Share Tech Mono',monospace;margin-top:2px;">${(item.snippet||'').substring(0,160)}</div>
+        </div>`).join('');
+    } else {
+      html += `<div style="font-size:8px;color:rgba(0,212,255,.4);font-family:'Share Tech Mono',monospace;">NO DATA FOR ${airport.toUpperCase()}</div>`;
     }
+    html += `</div>`;
+    const el = document.createElement('div');
+    el.className = 'msg jarvis';
+    el.innerHTML = `Live ${type} — ${airport.toUpperCase()}:` + html;
+    box.appendChild(el); box.scrollTop = box.scrollHeight;
+  } catch(e) {
+    addJarvisMsg(`Flight board uplink failed for ${airport.toUpperCase()}: ${e.message}`);
+  }
+}
 
-    function initHands() {
-      hands = new Hands({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-      });
-      hands.setOptions({
-        maxNumHands: 1,
-        modelComplexity: 0, // fastest
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-      });
-      hands.onResults(onResults);
-    }
+// ═══════════════════════════════════════
+// ═══════════════════════════════════════
+function initFluctuations() {
+  setInterval(()=>{ document.getElementById('arc-pct').textContent=(88+Math.floor(Math.random()*10))+'%'; },3500);
+  setInterval(()=>{ document.getElementById('b-temp').textContent=(2800+Math.floor(Math.random()*200)).toLocaleString()+'°C'; },2800);
+  setInterval(()=>{ document.getElementById('b-power').textContent=(3.15+Math.random()*.12).toFixed(2)+' GW'; },2000);
+  const bars=[{sf:'sf-rl',sv:'sv-rl',b:92,r:5},{sf:'sf-rr',sv:'sv-rr',b:88,r:5},{sf:'sf-th',sv:'sv-th',b:76,r:8},{sf:'sf-ar',sv:'sv-ar',b:84,r:4},{sf:'sf-wp',sv:'sv-wp',b:62,r:6}];
+  setInterval(()=>{
+    bars.forEach(bar=>{
+      const v=Math.max(30,Math.min(100,bar.b+Math.floor((Math.random()-.5)*bar.r)));
+      const sf=document.getElementById(bar.sf), sv=document.getElementById(bar.sv);
+      if(sf) sf.style.width=v+'%'; if(sv) sv.textContent=v+'%';
+    });
+  },4000);
+}
 
-    async function initHuman() {
-      // Fallback if the UMD global didn't load (some browsers block window globals)
-      if (typeof Human === "undefined") {
-        const mod = await import("https://cdn.jsdelivr.net/npm/@vladmandic/human@3.12.0/dist/human.esm.js");
-        window.Human = mod.Human || mod.default;
-      }
-      human = new Human({
-        modelBasePath: "https://cdn.jsdelivr.net/npm/@vladmandic/human@3.12.0/models",
-        backend: "webgl",
-        filter: { enabled: true },
-        face: {
-          enabled: true,
-          detector: { rotation: true, maxDetected: 3 },
-          mesh: { enabled: false },
-          iris: { enabled: false },
-          attention: { enabled: false },
-          emotion: { enabled: true },
-          description: { enabled: true },
-          antispoof: { enabled: true },
-          liveness: { enabled: true }
-        },
-        body: { enabled: false },
-        hand: { enabled: false },
-        gesture: { enabled: false },
-        segmentation: { enabled: false }
-      });
-      await human.load();
-      await human.warmup();
-      detectFacesLoop();
-    }
-
-    async function detectFacesLoop() {
-      if (!human || !video.videoWidth) {
-        requestAnimationFrame(detectFacesLoop);
-        return;
-      }
-      try {
-        const res = await human.detect(video);
-        lastHumanResult = res;
-        faceDetections = res?.face || [];
-        smoothFaceBoxes();
-      } catch (_) {
-        // ignore detection errors to keep loop alive
-      }
-      requestAnimationFrame(detectFacesLoop);
-    }
-
-    function smoothFaceBoxes() {
-      const alpha = 0.25; // smoothing factor
-      smoothedBoxes.length = faceDetections.length;
-      for (let i = 0; i < faceDetections.length; i++) {
-        const box = faceDetections[i].box;
-        if (!box) continue;
-        const prev = smoothedBoxes[i] || { x: box[0], y: box[1], w: box[2], h: box[3] };
-        const next = {
-          x: prev.x + (box[0] - prev.x) * alpha,
-          y: prev.y + (box[1] - prev.y) * alpha,
-          w: prev.w + (box[2] - prev.w) * alpha,
-          h: prev.h + (box[3] - prev.h) * alpha,
-        };
-        smoothedBoxes[i] = next;
-      }
-    }
-
-    function onResults(results) {
-      if (!canvas.width || !canvas.height) resizeCanvas();
-
-      ctx.save();
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (MIRROR) {
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-      }
-      ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-      ctx.restore();
-
-      if (results.multiHandLandmarks) {
-        ctx.save();
-        if (MIRROR) {
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
-        }
-        for (const landmarks of results.multiHandLandmarks) {
-          drawHand(ctx, landmarks);
-        }
-        drawFaces(ctx);
-        ctx.restore();
-      }
-    }
-
-    function drawHand(ctx, landmarks) {
-      // Style presets
-      const tipRadius = 7;
-      const jointRadius = 4;
-      const glow = "#7dd3fc";
-
-      // Blue silhouette (inspired by the reference hand)
-      drawSilhouette(ctx, landmarks);
-
-      // Connector stroke with gradient and glow
-      ctx.save();
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.shadowColor = glow;
-      ctx.shadowBlur = 12;
-      ctx.lineWidth = 6;
-
-      // Draw each connection
-      for (const [start, end] of HAND_CONNECTIONS) {
-        const s = landmarks[start];
-        const e = landmarks[end];
-        const gx = canvas.width * (s.x + e.x) * 0.5;
-        const gy = canvas.height * (s.y + e.y) * 0.5;
-        const grad = ctx.createLinearGradient(s.x * canvas.width, s.y * canvas.height, e.x * canvas.width, e.y * canvas.height);
-        grad.addColorStop(0, "#22d3ee");
-        grad.addColorStop(1, "#0ea5e9");
-        ctx.strokeStyle = grad;
-        ctx.beginPath();
-        ctx.moveTo(s.x * canvas.width, s.y * canvas.height);
-        ctx.lineTo(e.x * canvas.width, e.y * canvas.height);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // Aim line from index finger (Vision Pro–style)
-      drawAimLine(ctx, landmarks);
-
-      // Draw joints
-      for (let i = 0; i < landmarks.length; i++) {
-        const { x, y, z } = landmarks[i];
-        const isTip = [4, 8, 12, 16, 20].includes(i);
-        const r = isTip ? tipRadius : jointRadius;
-        const px = x * canvas.width;
-        const py = y * canvas.height;
-
-        const radial = ctx.createRadialGradient(px, py, 0, px, py, r * 1.3);
-        radial.addColorStop(0, "rgba(255,255,255,0.95)");
-        radial.addColorStop(1, isTip ? "rgba(34,211,238,0.8)" : "rgba(56,189,248,0.7)");
-
-        ctx.save();
-        ctx.shadowColor = glow;
-        ctx.shadowBlur = isTip ? 18 : 8;
-        ctx.fillStyle = radial;
-        ctx.beginPath();
-        ctx.arc(px, py, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-    }
-
-    function drawAimLine(ctx, landmarks) {
-      const base = landmarks[5]; // index mcp
-      const tip = landmarks[8];  // index tip
-      if (!base || !tip) return;
-
-      const bx = base.x * canvas.width;
-      const by = base.y * canvas.height;
-      const tx = tip.x * canvas.width;
-      const ty = tip.y * canvas.height;
-
-      const dx = tx - bx;
-      const dy = ty - by;
-      const len2 = dx * dx + dy * dy;
-      if (len2 < 1e-6) return;
-
-      // Find intersection with canvas bounds
-      const tVals = [];
-      if (dx > 0) tVals.push((canvas.width - bx) / dx);
-      if (dx < 0) tVals.push(-bx / dx);
-      if (dy > 0) tVals.push((canvas.height - by) / dy);
-      if (dy < 0) tVals.push(-by / dy);
-      const t = Math.min(...tVals.filter(v => v > 0));
-      if (!isFinite(t)) return;
-
-      const ex = bx + dx * t;
-      const ey = by + dy * t;
-
-      ctx.save();
-      ctx.lineWidth = 3;
-      ctx.shadowColor = "#38bdf8";
-      ctx.shadowBlur = 18;
-
-      const grad = ctx.createLinearGradient(bx, by, ex, ey);
-      grad.addColorStop(0, "rgba(34,211,238,0.65)");
-      grad.addColorStop(1, "rgba(14,165,233,0.25)");
-      ctx.strokeStyle = grad;
-
-      ctx.beginPath();
-      ctx.moveTo(bx, by);
-      ctx.lineTo(ex, ey);
-      ctx.stroke();
-
-      // End cap / pointer dot
-      const dot = ctx.createRadialGradient(ex, ey, 0, ex, ey, 10);
-      dot.addColorStop(0, "rgba(255,255,255,0.95)");
-      dot.addColorStop(1, "rgba(14,165,233,0.4)");
-      ctx.fillStyle = dot;
-      ctx.beginPath();
-      ctx.arc(ex, ey, 10, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
-    }
-
-    // Simple convex-hull silhouette for a soft, realistic hand mass
-    function drawSilhouette(ctx, landmarks) {
-      if (!landmarks || landmarks.length === 0) return;
-
-      const points = landmarks.map(p => ({ x: p.x * canvas.width, y: p.y * canvas.height }));
-      const hull = convexHull(points);
-      if (hull.length < 3) return;
-
-      const grad = ctx.createRadialGradient(
-        canvas.width * 0.45, canvas.height * 0.45, 10,
-        canvas.width * 0.45, canvas.height * 0.45, Math.max(canvas.width, canvas.height) * 0.6
-      );
-      grad.addColorStop(0, "rgba(56,189,248,0.35)");
-      grad.addColorStop(1, "rgba(14,116,144,0.05)");
-
-      ctx.save();
-      ctx.fillStyle = grad;
-      ctx.shadowColor = "#22d3ee";
-      ctx.shadowBlur = 25;
-
-      ctx.beginPath();
-      ctx.moveTo(hull[0].x, hull[0].y);
-      for (let i = 1; i < hull.length; i++) {
-        ctx.lineTo(hull[i].x, hull[i].y);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    }
-
-    function drawFaces(ctx) {
-      if (!faceDetections || !faceDetections.length) return;
-      ctx.save();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(14,165,233,0.8)";
-      ctx.fillStyle = "rgba(14,165,233,0.18)";
-      ctx.font = "16px Segoe UI";
-      ctx.textBaseline = "top";
-      for (let i = 0; i < faceDetections.length; i++) {
-        const face = faceDetections[i];
-        const smooth = smoothedBoxes[i];
-        const box = smooth || face.box;
-        if (!box) continue;
-        const x = box.x ?? box[0];
-        const y = box.y ?? box[1];
-        const w = box.w ?? box[2];
-        const h = box.h ?? box[3];
-        const cx = x + w * 0.5;
-        const cy = y + h * 0.5;
-        ctx.beginPath();
-        ctx.rect(x, y, w, h);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = "#e0f2fe";
-        const emotion = face.emotion?.[0]?.emotion;
-        const emoScore = face.emotion?.[0]?.score;
-        const gender = face.gender;
-        const age = face.age ? Math.round(face.age) : undefined;
-        const label = [
-          `face ${(face.score?.toFixed?.(2) || "")}`,
-          gender ? `gender:${gender} ${(face.genderScore?.toFixed?.(2) || "")}` : null,
-          age ? `age:${age}` : null,
-          emotion ? `${emotion}:${emoScore?.toFixed?.(2)}` : null,
-        ].filter(Boolean).join(" | ");
-        ctx.fillText(label, x + 6, y + 6);
-        ctx.fillStyle = "rgba(14,165,233,0.18)";
-
-        // Orientation lines (yaw, pitch, roll) in orange
-        const rot = face.rotation || {};
-        const len = Math.min(w, h) * 0.35;
-        ctx.strokeStyle = "#f97316";
-        ctx.lineWidth = 3;
-        ctx.beginPath(); // yaw (left/right)
-        const yawX = cx + Math.sin(rot.yaw || 0) * len;
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(yawX, cy);
-        ctx.stroke();
-
-        ctx.beginPath(); // pitch (up/down)
-        const pitchY = cy - Math.sin(rot.pitch || 0) * len;
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx, pitchY);
-        ctx.stroke();
-
-        ctx.beginPath(); // roll (tilt)
-        const roll = rot.roll || 0;
-        const rx = Math.cos(roll) * len * 0.6;
-        const ry = Math.sin(roll) * len * 0.6;
-        ctx.moveTo(cx - rx, cy - ry);
-        ctx.lineTo(cx + rx, cy + ry);
-        ctx.stroke();
-
-        ctx.fillStyle = "#f97316";
-        ctx.fillText(
-          `yaw:${deg(rot.yaw)} pitch:${deg(rot.pitch)} roll:${deg(rot.roll)}`,
-          x + 6,
-          y + 26
-        );
-      }
-      ctx.restore();
-    }
-
-    function deg(rad) {
-      if (rad === undefined || rad === null) return "--";
-      return (rad * 57.2958).toFixed(0);
-    }
-
-    // Monotonic chain convex hull
-    function convexHull(points) {
-      if (points.length <= 3) return points.slice();
-      const pts = points.slice().sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
-      const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-      const lower = [];
-      for (const p of pts) {
-        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
-          lower.pop();
-        }
-        lower.push(p);
-      }
-      const upper = [];
-      for (let i = pts.length - 1; i >= 0; i--) {
-        const p = pts[i];
-        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
-          upper.pop();
-        }
-        upper.push(p);
-      }
-      upper.pop();
-      lower.pop();
-      return lower.concat(upper);
-    }
-
-    startBtn.addEventListener("click", startExperience);
-    window.addEventListener("resize", resizeCanvas);
-  </script>
+// ═══════════════════════════════════════
+//  START
+// ═══════════════════════════════════════
+window.addEventListener('load', () => {
+  document.getElementById('setup-modal').classList.add('hidden');
+  startBoot();
+});
+</script>
 </body>
 </html>
