@@ -266,7 +266,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
       <div class="modal-row">
         <div class="modal-label">ANTHROPIC API KEY</div>
         <div class="modal-sublabel">console.anthropic.com → Get API Key</div>
-        <input class="modal-input" id="key-anthropic" type="password" value="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"/>
+        <input class="modal-input" id="key-anthropic" type="password" value="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"/>
       </div>
     </div>
     <div class="modal-section">
@@ -519,7 +519,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 //  CONFIG STORE
 // ═══════════════════════════════════════
 let KEYS = {
-  anthropic: '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',
+  anthropic: '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',
   finnhub:   'd6meaahr01qi0ajltq0gd6meaahr01qi0ajltq10',
   serpapi:   'a95593325c3dd0abacbbd6289ab28aaed64cfc8196fbc5c4a8eaf00299bc24ef'
 };
@@ -1112,9 +1112,9 @@ async function sendJarvis() {
   }
   addThinking();
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://proxy.akshatgayu.workers.dev', {
       method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':KEYS.anthropic,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','anthropic-beta':'messages-2023-12-15'},
+      headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         model:'claude-haiku-4-5-20251001', max_tokens:280,
         system:`You are J.A.R.V.I.S., the AI assistant for Akshat's personal Akshat Industries Command Center. You are brilliant, witty, slightly dry in humor, and hyper-capable. You speak concisely — 1-3 sentences max. You address the user as "Akshat" (never "Mr. Akshat"). Current time: ${new Date().toLocaleTimeString()}. Location: Salt Lake City, UT.
