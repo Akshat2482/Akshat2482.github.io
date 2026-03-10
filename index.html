@@ -4,8 +4,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>AKSHAT INDUSTRIES — AKSHAT COMMAND CENTER</title>
-<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Widgets/widgets.css"/>
-<script src="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Cesium.js"></script>
 <link rel="icon" href="favicon.ico"/>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
@@ -148,7 +146,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .right-col{display:flex;flex-direction:column;gap:8px;grid-row:3;overflow:hidden;}
 
 /* JARVIS CHAT */
-.jarvis-panel{flex:2;display:flex;flex-direction:column;min-height:0;}
+.jarvis-panel{flex:3.5;display:flex;flex-direction:column;min-height:0;}
 .chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:3px;margin-bottom:7px;scrollbar-width:thin;scrollbar-color:rgba(0,212,255,.2) transparent;}
 .chat-messages::-webkit-scrollbar{width:3px;}
 .chat-messages::-webkit-scrollbar-thumb{background:rgba(0,212,255,.2);border-radius:2px;}
@@ -481,26 +479,6 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     </div>
 
 
-    <!-- CesiumJS 3D Satellite Globe -->
-    <div class="panel" style="flex-shrink:0;padding:8px 10px;">
-      <div class="pt">🛰 ORBITAL TRACKER · <span id="sat-count" style="color:var(--cg);">INITIALIZING...</span></div>
-      <div id="cesium-container" style="width:100%;height:195px;position:relative;border-radius:2px;overflow:hidden;">
-        <!-- Cesium Ion token input overlay — hidden once token set -->
-        <div id="cesium-token-prompt" style="position:absolute;inset:0;background:rgba(0,6,16,.96);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px;">
-          <div style="font-size:8px;letter-spacing:.2em;color:rgba(0,212,255,.6);font-family:'Share Tech Mono',monospace;">CESIUM ION TOKEN REQUIRED</div>
-          <div style="font-size:7px;color:rgba(0,212,255,.35);font-family:'Share Tech Mono',monospace;text-align:center;">Free at <b style="color:var(--c);">ion.cesium.com</b> → Sign up → Access Tokens</div>
-          <input id="cesium-token-input" style="width:100%;background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);color:#fff;font-family:'Share Tech Mono',monospace;font-size:9px;padding:6px 8px;border-radius:2px;outline:none;" placeholder="Paste your Cesium Ion token..."/>
-          <button onclick="initCesiumGlobe()" style="background:rgba(0,212,255,.12);border:1px solid var(--c);color:var(--c);font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:.2em;padding:6px 16px;border-radius:2px;cursor:pointer;">LAUNCH GLOBE</button>
-        </div>
-        <div id="cesiumContainer" style="width:100%;height:100%;"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:7px;font-family:'Share Tech Mono',monospace;color:rgba(0,212,255,.4);letter-spacing:.1em;">
-        <span>● <span style="color:#ffff00">LEO</span>  ● <span style="color:#00d4ff">MEO</span>  ● <span style="color:#ff8800">GEO</span>  ● <span style="color:#00ff88">SLC</span></span>
-        <span id="sat-hover-name">DRAG · SCROLL TO ZOOM</span>
-      </div>
-    </div>
-
-
     <!-- Threat -->
     <div class="panel" style="flex-shrink:0;">
       <div class="pt">THREAT ASSESSMENT</div>
@@ -543,8 +521,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 let KEYS = {
   anthropic: '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',
   finnhub:   'd6meaahr01qi0ajltq0gd6meaahr01qi0ajltq10',
-  serpapi:   'a95593325c3dd0abacbbd6289ab28aaed64cfc8196fbc5c4a8eaf00299bc24ef',
-  cesium:    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkNjc2MTQyYi01ZDcyLTQ1OWItOTQxNy1lODczMDhlNWQxMGEiLCJpZCI6NDAxMDkzLCJpYXQiOjE3NzMxMTEzODV9.DhDMm6lcvYFAPfFfr02jxMi8SVW2ptFtz8g6cmknyx0'
+  serpapi:   'a95593325c3dd0abacbbd6289ab28aaed64cfc8196fbc5c4a8eaf00299bc24ef'
 };
 const SESSION_START = Date.now();
 const STOCK_SYMS = ['AAPL','TSLA','NVDA','MSFT','AMZN','SPY'];
@@ -606,7 +583,6 @@ function initAll() {
   initClock(); initUptime(); initWeather();
   initStocks(); initFlightMap(); initEnergyGraph();
   initIntelTicker(); initJarvisAuto(); initFluctuations();
-  initSatellites();
 }
 
 // ═══════════════════════════════════════
@@ -1262,160 +1238,6 @@ async function showFlightBoard(airport, type, query) {
 
 
 
-// ═══════════════════════════════════════
-//  CESIUMJS 3D SATELLITE GLOBE
-// ═══════════════════════════════════════
-let cesiumViewer = null;
-
-function initSatellites() {
-  const token = KEYS.cesium;
-  document.getElementById('cesium-token-input').value = token;
-  initCesiumGlobe();
-}
-
-function initCesiumGlobe() {
-  const token = document.getElementById('cesium-token-input').value.trim() || KEYS.cesium;
-  if (!token) { alert('Please enter your Cesium Ion token'); return; }
-  KEYS.cesium = token;
-
-  // Hide prompt
-  document.getElementById('cesium-token-prompt').style.display = 'none';
-
-  // Set token
-  Cesium.Ion.defaultAccessToken = token;
-
-  // Override Cesium's default stylesheet clashes
-  const style = document.createElement('style');
-  style.textContent = `
-    #cesiumContainer { background:#000 !important; }
-    .cesium-widget-credits, .cesium-credit-logoContainer, .cesium-credit-textContainer { display:none !important; }
-    .cesium-viewer-toolbar, .cesium-viewer-animationContainer, .cesium-viewer-timelineContainer,
-    .cesium-viewer-bottom, .cesium-viewer-fullscreenContainer { display:none !important; }
-    .cesium-widget canvas { border-radius:2px; }
-  `;
-  document.head.appendChild(style);
-
-  cesiumViewer = new Cesium.Viewer('cesiumContainer', {
-    terrainProvider: new Cesium.EllipsoidTerrainProvider(),
-    imageryProvider: new Cesium.IonImageryProvider({ assetId: 3 }), // Bing Aerial
-    animation: false,
-    timeline: false,
-    baseLayerPicker: false,
-    geocoder: false,
-    homeButton: false,
-    sceneModePicker: false,
-    navigationHelpButton: false,
-    infoBox: false,
-    selectionIndicator: false,
-    fullscreenButton: false,
-    creditContainer: document.createElement('div'), // hide credits
-  });
-
-  const viewer = cesiumViewer;
-  const scene  = viewer.scene;
-  scene.backgroundColor = new Cesium.Color(0, 0, 0, 1);
-  scene.globe.enableLighting = true;
-  scene.skyBox.show = true;
-  scene.skyAtmosphere.show = true;
-
-  // Tilt camera to show globe from space
-  viewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(-111.891, 20, 18000000),
-    orientation: { heading: 0, pitch: -Cesium.Math.PI_OVER_TWO * 0.7, roll: 0 }
-  });
-
-  // ── SLC marker ──
-  viewer.entities.add({
-    position: Cesium.Cartesian3.fromDegrees(-111.891, 40.7608, 0),
-    point: { pixelSize: 10, color: Cesium.Color.fromCssColorString('#00ff88'), outlineColor: Cesium.Color.fromCssColorString('#00ff88'), outlineWidth: 2 },
-    label: {
-      text: 'SLC', font: '10px Share Tech Mono', fillColor: Cesium.Color.fromCssColorString('#00d4ff'),
-      pixelOffset: new Cesium.Cartesian2(0, -20), showBackground: true,
-      backgroundColor: Cesium.Color.fromCssColorString('rgba(0,10,22,0.8)'),
-    }
-  });
-
-  // ── Generate satellites with real orbital mechanics ──
-  const SAT_CONFIGS = [
-    // [name, alt_km, inc_deg, lon_offset, count, color_hex, type]
-    ['STARLINK',  550,  53, 0,  80, '#ffff00', 'LEO'],
-    ['ONEWEB',    1200, 87, 1,  30, '#ffff00', 'LEO'],
-    ['ISS',       408,  51, 2,  1,  '#00ff88', 'STATION'],
-    ['GPS',       20200,55, 3,  24, '#00d4ff', 'MEO'],
-    ['GLONASS',   19100,64, 4,  24, '#00aaff', 'MEO'],
-    ['GALILEO',   23222,56, 5,  30, '#0066ff', 'MEO'],
-    ['GOES',      35786, 0, 6,  8,  '#ff8800', 'GEO'],
-    ['INTELSAT',  35786, 1, 7,  10, '#ff6600', 'GEO'],
-    ['NOAA',      870,  98, 8,  5,  '#ffaa00', 'WEATHER'],
-    ['TERRA/AQUA',705,  98, 9,  4,  '#ff5500', 'EO'],
-  ];
-
-  const allSatEntities = [];
-  const earthR = 6371000; // meters
-
-  SAT_CONFIGS.forEach(([name, altKm, incDeg, phaseOffset, count, colorHex, type]) => {
-    const altM   = altKm * 1000;
-    const radius = earthR + altM;
-    const period = 2 * Math.PI * Math.sqrt(Math.pow(radius, 3) / (3.986e14)); // seconds
-    const inc    = Cesium.Math.toRadians(incDeg);
-
-    for (let i = 0; i < count; i++) {
-      const phase0    = (i / count) * Math.PI * 2 + phaseOffset;
-      const raan      = (i / count) * Math.PI * 2 * 0.8; // right ascension
-
-      const positionProp = new Cesium.SampledPositionProperty();
-      const start = Cesium.JulianDate.now();
-      const steps = 60;
-      for (let s = 0; s <= steps; s++) {
-        const t      = s * (period / steps);
-        const M      = phase0 + (2 * Math.PI / period) * t;
-        // ECI-like position
-        const xOrb   = radius * Math.cos(M);
-        const yOrb   = radius * Math.sin(M);
-        // Rotate by inclination and RAAN
-        const x = xOrb * Math.cos(raan) - yOrb * Math.sin(raan) * Math.cos(inc);
-        const y = xOrb * Math.sin(raan) + yOrb * Math.cos(raan) * Math.cos(inc);
-        const z = yOrb * Math.sin(inc);
-
-        const lon = Math.atan2(y, x) * 180 / Math.PI;
-        const lat = Math.asin(z / radius) * 180 / Math.PI;
-
-        const jd = Cesium.JulianDate.addSeconds(start, t, new Cesium.JulianDate());
-        positionProp.addSample(jd, Cesium.Cartesian3.fromDegrees(lon, lat, altM));
-      }
-      positionProp.forwardExtrapolationType = Cesium.ExtrapolationType.EXTRAPOLATE;
-
-      const entity = viewer.entities.add({
-        position: positionProp,
-        point: {
-          pixelSize: altKm > 20000 ? 5 : altKm > 1000 ? 4 : 3,
-          color: Cesium.Color.fromCssColorString(colorHex),
-          scaleByDistance: new Cesium.NearFarScalar(1e6, 1.2, 1e8, 0.4),
-        },
-        name: `${name}-${i+1} (${type}, ${altKm}km alt)`,
-      });
-      allSatEntities.push(entity);
-    }
-  });
-
-  const totalSats = allSatEntities.length;
-  document.getElementById('sat-count').textContent = `${totalSats} SATELLITES · LIVE ORBITS`;
-
-  // Auto-slow spin
-  viewer.clock.shouldAnimate = true;
-  viewer.clock.multiplier = 120; // 2 min per real second — see orbits move
-  viewer.clock.startTime = Cesium.JulianDate.now();
-  viewer.clock.currentTime = Cesium.JulianDate.now();
-
-  // Click to show satellite name
-  const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
-  handler.setInputAction(e => {
-    const picked = scene.pick(e.position);
-    if (Cesium.defined(picked) && picked.id && picked.id.name) {
-      document.getElementById('sat-hover-name').textContent = '▶ ' + picked.id.name;
-    }
-  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-}
 
 // ═══════════════════════════════════════
 //  FLUCTUATIONS
