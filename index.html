@@ -254,38 +254,37 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 <body>
 
 <!-- ══ SETUP MODAL ══ -->
+
+
+<!-- ══ SETUP MODAL ══ -->
 <div id="setup-modal">
   <div class="modal-box">
     <div class="modal-logo">AKSHAT <span>INDUSTRIES</span></div>
     <div class="modal-sub">AKSHAT COMMAND CENTER — SYSTEM INITIALIZATION</div>
-
     <div class="modal-section">
       <div class="modal-section-title"><span>01</span> J.A.R.V.I.S. AI CORE <span class="modal-opt-badge">OPTIONAL</span></div>
       <div class="modal-row">
         <div class="modal-label">ANTHROPIC API KEY</div>
         <div class="modal-sublabel">console.anthropic.com → Get API Key</div>
-        <input class="modal-input" id="key-anthropic" type="password" placeholder="sk-ant-api03-..."/>
+        <input class="modal-input" id="key-anthropic" type="password" value="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"/>
       </div>
     </div>
-
     <div class="modal-section">
       <div class="modal-section-title"><span>02</span> MARKET INTELLIGENCE <span class="modal-req-badge">RECOMMENDED</span></div>
       <div class="modal-row">
         <div class="modal-label">FINNHUB API KEY</div>
         <div class="modal-sublabel">finnhub.io → Free account → Dashboard</div>
-        <input class="modal-input" id="key-finnhub" type="password" placeholder="d1abc123xyz..."/>
+        <input class="modal-input" id="key-finnhub" type="password" value="d6meaahr01qi0ajltq0gd6meaahr01qi0ajltq10"/>
       </div>
     </div>
-
     <div class="modal-section">
       <div class="modal-section-title"><span>03</span> INTEL SEARCH <span class="modal-opt-badge">OPTIONAL</span></div>
       <div class="modal-row">
         <div class="modal-label">SERPAPI KEY</div>
         <div class="modal-sublabel">serpapi.com → Free 100 searches/month</div>
-        <input class="modal-input" id="key-serpapi" type="password" placeholder="abc123def456..."/>
+        <input class="modal-input" id="key-serpapi" type="password" value="a95593325c3dd0abacbbd6289ab28aaed64cfc8196fbc5c4a8eaf00299bc24ef"/>
       </div>
     </div>
-
     <button class="modal-btn" onclick="saveKeys()">⚡ INITIALIZE COMMAND CENTER</button>
     <button class="modal-skip" onclick="skipKeys()">LAUNCH WITHOUT API KEYS (LIMITED MODE)</button>
     <div class="modal-links">
@@ -530,6 +529,7 @@ let KEYS = {
 };
 const SESSION_START = Date.now();
 const STOCK_SYMS = ['AAPL','TSLA','NVDA','MSFT','AMZN','SPY'];
+
 
 // ═══════════════════════════════════════
 //  SETUP MODAL
@@ -1243,273 +1243,253 @@ function initEarthGlobe() {
   const canvas = document.getElementById('earth-canvas');
   if (!canvas) return;
   const dpr = window.devicePixelRatio || 1;
-  function resize() {
-    canvas.width  = canvas.offsetWidth  * dpr;
-    canvas.height = canvas.offsetHeight * dpr;
-  }
+  function resize() { canvas.width = canvas.offsetWidth * dpr; canvas.height = canvas.offsetHeight * dpr; }
   resize();
   window.addEventListener('resize', resize);
-
   const ctx = canvas.getContext('2d');
-  let t = 0; // time
-  let satBob = 0;
+  let t = 0, satBob = 0;
 
-  // City lights on the night side — [x_fraction, y_fraction_below_horizon, brightness]
+  // Real NASA Blue Marble Earth texture
+  const earthImg = new Image();
+  earthImg.crossOrigin = 'anonymous';
+  earthImg.src = 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/land_ocean_ice_cloud_2048.jpg';
+
+  // SLC exact coords
+  const SLC_LON = -111.891, SLC_LAT = 40.7608;
+  const slcXFrac = (SLC_LON + 180) / 360;  // ~0.189
+  const slcYFrac = (90 - SLC_LAT) / 180;   // ~0.274
+
+  // US east-coast cities for night lights [lon, lat, brightness]
   const CITIES = [
-    [0.38, 0.08, 0.9],  // SLC — main dot (bigger, handled separately)
-    [0.28, 0.14, 0.6],  // LA
-    [0.52, 0.12, 0.7],  // Denver
-    [0.18, 0.18, 0.5],  // SF
-    [0.62, 0.10, 0.6],  // Kansas City
-    [0.70, 0.16, 0.5],  // Dallas
-    [0.78, 0.20, 0.65], // Houston
-    [0.82, 0.12, 0.7],  // Atlanta
-    [0.88, 0.08, 0.8],  // Miami
-    [0.14, 0.24, 0.4],  // Portland
-    [0.72, 0.28, 0.4],  // New Orleans
-    [0.45, 0.22, 0.35], // Albuquerque
-    [0.33, 0.28, 0.3],  // Phoenix
-    [0.56, 0.28, 0.35], // OKC
-    [0.88, 0.24, 0.45], // Tampa
+    [-87.6,41.8,0.9],[-74.0,40.7,1.0],[-71.1,42.4,0.8],[-77.0,38.9,0.85],
+    [-84.4,33.7,0.75],[-80.2,25.8,0.8],[-90.2,29.9,0.7],[-95.4,29.8,0.8],
+    [-96.8,32.8,0.75],[-93.1,44.9,0.65],[-97.5,35.5,0.6],[-85.8,38.2,0.7],
+    [-81.7,41.5,0.7],[-83.0,42.3,0.65],[-86.2,39.8,0.6]
   ];
 
   function draw() {
     const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
+    ctx.clearRect(0,0,W,H);
 
-    // ── Space background ──
-    ctx.fillStyle = '#000005';
-    ctx.fillRect(0, 0, W, H);
+    // ── Space ──
+    ctx.fillStyle = '#00000a';
+    ctx.fillRect(0,0,W,H);
 
-    // ── Stars ──
-    for (let i = 0; i < 160; i++) {
-      const sx = ((Math.sin(i * 127.3) * 0.5 + 0.5)) * W;
-      const sy = ((Math.sin(i * 311.7) * 0.5 + 0.5)) * H * 0.62; // only in upper space area
-      const sr = (0.3 + (Math.sin(i * 53.1) * 0.5 + 0.5) * 1.1) * dpr;
+    // ── Stars — varied sizes, colours, twinkle ──
+    for (let i = 0; i < 220; i++) {
+      const sx = (Math.sin(i*127.3)*0.5+0.5)*W;
+      const sy = (Math.sin(i*311.7)*0.5+0.5)*H*0.58;
+      const base = 0.3+(Math.sin(i*53.1)*0.5+0.5)*1.4;
+      const twinkle = 0.3+Math.sin(t*1.1+i*0.73)*0.35+Math.sin(t*0.4+i*1.9)*0.25;
+      const col = i%6===0?'#99ccff':i%9===0?'#ffddaa':i%13===0?'#ffaaaa':'#ffffff';
       ctx.beginPath();
-      ctx.arc(sx, sy, sr, 0, Math.PI * 2);
-      ctx.globalAlpha = 0.25 + (Math.sin(t * 0.6 + i * 0.4) * 0.5 + 0.5) * 0.65;
-      ctx.fillStyle = '#fff';
+      ctx.arc(sx, sy, base*dpr, 0, Math.PI*2);
+      ctx.globalAlpha = Math.max(0.05, Math.min(1, twinkle));
+      ctx.fillStyle = col;
       ctx.fill();
+      // Bright star cross-flare
+      if (base > 1.1 && twinkle > 0.7) {
+        ctx.globalAlpha = twinkle*0.4;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 0.4*dpr;
+        ctx.beginPath();
+        ctx.moveTo(sx-base*3*dpr,sy); ctx.lineTo(sx+base*3*dpr,sy);
+        ctx.moveTo(sx,sy-base*3*dpr); ctx.lineTo(sx,sy+base*3*dpr);
+        ctx.stroke();
+      }
     }
     ctx.globalAlpha = 1;
 
-    // ── Earth: giant circle — only top curve visible ──
-    // Radius much larger than canvas so only horizon shows
-    const R = W * 2.2;
+    // ── Earth — giant arc, only curved horizon visible ──
+    const R = W * 2.8;          // very large so curvature is subtle/realistic
     const earthCX = W * 0.5;
-    const earthCY = H * 0.62 + R; // center far below canvas
+    const earthCY = H * 0.72 + R;  // push center far below so horizon sits at 72% down
 
     ctx.save();
-    // Clip to canvas
     ctx.beginPath();
-    ctx.rect(0, 0, W, H);
+    ctx.arc(earthCX, earthCY, R, 0, Math.PI*2);
     ctx.clip();
 
-    // Earth body — ocean base
-    ctx.beginPath();
-    ctx.arc(earthCX, earthCY, R, 0, Math.PI * 2);
-    const oceanGrad = ctx.createRadialGradient(earthCX, earthCY - R * 0.3, R * 0.1, earthCX, earthCY, R);
-    oceanGrad.addColorStop(0, '#1565a0');
-    oceanGrad.addColorStop(0.3, '#0d4a7a');
-    oceanGrad.addColorStop(0.65, '#082d55');
-    oceanGrad.addColorStop(1, '#040d1e');
-    ctx.fillStyle = oceanGrad;
-    ctx.fill();
+    if (earthImg.complete && earthImg.naturalWidth > 0) {
+      // Scale so ~55% of Earth longitude visible, centered on western US
+      const visLon = 0.52;
+      const scale = W / (earthImg.width * visLon);
+      const drawW = earthImg.width * scale;
+      const drawH = earthImg.height * scale;
 
-    // ── Land masses near SLC (North America top) ──
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(earthCX, earthCY, R, 0, Math.PI * 2);
-    ctx.clip();
+      // Position SLC at ~42% from left edge of panel
+      const targetX = W * 0.42;
+      const targetY = earthCY - R + R * 0.13;
+      const drawX = targetX - slcXFrac * drawW;
+      const drawY = targetY - slcYFrac * drawH;
 
-    // Dark land base
-    ctx.fillStyle = 'rgba(15,35,15,0.9)';
-    ctx.beginPath();
-    // rough NA continent silhouette mapped onto the curved surface
-    const lx = (f) => earthCX + (f - 0.5) * R * 2.0;
-    const ly = (fy) => earthCY - Math.sqrt(Math.max(0, R*R - Math.pow(lx(0.5)-earthCX,2))) + fy * R * 0.18;
+      ctx.drawImage(earthImg, drawX, drawY, drawW, drawH);
 
-    // Terrain patches
-    [[0.10,0.02,0.55,0.38],[0.30,0.01,0.65,0.32],[0.08,0.05,0.42,0.22]].forEach(([x1,y1,x2,y2]) => {
-      const px1 = earthCX + (x1 - 0.5) * R * 1.85;
-      const px2 = earthCX + (x2 - 0.5) * R * 1.85;
-      // horizon y for each x
-      const hy1 = earthCY - Math.sqrt(Math.max(0, R*R - (px1-earthCX)**2));
-      const hy2 = earthCY - Math.sqrt(Math.max(0, R*R - (px2-earthCX)**2));
-      ctx.beginPath();
-      ctx.moveTo(px1, hy1 + y1 * R * 0.28);
-      ctx.lineTo(px2, hy2 + y1 * R * 0.28);
-      ctx.lineTo(px2, hy2 + y2 * R * 0.28);
-      ctx.lineTo(px1, hy1 + y2 * R * 0.28);
-      ctx.closePath();
-      ctx.fillStyle = `rgba(20,52,20,${0.7 + Math.random()*0.1})`;
-      ctx.fill();
-    });
+      // Night-side overlay (east coast and beyond)
+      const ng = ctx.createLinearGradient(W*0.25, 0, W, 0);
+      ng.addColorStop(0,   'rgba(0,0,0,0)');
+      ng.addColorStop(0.35,'rgba(0,3,15,0.25)');
+      ng.addColorStop(0.62,'rgba(0,3,18,0.62)');
+      ng.addColorStop(1,   'rgba(0,0,12,0.88)');
+      ctx.fillStyle = ng;
+      ctx.fillRect(0,0,W,H);
 
-    // Night side darkness (right portion)
-    const nightGrad = ctx.createLinearGradient(W * 0.35, 0, W, 0);
-    nightGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    nightGrad.addColorStop(0.3, 'rgba(0,0,10,0.25)');
-    nightGrad.addColorStop(0.65, 'rgba(0,0,10,0.6)');
-    nightGrad.addColorStop(1, 'rgba(0,0,15,0.82)');
-    ctx.fillStyle = nightGrad;
-    ctx.fillRect(0, 0, W, H);
+      // City lights
+      CITIES.forEach(([lon,lat,br],idx)=>{
+        const cx2 = drawX + (lon+180)/360*drawW;
+        const cy2 = drawY + (90-lat)/180*drawH;
+        if (cx2<-10||cx2>W+10||cy2<-10||cy2>H+10) return;
+        const nightF = Math.max(0,(cx2/W-0.28)/0.72);
+        if (nightF < 0.06) return;
+        const a = nightF*br*(0.65+Math.sin(t*0.35+idx)*0.18);
+        const gr = ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,7*dpr);
+        gr.addColorStop(0,`rgba(255,215,110,${a})`);
+        gr.addColorStop(0.45,`rgba(255,155,55,${a*0.35})`);
+        gr.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=gr;
+        ctx.beginPath(); ctx.arc(cx2,cy2,7*dpr,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx2,cy2,1.6*dpr,0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,235,160,${a*0.95})`; ctx.fill();
+      });
 
-    // ── City lights (night side) ──
-    CITIES.forEach(([fx, fy, br], idx) => {
-      const cx2 = earthCX + (fx - 0.5) * R * 1.7;
-      const horizonY = earthCY - Math.sqrt(Math.max(0, R*R - (cx2-earthCX)**2));
-      const cy2 = horizonY + fy * R * 0.22;
-      if (cy2 > H || cy2 < 0) return;
-      // Only show on night side (right 55%)
-      const nightFactor = Math.max(0, (fx - 0.3) / 0.7);
-      if (nightFactor < 0.05) return;
-      const alpha = nightFactor * br * (0.7 + Math.sin(t * 0.3 + idx) * 0.15);
-      // Glow
-      const grd = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, 5 * dpr);
-      grd.addColorStop(0, `rgba(255,200,100,${alpha * 0.9})`);
-      grd.addColorStop(0.4, `rgba(255,160,60,${alpha * 0.4})`);
-      grd.addColorStop(1, 'rgba(255,120,30,0)');
-      ctx.fillStyle = grd;
-      ctx.beginPath();
-      ctx.arc(cx2, cy2, 5 * dpr, 0, Math.PI * 2);
-      ctx.fill();
-      // Core dot
-      ctx.beginPath();
-      ctx.arc(cx2, cy2, 1.2 * dpr, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255,220,150,${alpha})`;
-      ctx.fill();
-    });
+      // SLC position
+      const slcX = drawX + slcXFrac * drawW;
+      const slcY = drawY + slcYFrac * drawH;
+      const satX = W*0.5, satY = H*0.09 + Math.sin(satBob)*3*dpr;
 
-    ctx.restore();
+      if (slcX>0&&slcX<W&&slcY>0&&slcY<H) {
+        // Cyan targeting bracket around SLC
+        const bl = 10*dpr, bg = 5*dpr;
+        ctx.strokeStyle = 'rgba(0,212,255,0.7)';
+        ctx.lineWidth = 1.2*dpr;
+        [[slcX-bg-bl,slcY-bg,slcX-bg,slcY-bg,slcX-bg,slcY-bg-bl],
+         [slcX+bg+bl,slcY-bg,slcX+bg,slcY-bg,slcX+bg,slcY-bg-bl],
+         [slcX-bg-bl,slcY+bg,slcX-bg,slcY+bg,slcX-bg,slcY+bg+bl],
+         [slcX+bg+bl,slcY+bg,slcX+bg,slcY+bg,slcX+bg,slcY+bg+bl]
+        ].forEach(([x1,y1,x2,y2,x3,y3])=>{
+          ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3); ctx.stroke();
+        });
 
-    // ── Atmosphere glow on horizon ──
-    const horizonY_center = earthCY - R;
-    const atmosH = H * 0.12;
-    const atmosGrad = ctx.createLinearGradient(0, horizonY_center - atmosH, 0, horizonY_center + atmosH * 0.5);
-    atmosGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    atmosGrad.addColorStop(0.3, 'rgba(30,100,255,0.08)');
-    atmosGrad.addColorStop(0.6, 'rgba(60,160,255,0.22)');
-    atmosGrad.addColorStop(0.8, 'rgba(80,180,255,0.35)');
-    atmosGrad.addColorStop(1, 'rgba(100,200,255,0.1)');
-    ctx.beginPath();
-    ctx.arc(earthCX, earthCY, R + atmosH * 0.8, 0, Math.PI * 2);
-    ctx.arc(earthCX, earthCY, R - atmosH * 0.3, 0, Math.PI * 2, true);
-    ctx.fillStyle = atmosGrad;
-    ctx.fill();
+        // Pulse rings
+        const pr = (9+Math.sin(t*3)*4)*dpr;
+        ctx.beginPath(); ctx.arc(slcX,slcY,pr,0,Math.PI*2);
+        ctx.strokeStyle=`rgba(0,255,136,${0.22+Math.sin(t*3)*0.12})`;
+        ctx.lineWidth=1.5*dpr; ctx.stroke();
+        ctx.beginPath(); ctx.arc(slcX,slcY,6*dpr,0,Math.PI*2);
+        ctx.strokeStyle='rgba(0,255,136,0.55)'; ctx.lineWidth=1.2*dpr; ctx.stroke();
+        // Core
+        ctx.beginPath(); ctx.arc(slcX,slcY,4.5*dpr,0,Math.PI*2);
+        ctx.fillStyle='#00ff88'; ctx.shadowColor='#00ff88'; ctx.shadowBlur=16*dpr;
+        ctx.fill(); ctx.shadowBlur=0;
 
-    ctx.restore();
+        // Dashed beam to sat
+        ctx.setLineDash([3*dpr,6*dpr]);
+        ctx.beginPath(); ctx.moveTo(slcX,slcY); ctx.lineTo(satX,satY+16*dpr);
+        ctx.strokeStyle='rgba(0,255,136,0.18)'; ctx.lineWidth=dpr; ctx.stroke();
+        ctx.setLineDash([]);
 
-    // ── SLC green dot ──
-    const slcFX = 0.38;
-    const slcCX = earthCX + (slcFX - 0.5) * R * 1.7;
-    const slcHorizonY = earthCY - Math.sqrt(Math.max(0, R*R - (slcCX - earthCX)**2));
-    const slcCY = slcHorizonY + 0.08 * R * 0.22;
-
-    if (slcCY < H && slcCY > 0) {
-      const pulseR = (9 + Math.sin(t * 3) * 4) * dpr;
-      // Outer ring
-      ctx.beginPath();
-      ctx.arc(slcCX, slcCY, pulseR, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(0,255,136,${0.25 + Math.sin(t*3)*0.15})`;
-      ctx.lineWidth = 1.5 * dpr;
-      ctx.stroke();
-      // Mid ring
-      ctx.beginPath();
-      ctx.arc(slcCX, slcCY, 6 * dpr, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(0,255,136,0.55)';
-      ctx.lineWidth = 1.2 * dpr;
-      ctx.stroke();
-      // Core
-      ctx.beginPath();
-      ctx.arc(slcCX, slcCY, 4.5 * dpr, 0, Math.PI * 2);
-      ctx.fillStyle = '#00ff88';
-      ctx.shadowColor = '#00ff88';
-      ctx.shadowBlur = 14 * dpr;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-
-      // Dashed beam to satellite
-      const satY = H * 0.10 + Math.sin(satBob) * 3 * dpr;
-      const satX = W * 0.5;
-      ctx.setLineDash([3 * dpr, 6 * dpr]);
-      ctx.beginPath();
-      ctx.moveTo(slcCX, slcCY);
-      ctx.lineTo(satX, satY + 14 * dpr);
-      ctx.strokeStyle = 'rgba(0,255,136,0.2)';
-      ctx.lineWidth = 1 * dpr;
-      ctx.stroke();
-      ctx.setLineDash([]);
+        // Cyan label
+        ctx.font = `bold ${8*dpr}px 'Share Tech Mono',monospace`;
+        ctx.fillStyle='rgba(0,212,255,0.75)';
+        ctx.shadowColor='rgba(0,212,255,0.5)'; ctx.shadowBlur=4*dpr;
+        ctx.fillText('SLC', slcX+14*dpr, slcY-12*dpr);
+        ctx.shadowBlur=0;
+      }
+    } else {
+      // Fallback — realistic looking Earth while texture loads
+      const og = ctx.createRadialGradient(W*0.35, earthCY-R*0.25, R*0.05, earthCX, earthCY, R);
+      og.addColorStop(0,   '#2288cc');
+      og.addColorStop(0.15,'#1a6ba0');
+      og.addColorStop(0.45,'#0d4a7a');
+      og.addColorStop(0.8, '#082d55');
+      og.addColorStop(1,   '#020b1a');
+      ctx.fillStyle = og; ctx.fillRect(0,0,W,H);
+      // Land patches (western US region)
+      const landPatches = [
+        [0.05,0.0,0.55,0.45],[0.18,0.02,0.48,0.38],[0.22,0.05,0.4,0.3]
+      ];
+      landPatches.forEach(([x1f,y1f,x2f,y2f]) => {
+        const px1 = earthCX + (x1f-0.5)*R*1.9;
+        const px2 = earthCX + (x2f-0.5)*R*1.9;
+        const hy = (xp) => earthCY - Math.sqrt(Math.max(0, R*R-(xp-earthCX)**2));
+        ctx.beginPath();
+        ctx.moveTo(px1, hy(px1)+y1f*R*0.32);
+        ctx.lineTo(px2, hy(px2)+y1f*R*0.32);
+        ctx.lineTo(px2, hy(px2)+y2f*R*0.32);
+        ctx.lineTo(px1, hy(px1)+y2f*R*0.32);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(22,68,22,0.75)'; ctx.fill();
+      });
     }
 
+    ctx.restore();
+
+    // ── Atmosphere rim ──
+    const horizY = earthCY - R;
+    const atH = H*0.18;
+    const ag = ctx.createLinearGradient(0,horizY-atH,0,horizY+atH*0.5);
+    ag.addColorStop(0,'rgba(0,0,0,0)');
+    ag.addColorStop(0.3,'rgba(15,70,220,0.07)');
+    ag.addColorStop(0.62,'rgba(50,140,255,0.22)');
+    ag.addColorStop(0.82,'rgba(80,180,255,0.42)');
+    ag.addColorStop(1,'rgba(120,210,255,0.06)');
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(earthCX,earthCY,R+atH*0.95,0,Math.PI*2);
+    ctx.arc(earthCX,earthCY,R-atH*0.38,0,Math.PI*2,true);
+    ctx.fillStyle=ag; ctx.fill();
+    ctx.restore();
+
     // ── Satellite ──
-    const satX = W * 0.5;
-    const satY = H * 0.10 + Math.sin(satBob) * 3 * dpr;
-    const s = 3.8 * dpr;
+    const satX2 = W*0.5;
+    const satY2 = H*0.09 + Math.sin(satBob)*3*dpr;
+    const s = 4*dpr;
 
-    // Glow halo
-    const satGlow = ctx.createRadialGradient(satX, satY, 0, satX, satY, 22 * dpr);
-    satGlow.addColorStop(0, 'rgba(220,235,255,0.45)');
-    satGlow.addColorStop(0.5, 'rgba(160,200,255,0.15)');
-    satGlow.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = satGlow;
-    ctx.beginPath(); ctx.arc(satX, satY, 22 * dpr, 0, Math.PI * 2); ctx.fill();
-
+    // Halo
+    const sg = ctx.createRadialGradient(satX2,satY2,0,satX2,satY2,26*dpr);
+    sg.addColorStop(0,'rgba(200,225,255,0.5)');
+    sg.addColorStop(0.45,'rgba(140,185,255,0.18)');
+    sg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(satX2,satY2,26*dpr,0,Math.PI*2); ctx.fill();
     // Body
-    ctx.fillStyle = '#d0dde8';
-    ctx.shadowColor = '#99bbdd';
-    ctx.shadowBlur = 10 * dpr;
-    ctx.fillRect(satX - s, satY - s * 0.65, s * 2, s * 1.3);
-    ctx.shadowBlur = 0;
-
-    // Solar panels
-    ctx.fillStyle = '#1a3060';
-    ctx.strokeStyle = '#4488bb';
-    ctx.lineWidth = 0.6 * dpr;
-    ctx.fillRect(satX - s * 4.8, satY - s * 0.38, s * 3.5, s * 0.76);
-    ctx.strokeRect(satX - s * 4.8, satY - s * 0.38, s * 3.5, s * 0.76);
-    ctx.fillRect(satX + s * 1.3, satY - s * 0.38, s * 3.5, s * 0.76);
-    ctx.strokeRect(satX + s * 1.3, satY - s * 0.38, s * 3.5, s * 0.76);
-    // Grid lines on panels
-    ctx.strokeStyle = 'rgba(80,140,200,0.5)';
-    ctx.lineWidth = 0.4 * dpr;
-    [-3.3,-2.1,-0.8].forEach(ox => {
-      ctx.beginPath();
-      ctx.moveTo(satX + ox * s, satY - s * 0.38);
-      ctx.lineTo(satX + ox * s, satY + s * 0.38);
-      ctx.stroke();
-    });
-    [2.5, 3.8].forEach(ox => {
-      ctx.beginPath();
-      ctx.moveTo(satX + ox * s, satY - s * 0.38);
-      ctx.lineTo(satX + ox * s, satY + s * 0.38);
-      ctx.stroke();
-    });
+    ctx.fillStyle='#ccd8e5'; ctx.shadowColor='#88aacc'; ctx.shadowBlur=10*dpr;
+    ctx.fillRect(satX2-s,satY2-s*0.6,s*2,s*1.2); ctx.shadowBlur=0;
+    // Panels
+    ctx.fillStyle='#152848'; ctx.strokeStyle='#3377aa'; ctx.lineWidth=0.7*dpr;
+    ctx.fillRect(satX2-s*5.2,satY2-s*0.38,s*3.9,s*0.76);
+    ctx.strokeRect(satX2-s*5.2,satY2-s*0.38,s*3.9,s*0.76);
+    ctx.fillRect(satX2+s*1.3,satY2-s*0.38,s*3.9,s*0.76);
+    ctx.strokeRect(satX2+s*1.3,satY2-s*0.38,s*3.9,s*0.76);
+    ctx.strokeStyle='rgba(55,115,180,0.5)'; ctx.lineWidth=0.4*dpr;
+    [-3.9,-2.65,-1.4].forEach(o=>{ctx.beginPath();ctx.moveTo(satX2+o*s,satY2-s*0.38);ctx.lineTo(satX2+o*s,satY2+s*0.38);ctx.stroke();});
+    [2.5,3.75].forEach(o=>{ctx.beginPath();ctx.moveTo(satX2+o*s,satY2-s*0.38);ctx.lineTo(satX2+o*s,satY2+s*0.38);ctx.stroke();});
     // Antenna
-    ctx.beginPath();
-    ctx.moveTo(satX, satY - s * 0.65);
-    ctx.lineTo(satX, satY - s * 2.4);
-    ctx.strokeStyle = '#bbccdd';
-    ctx.lineWidth = 0.9 * dpr;
-    ctx.stroke();
-    // Antenna tip glow
-    ctx.beginPath();
-    ctx.arc(satX, satY - s * 2.4, s * 0.55, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = '#ffffff';
-    ctx.shadowBlur = 8 * dpr;
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.moveTo(satX2,satY2-s*0.6); ctx.lineTo(satX2,satY2-s*2.6);
+    ctx.strokeStyle='#aabbcc'; ctx.lineWidth=dpr; ctx.stroke();
+    ctx.beginPath(); ctx.arc(satX2,satY2-s*2.6,s*0.6,0,Math.PI*2);
+    ctx.fillStyle='#fff'; ctx.shadowColor='#fff'; ctx.shadowBlur=9*dpr; ctx.fill(); ctx.shadowBlur=0;
 
-    t += 0.022;
-    satBob += 0.018;
+    // Cyan corner brackets
+    ctx.strokeStyle='rgba(0,212,255,0.3)'; ctx.lineWidth=dpr;
+    const cl=14*dpr, cp=7*dpr;
+    ctx.beginPath();
+    ctx.moveTo(cp+cl,cp);ctx.lineTo(cp,cp);ctx.lineTo(cp,cp+cl);
+    ctx.moveTo(W-cp-cl,cp);ctx.lineTo(W-cp,cp);ctx.lineTo(W-cp,cp+cl);
+    ctx.stroke();
+
+    t += 0.02; satBob += 0.018;
     requestAnimationFrame(draw);
   }
-  draw();
+
+  earthImg.onload = draw;
+  earthImg.onerror = () => draw();
+  if (earthImg.complete && earthImg.naturalWidth > 0) draw();
 }
 
 // ═══════════════════════════════════════
+//  FLUCTUATIONS
+// ═══════════════════════════════════════
+function initFluctuations() {
   setInterval(()=>{ document.getElementById('arc-pct').textContent=(88+Math.floor(Math.random()*10))+'%'; },3500);
   setInterval(()=>{ document.getElementById('b-temp').textContent=(2800+Math.floor(Math.random()*200)).toLocaleString()+'°C'; },2800);
   setInterval(()=>{ document.getElementById('b-power').textContent=(3.15+Math.random()*.12).toFixed(2)+' GW'; },2000);
