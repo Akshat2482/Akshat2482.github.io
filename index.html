@@ -1268,13 +1268,9 @@ async function showFlightBoard(airport, type, query) {
 let cesiumViewer = null;
 
 function initSatellites() {
-  // Check if token is in KEYS (from modal) or prompt inline
-  const token = KEYS.cesium || '';
-  if (token) {
-    document.getElementById('cesium-token-input').value = token;
-    initCesiumGlobe();
-  }
-  // else — token prompt overlay shown by default
+  const token = KEYS.cesium;
+  document.getElementById('cesium-token-input').value = token;
+  initCesiumGlobe();
 }
 
 function initCesiumGlobe() {
@@ -1300,7 +1296,7 @@ function initCesiumGlobe() {
   document.head.appendChild(style);
 
   cesiumViewer = new Cesium.Viewer('cesiumContainer', {
-    terrainProvider: Cesium.createWorldTerrain(),
+    terrainProvider: new Cesium.EllipsoidTerrainProvider(),
     imageryProvider: new Cesium.IonImageryProvider({ assetId: 3 }), // Bing Aerial
     animation: false,
     timeline: false,
