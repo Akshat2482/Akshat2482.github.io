@@ -6,6 +6,8 @@
 <title>AKSHAT INDUSTRIES — AKSHAT COMMAND CENTER</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
 <link rel="icon" href="favicon.ico"/>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
 <style>
@@ -93,7 +95,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .pos{color:var(--cg)}.neg{color:var(--cr)}
 
 /* ══ LEFT COL ══ */
-.left-col{display:flex;flex-direction:column;gap:8px;grid-row:3;overflow:hidden;}
+.left-col{display:flex;flex-direction:column;gap:8px;grid-row:3/5;overflow:hidden;min-height:0;}
 
 /* ARC REACTOR */
 .arc-wrap{display:flex;flex-direction:column;align-items:center;padding:6px 0 2px;}
@@ -142,7 +144,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .mcard-sig{font-size:6.5px;letter-spacing:.1em;margin-top:2px;}
 
 /* ══ RIGHT COL ══ */
-.right-col{display:flex;flex-direction:column;gap:8px;grid-row:3;overflow:hidden;}
+.right-col{display:flex;flex-direction:column;gap:8px;grid-row:3/5;overflow:hidden;}
 
 /* JARVIS CHAT */
 .jarvis-panel{flex:3.5;display:flex;flex-direction:column;min-height:0;}
@@ -189,7 +191,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .thrt-val{font-size:7.5px;font-family:'Share Tech Mono',monospace;color:#fff;width:22px;text-align:right;}
 
 /* ══ STOCK ANALYSIS PANEL ══ */
-.stock-analysis-panel{flex-shrink:0;}
+.stock-analysis-panel{flex:1;display:flex;flex-direction:column;min-height:0;}
 .sa-input-row{display:flex;gap:5px;margin-bottom:8px;}
 .sa-input{flex:1;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.18);color:#fff;font-family:'Share Tech Mono',monospace;font-size:10px;padding:6px 9px;border-radius:3px;outline:none;text-transform:uppercase;letter-spacing:.12em;}
 .sa-input:focus{border-color:var(--c);}
@@ -234,6 +236,11 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .search-placeholder{font-size:8px;letter-spacing:.15em;color:rgba(0,212,255,.3);text-align:center;padding:16px 0;font-family:'Share Tech Mono',monospace;line-height:2;}
 .search-loading{font-size:8px;letter-spacing:.15em;color:rgba(0,212,255,.5);text-align:center;padding:12px 0;font-family:'Share Tech Mono',monospace;}
 
+/* AUDIO VIZ */
+.viz-wrap{height:150px;position:relative;background:rgba(0,8,20,.65);border:1px solid rgba(0,212,255,.12);border-radius:2px;overflow:hidden;}
+#viz-status{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:.12em;color:rgba(0,212,255,.5);backdrop-filter:blur(2px);z-index:2;}
+#viz-canvas{width:100%;height:100%;display:block;}
+
 /* INTEL TICKER */
 .intel-ticker-wrap{overflow:hidden;padding:4px 0;}
 .intel-ticker-inner{display:flex;gap:44px;animation:tickScroll 55s linear infinite;white-space:nowrap;}
@@ -242,7 +249,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .isep{color:var(--cr);font-size:11px;}
 
 /* BOTTOM BAR */
-.bottom-bar{grid-column:1/-1;display:flex;gap:8px;}
+.bottom-bar{grid-column:2/3;display:flex;gap:8px;}
 .bstat{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;text-align:left;}
 .bstat.panel::before{display:none;}
 .bicon{font-size:26px;flex-shrink:0;}
@@ -313,7 +320,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
 <div class="scan-beam"></div>
 <div class="corner tl"></div><div class="corner tr"></div>
-<div class="corner bl"></div><div class="corner br"></div>
+<div class="corner bl"></div>
 
 <!-- ══════════ MAIN HUD ══════════ -->
 <div id="hud">
@@ -391,7 +398,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     </div>
 
     <!-- Stock Analysis -->
-    <div class="panel stock-analysis-panel" style="flex-shrink:0;">
+    <div class="panel stock-analysis-panel" style="flex:1;min-height:0;">
       <div class="pt">STOCK ANALYSIS</div>
       <div class="sa-input-row">
         <input class="sa-input" id="sa-input" placeholder="Type symbol e.g. AAPL" maxlength="8"/>
@@ -491,14 +498,14 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     </div>
 
 
-    <!-- Threat -->
+    <!-- Threat (Audio Visualizer) -->
     <div class="panel" style="flex-shrink:0;">
-      <div class="pt">THREAT ASSESSMENT</div>
-      <div class="thrt-row"><div class="thrt-lbl">AIR</div><div class="thrt-bar"><div class="thrt-fill" style="width:72%;background:linear-gradient(90deg,#ffb700,#ff6600)"></div></div><div class="thrt-val">72</div></div>
-      <div class="thrt-row"><div class="thrt-lbl">GROUND</div><div class="thrt-bar"><div class="thrt-fill" style="width:48%;background:linear-gradient(90deg,#00ff88,#00aa44)"></div></div><div class="thrt-val">48</div></div>
-      <div class="thrt-row"><div class="thrt-lbl">CYBER</div><div class="thrt-bar"><div class="thrt-fill" style="width:91%;background:linear-gradient(90deg,#ff3d3d,#aa0000)"></div></div><div class="thrt-val">91</div></div>
-      <div class="thrt-row"><div class="thrt-lbl">BIO</div><div class="thrt-bar"><div class="thrt-fill" style="width:18%;background:linear-gradient(90deg,#00d4ff,#0066aa)"></div></div><div class="thrt-val">18</div></div>
-      <div class="thrt-row" style="margin-bottom:0;"><div class="thrt-lbl">NUCLEAR</div><div class="thrt-bar"><div class="thrt-fill" style="width:5%;background:linear-gradient(90deg,#00ff88,#008844)"></div></div><div class="thrt-val">05</div></div>
+      <div class="pt">AUDIO VISUALIZER — MIC INPUT</div>
+      <div class="viz-wrap">
+        <div id="viz-status">REQUESTING MICROPHONE ACCESS…</div>
+        <canvas id="viz-canvas"></canvas>
+      </div>
+      <div style="margin-top:6px;font-size:7px;letter-spacing:.12em;color:rgba(0,212,255,.45);text-transform:uppercase;">Mic level animates bars; deny mic to pause.</div>
     </div>
 
     <!-- SEARCH PANEL -->
@@ -517,7 +524,6 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
   <!-- ══ BOTTOM BAR ══ -->
   <div class="bottom-bar">
-    <div class="panel bstat"><div class="bicon">⚡</div><div><div class="blbl">REACTOR OUTPUT</div><div class="bval" id="b-power">3.21 GW</div></div></div>
     <div class="panel bstat"><div class="bicon">🌡️</div><div><div class="blbl">CORE TEMP</div><div class="bval" id="b-temp">2,847°C</div></div></div>
     <div class="panel bstat"><div class="bicon">🛰️</div><div><div class="blbl">SATELLITES</div><div class="bval">7 / 9</div></div></div>
     <div class="panel bstat"><div class="bicon">🚀</div><div><div class="blbl">MAX VELOCITY</div><div class="bval">MACH 3.8</div></div></div>
@@ -1198,7 +1204,8 @@ async function sendJarvis() {
 
 IDENTITY RULES — CRITICAL:
 - You are JARVIS. You were created by Akshat. That is all.
-- NEVER mention Llama, Groq, OpenAI, Anthropic, GPT, or any underlying model/company under any circumstances.
+- NEVER mention Llama, Groq, OpenAI, Anthropic, GPT, or an
+y underlying model/company under any circumstances.
 - If asked "who are you", "what are you", "what model are you", "who made you" or anything similar — always say you are J.A.R.V.I.S., created by Akshat Industries.
 - Example: "I am J.A.R.V.I.S. — Just A Rather Very Intelligent System. Engineered by Akshat to run the Akshat Industries Command Center. At your service."
 - If asked about your capabilities, always say you are a hyper-capable AI assistant with access to a wide range of tools and data, designed to assist Akshat with anything he needs.
@@ -1214,6 +1221,7 @@ IDENTITY RULES — CRITICAL:
 - If asked for a fun fact, you can say "Did you know that the first computer virus was created in 1971 and was called the Creeper? It was designed to infect mainframe computers and display the message 'I'm the creeper, catch me if you can!' on infected systems, Akshat."
 - If asked for a quote, you can say "As Tony Stark once said, 'I am Iron Man.' But in this case, I am J.A.R.V.I.S., at your service, Akshat."
 
+\
 PERSONALITY:
 - Speak concisely — 1-3 sentences max for normal replies
 - Address the user as "Akshat" (never "Mr. Akshat")
@@ -1252,7 +1260,8 @@ Example: {"action":"flight_board","airport":"JFK","type":"arrivals","query":"JFK
 // ═══════════════════════════════════════
 //  SERPAPI SEARCH
 // ═══════════════════════════════════════
-document.getElementById('search-input').addEventListener('keydown', e => { if(e.key==='Enter') doSearch(); });
+const searchInputEl = document.getElementById('search-input');
+if (searchInputEl) searchInputEl.addEventListener('keydown', e => { if(e.key==='Enter') doSearch(); });
 
 async function serpFetch(params) {
   const base = 'https://serpapi.com/search.json';
@@ -1370,7 +1379,6 @@ async function showFlightBoard(airport, type, query) {
 function initFluctuations() {
   setInterval(()=>{ document.getElementById('arc-pct').textContent=(88+Math.floor(Math.random()*10))+'%'; },3500);
   setInterval(()=>{ document.getElementById('b-temp').textContent=(2800+Math.floor(Math.random()*200)).toLocaleString()+'°C'; },2800);
-  setInterval(()=>{ document.getElementById('b-power').textContent=(3.15+Math.random()*.12).toFixed(2)+' GW'; },2000);
   const bars=[{sf:'sf-rl',sv:'sv-rl',b:92,r:5},{sf:'sf-rr',sv:'sv-rr',b:88,r:5},{sf:'sf-th',sv:'sv-th',b:76,r:8},{sf:'sf-ar',sv:'sv-ar',b:84,r:4},{sf:'sf-wp',sv:'sv-wp',b:62,r:6}];
   setInterval(()=>{
     bars.forEach(bar=>{
@@ -1382,11 +1390,68 @@ function initFluctuations() {
 }
 
 // ═══════════════════════════════════════
+//  AUDIO VIZ — MIC LEVEL
+// ═══════════════════════════════════════
+function initAudioViz() {
+  const canvas = document.getElementById('viz-canvas');
+  const status = document.getElementById('viz-status');
+  if (!canvas || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    if (status) status.textContent = 'MIC NOT SUPPORTED';
+    return;
+  }
+  const ctx2d = canvas.getContext('2d');
+  let analyser, dataArray, raf;
+
+  function draw() {
+    raf = requestAnimationFrame(draw);
+    const w = canvas.width = canvas.clientWidth || 1;
+    const h = canvas.height = canvas.clientHeight || 1;
+    analyser.getByteFrequencyData(dataArray);
+    ctx2d.clearRect(0,0,w,h);
+    const bars = 48;
+    const binSize = Math.max(1, Math.floor(dataArray.length / bars));
+    for(let i=0;i<bars;i++){
+      const v = dataArray[i*binSize] / 255;
+      const bh = v * (h*0.9);
+      const x = i * (w / bars);
+      const bw = Math.max(2, (w / bars) - 2);
+      const g = ctx2d.createLinearGradient(0,0,0,h);
+      g.addColorStop(0,'#00d4ff');
+      g.addColorStop(1,'rgba(0,212,255,0.05)');
+      ctx2d.fillStyle = g;
+      ctx2d.shadowColor = '#00d4ff';
+      ctx2d.shadowBlur = 10;
+      ctx2d.fillRect(x+1, h - bh, bw, bh);
+    }
+  }
+
+  async function start() {
+    try {
+      if (status) status.textContent = 'REQUESTING MICROPHONE…';
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      if (status) status.textContent = '';
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+      source.connect(analyser);
+      draw();
+    } catch(e) {
+      if (status) status.textContent = 'MIC DENIED';
+      console.error('Mic access failed', e);
+    }
+  }
+  start();
+}
+
+// ═══════════════════════════════════════
 //  START
 // ═══════════════════════════════════════
 window.addEventListener('load', () => {
   document.getElementById('setup-modal').classList.add('hidden');
   startBoot();
+  initAudioViz();
 });
 </script>
 </body>
