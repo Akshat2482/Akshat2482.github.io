@@ -31,6 +31,9 @@
 .palm-sub{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:.18em;color:rgba(0,212,255,.3);margin-top:6px;text-align:center;}
 .palm-progress-bar{width:340px;height:2px;background:rgba(0,212,255,.1);border-radius:2px;margin-top:10px;overflow:hidden;}
 .palm-progress-fill{height:100%;width:0%;background:var(--c);box-shadow:0 0 8px var(--c);border-radius:2px;transition:width .4s ease;}
+#enroll-btn{margin-top:12px;width:340px;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.6);color:#fff;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:.18em;padding:10px;border-radius:4px;cursor:pointer;display:none;transition:.2s;box-shadow:0 0 18px rgba(0,212,255,.18);}
+#enroll-btn:hover{background:rgba(0,212,255,.22);box-shadow:0 0 26px rgba(0,212,255,.28);}
+#enroll-btn:disabled{opacity:0.6;cursor:not-allowed;box-shadow:none;}
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Orbitron',sans-serif;color:var(--c);}
 body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,212,255,.016) 2px,rgba(0,212,255,.016) 4px);pointer-events:none;z-index:9000;}
@@ -289,6 +292,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   <div id="palm-status">INITIALIZING NEURAL SCANNER…</div>
   <div class="palm-sub" id="palm-sub">LOADING FACE RECOGNITION MODELS</div>
   <div class="palm-progress-bar"><div class="palm-progress-fill" id="palm-prog"></div></div>
+  <button id="enroll-btn">ENROLL THIS FACE</button>
 
 </div>
 
@@ -1500,10 +1504,50 @@ function initAudioViz() {
   const statusEl = document.getElementById('palm-status');
   const subEl    = document.getElementById('palm-sub');
   const progEl   = document.getElementById('palm-prog');
+  const enrollBtn= document.getElementById('enroll-btn');
 
   const setStatus = (t,c) => { statusEl.textContent=t; statusEl.className=c||''; };
   const sleep     = ms => new Promise(r => setTimeout(r, ms));
   const detectOpts= new faceapi.SsdMobilenetv1Options({minConfidence:0.55});
+
+  // ── IndexedDB helpers ──
+  const DB_NAME='faceAuthDB', STORE='faces', KEY='reference';
+  function openDB() {
+    return new Promise((res, rej)=>{
+      const req = indexedDB.open(DB_NAME,1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(STORE); };
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+  }
+  async function saveDescriptorToDB(desc) {
+    const db = await openDB();
+    await new Promise((res, rej)=>{
+      const tx = db.transaction(STORE,'readwrite');
+      tx.objectStore(STORE).put(Array.from(desc), KEY);
+      tx.oncomplete=res; tx.onerror=()=>rej(tx.error);
+    });
+  }
+  async function loadDescriptorFromDB() {
+    try {
+      const db = await openDB();
+      return await new Promise((res, rej)=>{
+        const tx = db.transaction(STORE,'readonly');
+        const req = tx.objectStore(STORE).get(KEY);
+        req.onsuccess = ()=>res(req.result || null);
+        req.onerror = ()=>rej(req.error);
+      });
+    } catch { return null; }
+  }
+  async function loadReferenceFromDB() {
+    const data = await loadDescriptorFromDB();
+    if (data && data.length) {
+      referenceDescriptor = new Float32Array(data);
+      console.log('[FaceAuth] reference face loaded from IndexedDB');
+      return true;
+    }
+    return false;
+  }
 
   async function loadReferenceFace() {
     try {
@@ -1522,6 +1566,31 @@ function initAudioViz() {
     }
     referenceDescriptor = null;
     return false;
+  }
+
+  async function enrollCurrentFace() {
+    enrollBtn.disabled = true;
+    enrollBtn.textContent = 'ENROLLING…';
+    setStatus('ENROLLING CURRENT FACE…','');
+    const live = await faceapi
+      .detectSingleFace(video, detectOpts)
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+    if (!live?.descriptor) {
+      setStatus('ENROLL FAILED — FACE NOT CLEAR','fail');
+      enrollBtn.textContent = 'ENROLL THIS FACE';
+      enrollBtn.disabled = false;
+      return;
+    }
+    await saveDescriptorToDB(live.descriptor);
+    referenceDescriptor = live.descriptor;
+    setStatus('REFERENCE SAVED — RETRYING MATCH','ok');
+    subEl.textContent = 'REFERENCE UPDATED LOCALLY';
+    enrollBtn.style.display='none';
+    enrollBtn.disabled=false;
+    enrollBtn.textContent='ENROLL THIS FACE';
+    state='idle'; scanDone=false; zoomBox=targetBox=null;
+    if (!detInterval) detInterval = setInterval(detect, 800);
   }
 
   async function verifyFaceMatch() {
@@ -1733,6 +1802,7 @@ function initAudioViz() {
       progEl.style.boxShadow = '0 0 10px var(--c)';
       setStatus('IDENTITY MISMATCH — ACCESS DENIED', 'fail');
       subEl.textContent = match.reason || 'FACE NOT RECOGNISED';
+      enrollBtn.style.display = 'block';
       if (!detInterval) detInterval = setInterval(detect, 800);
       return;
     }
@@ -1743,6 +1813,7 @@ function initAudioViz() {
     progEl.style.boxShadow = '0 0 14px var(--cg)';
     setStatus(`▸ IDENTITY CONFIRMED — MATCH ${Math.round((1-match.distance)*100)}%`, 'ok');
     subEl.textContent = 'WELCOME BACK. LAUNCHING COMMAND CENTER…';
+    enrollBtn.style.display = 'none';
     stopCamera();
     await sleep(2000);
     launchCommandCenter();
@@ -1782,10 +1853,12 @@ function initAudioViz() {
       subEl.textContent = e.message; return;
     }
 
-    const refLoaded = await loadReferenceFace();
+    let refLoaded = await loadReferenceFromDB();
+    if (!refLoaded) refLoaded = await loadReferenceFace();
     if (!refLoaded) {
-      setStatus('REFERENCE face.jpeg NOT READY', 'fail');
-      subEl.textContent = 'PLACE A CLEAR FACE IMAGE IN face.jpeg';
+      setStatus('NO REFERENCE FOUND — ENROLL REQUIRED', 'fail');
+      subEl.textContent = 'CLICK ENROLL TO SAVE YOUR FACE LOCALLY';
+      enrollBtn.style.display = 'block';
     }
 
     try {
@@ -1803,6 +1876,8 @@ function initAudioViz() {
     setStatus('SCANNING FOR FACE…', '');
     subEl.textContent = 'LOOK DIRECTLY AT THE CAMERA';
     progEl.style.width = '10%';
+
+    enrollBtn.addEventListener('click', enrollCurrentFace);
   }
 
   window.addEventListener('load', init);
