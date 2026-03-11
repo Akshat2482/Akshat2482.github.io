@@ -10,8 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
 <link rel="icon" href="favicon.ico"/>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.min.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
 <style>
 :root{--c:#00d4ff;--cr:#ff3d3d;--cg:#00ff88;--cy:#ffb700;--bg:rgba(0,10,22,.92);--border:rgba(0,212,255,.2);}
@@ -19,7 +18,9 @@
 /* ══ PALM AUTH ══ */
 #palm-auth{position:fixed;inset:0;background:#000;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:opacity .9s ease;}
 #palm-auth.fade-out{opacity:0;pointer-events:none;}
-#palm-canvas{display:block;position:relative;z-index:1;}
+#palm-auth-wrap{position:relative;display:inline-block;width:340px;height:260px;}
+#palm-video{position:absolute;top:0;left:0;width:340px;height:260px;object-fit:cover;border-radius:4px;transform:scaleX(-1);}
+#palm-canvas{position:absolute;top:0;left:0;width:340px;height:260px;z-index:2;border-radius:4px;}
 .palm-header{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:.38em;color:rgba(0,212,255,.45);text-transform:uppercase;margin-bottom:18px;position:relative;z-index:2;}
 .palm-header-logo{font-size:13px;font-weight:900;letter-spacing:.28em;color:#fff;text-shadow:0 0 24px var(--c);display:flex;align-items:center;gap:10px;margin-bottom:5px;}
 .palm-header-logo span{color:var(--cr);text-shadow:0 0 16px var(--cr);}
@@ -28,13 +29,8 @@
 #palm-status.fail{color:var(--cr);text-shadow:0 0 12px var(--cr);}
 #palm-status.scanning{color:var(--cy);text-shadow:0 0 10px var(--cy);}
 .palm-sub{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:.18em;color:rgba(0,212,255,.3);margin-top:6px;text-align:center;}
-.palm-corner{position:absolute;width:18px;height:18px;pointer-events:none;}
-.palm-corner::before,.palm-corner::after{content:'';position:absolute;background:var(--c);box-shadow:0 0 4px var(--c);}
-.palm-corner::before{width:100%;height:1.5px;}.palm-corner::after{width:1.5px;height:100%;}
-#palm-auth-wrap{position:relative;display:inline-block;}
-.palm-progress-bar{width:220px;height:2px;background:rgba(0,212,255,.1);border-radius:2px;margin-top:10px;overflow:hidden;}
-.palm-progress-fill{height:100%;width:0%;background:var(--c);box-shadow:0 0 8px var(--c);border-radius:2px;transition:width .1s linear;}
-#palm-biometric-lines{position:absolute;inset:0;pointer-events:none;z-index:10;}
+.palm-progress-bar{width:340px;height:2px;background:rgba(0,212,255,.1);border-radius:2px;margin-top:10px;overflow:hidden;}
+.palm-progress-fill{height:100%;width:0%;background:var(--c);box-shadow:0 0 8px var(--c);border-radius:2px;transition:width .4s ease;}
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Orbitron',sans-serif;color:var(--c);}
 body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,212,255,.016) 2px,rgba(0,212,255,.016) 4px);pointer-events:none;z-index:9000;}
@@ -282,19 +278,18 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 </head>
 <body>
 
-<!-- ══ PALM BIOMETRIC AUTH ══ -->
+<!-- ══ FACE BIOMETRIC AUTH ══ -->
 <div id="palm-auth">
   <div class="palm-header-logo">AKSHAT <span>INDUSTRIES</span></div>
-  <div class="palm-header">BIOMETRIC AUTHENTICATION REQUIRED</div>
+  <div class="palm-header">FACIAL RECOGNITION — IDENTITY VERIFICATION</div>
   <div id="palm-auth-wrap">
-    <video id="palm-video" autoplay playsinline muted style="display:none;"></video>
-    <canvas id="palm-canvas" width="340" height="400"></canvas>
-    <svg id="palm-biometric-lines" width="340" height="400" xmlns="http://www.w3.org/2000/svg"></svg>
+    <video id="palm-video" autoplay playsinline muted></video>
+    <canvas id="palm-canvas" width="340" height="260"></canvas>
   </div>
-  <div id="palm-status">INITIALIZING BIOMETRIC SCANNER…</div>
-  <div class="palm-sub" id="palm-sub">PLACE YOUR RIGHT PALM FLAT WITHIN THE OUTLINE</div>
+  <div id="palm-status">INITIALIZING NEURAL SCANNER…</div>
+  <div class="palm-sub" id="palm-sub">LOADING FACE RECOGNITION MODELS</div>
   <div class="palm-progress-bar"><div class="palm-progress-fill" id="palm-prog"></div></div>
-  <button id="pa-enroll-btn" style="display:none;margin-top:10px;background:rgba(255,183,0,.1);border:1px solid var(--cy);color:var(--cy);font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:.22em;padding:9px 22px;border-radius:3px;cursor:pointer;transition:.2s;" onclick="window.palmEnrollNow()">⊕ ENROLL THIS PALM</button>
+
 </div>
 
 <!-- ══ SETUP MODAL ══ -->
@@ -1481,664 +1476,333 @@ function initAudioViz() {
 }
 
 // ═══════════════════════════════════════
-//  PALM BIOMETRIC AUTHENTICATION
+//  FACE BIOMETRIC AUTHENTICATION
 // ═══════════════════════════════════════
 (function() {
-  const CANVAS_W = 340, CANVAS_H = 400;
-  // Palm outline path definition (hand silhouette) — coords for 340x400 canvas
-  // Palm region: roughly lower 60% of canvas, fingers upper 40%
-  const FINGER_TIPS = [
-    {x:82,  y:20,  w:28, h:110, r:14}, // pinky
-    {x:118, y:6,   w:30, h:130, r:15}, // ring
-    {x:156, y:0,   w:32, h:140, r:16}, // middle
-    {x:196, y:10,  w:30, h:130, r:15}, // index
-    {x:244, y:60,  w:28, h:90,  r:14}, // thumb (angled)
-  ];
-  const PALM_RECT = {x:68, y:140, w:220, h:190, r:22};
+  const W = 340, H = 260;
+  const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
 
-  const PALM_IMG_SRCS = ['palm.jpeg', 'palm2.jpeg', 'palm3.jpeg'];
-  let palmCodes = []; // stored Gabor palm codes (Uint8Array bitplanes)
-  let handDetected = false;
-  let scanY = 0;
-  let scanActive = false;
-  let scanComplete = false;
-  let scanProgress = 0;
-  let authResult = null;
-  let scanAnimId = null;
-  let mpHands = null;
-  let camera = null;
-  let lastLandmarks = null;
-  let handLostTimeout = null;
-  let detectionReady = false;
-  let noMpFallback = false;
+  // State machine: 'idle' → 'found' → 'scanning' → 'done'
+  let state      = 'idle';
+  let lastBox    = null;   // face bounding box from detection
+  let zoomBox    = null;   // current animated zoom rect {x,y,w,h}
+  let targetBox  = null;   // target zoom rect (face padded)
+  let scanY      = 0;
+  let scanDone   = false;
+  let glowPhase  = 0;
+  let detInterval= null;
+  let referenceDescriptor = null;
+  const MATCH_THRESHOLD = 0.50; // tighter match = closer to 0
 
-  const video   = document.getElementById('palm-video');
-  const canvas  = document.getElementById('palm-canvas');
-  const ctx     = canvas.getContext('2d');
-  const svgEl   = document.getElementById('palm-biometric-lines');
-  const statusEl= document.getElementById('palm-status');
-  const subEl   = document.getElementById('palm-sub');
-  const progEl  = document.getElementById('palm-prog');
+  const video    = document.getElementById('palm-video');
+  const canvas   = document.getElementById('palm-canvas');
+  const ctx      = canvas.getContext('2d');
+  const statusEl = document.getElementById('palm-status');
+  const subEl    = document.getElementById('palm-sub');
+  const progEl   = document.getElementById('palm-prog');
 
-  // ═══════════════════════════════════════════════════
-  //  GABOR PALMPRINT ENGINE
-  //  Crops the palm ROI, applies 6-orientation Gabor
-  //  filter bank, encodes responses into a binary
-  //  palmcode, compares via Hamming distance.
-  //  Matches academic IEE/HKPU palmprint algorithms.
-  // ═══════════════════════════════════════════════════
+  const setStatus = (t,c) => { statusEl.textContent=t; statusEl.className=c||''; };
+  const sleep     = ms => new Promise(r => setTimeout(r, ms));
+  const detectOpts= new faceapi.SsdMobilenetv1Options({minConfidence:0.55});
 
-  const GABOR_SIZE   = 35;   // kernel size (odd)
-  const GABOR_SIGMA  = 5.6;  // Gaussian envelope
-  const GABOR_LAMBDA = 9.0;  // wavelength (crease spacing)
-  const GABOR_GAMMA  = 0.5;  // aspect ratio
-  const GABOR_ANGLES = [0, 30, 60, 90, 120, 150].map(d => d * Math.PI / 180);
-  const ROI_W = 128, ROI_H = 128; // normalised palm ROI
-
-  // Build one Gabor kernel (returns Float64Array, ROI_W×ROI_H not needed — size×size)
-  function buildGaborKernel(theta) {
-    const half = (GABOR_SIZE - 1) / 2;
-    const k = new Float64Array(GABOR_SIZE * GABOR_SIZE);
-    let idx = 0;
-    for (let y = -half; y <= half; y++) {
-      for (let x = -half; x <= half; x++) {
-        const xp =  x * Math.cos(theta) + y * Math.sin(theta);
-        const yp = -x * Math.sin(theta) + y * Math.cos(theta);
-        const gauss = Math.exp(-(xp*xp + GABOR_GAMMA*GABOR_GAMMA*yp*yp) / (2*GABOR_SIGMA*GABOR_SIGMA));
-        const wave  = Math.cos(2 * Math.PI * xp / GABOR_LAMBDA);
-        k[idx++] = gauss * wave;
+  async function loadReferenceFace() {
+    try {
+      const img = await faceapi.fetchImage('face.jpeg');
+      const ref = await faceapi
+        .detectSingleFace(img)
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+      if (ref?.descriptor) {
+        referenceDescriptor = ref.descriptor;
+        console.log('[FaceAuth] reference face loaded');
+        return true;
       }
+    } catch(e) {
+      console.warn('[FaceAuth] reference face missing/unreadable', e);
     }
-    return k;
+    referenceDescriptor = null;
+    return false;
   }
 
-  // Pre-compute all 6 kernels once at startup
-  const GABOR_KERNELS = GABOR_ANGLES.map(buildGaborKernel);
-
-  // Extract grayscale ROI from center of canvas/image at ROI_W×ROI_H
-  function extractROI(src) {
-    const tmp = document.createElement('canvas');
-    tmp.width = ROI_W; tmp.height = ROI_H;
-    const tc = tmp.getContext('2d');
-    // Draw center crop (palm region, skip top 10% fingers, bottom 10% wrist)
-    const sw = src.videoWidth || src.naturalWidth || src.width  || CANVAS_W;
-    const sh = src.videoHeight|| src.naturalHeight|| src.height || CANVAS_H;
-    const cropX = sw * 0.10, cropY = sh * 0.20;
-    const cropW = sw * 0.80, cropH = sh * 0.65;
-    tc.drawImage(src, cropX, cropY, cropW, cropH, 0, 0, ROI_W, ROI_H);
-    const id = tc.getImageData(0, 0, ROI_W, ROI_H).data;
-    // Grayscale float array + local histogram equalization
-    const gray = new Float64Array(ROI_W * ROI_H);
-    for (let i = 0; i < ROI_W * ROI_H; i++)
-      gray[i] = (id[i*4]*0.299 + id[i*4+1]*0.587 + id[i*4+2]*0.114);
-    // Normalize 0–1
-    let mn = 255, mx = 0;
-    gray.forEach(v => { if(v<mn) mn=v; if(v>mx) mx=v; });
-    const rng = mx - mn || 1;
-    for (let i = 0; i < gray.length; i++) gray[i] = (gray[i] - mn) / rng;
-    return gray;
+  async function verifyFaceMatch() {
+    if (!referenceDescriptor) return { ok:false, reason:'REFERENCE FACE MISSING' };
+    const live = await faceapi
+      .detectSingleFace(video, detectOpts)
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+    if (!live?.descriptor) return { ok:false, reason:'LIVE FACE NOT CLEAR' };
+    const distance = faceapi.euclideanDistance(live.descriptor, referenceDescriptor);
+    return distance < MATCH_THRESHOLD
+      ? { ok:true, distance }
+      : { ok:false, reason:`NO MATCH Δ=${distance.toFixed(2)}` };
   }
 
-  // Convolve gray[ROI_W×ROI_H] with kernel[GABOR_SIZE×GABOR_SIZE]
-  function convolve(gray, kernel) {
-    const half = (GABOR_SIZE - 1) / 2;
-    const out  = new Float64Array(ROI_W * ROI_H);
-    for (let y = 0; y < ROI_H; y++) {
-      for (let x = 0; x < ROI_W; x++) {
-        let sum = 0;
-        for (let ky = -half; ky <= half; ky++) {
-          for (let kx = -half; kx <= half; kx++) {
-            const sy = Math.min(ROI_H-1, Math.max(0, y+ky));
-            const sx = Math.min(ROI_W-1, Math.max(0, x+kx));
-            sum += gray[sy*ROI_W + sx] * kernel[(ky+half)*GABOR_SIZE + (kx+half)];
+  // ── Render loop — runs every frame ───────────────
+  function renderLoop() {
+    requestAnimationFrame(renderLoop);
+    ctx.clearRect(0, 0, W, H);
+    glowPhase += 0.05;
+
+    if (!video.videoWidth) return;
+
+    if (state === 'idle') {
+      // Full camera view, scanning corners
+      drawVideoFull();
+      drawCorners('#00d4ff', 0.5 + 0.2*Math.sin(glowPhase));
+      return;
+    }
+
+    if (state === 'found' || state === 'scanning') {
+      // Animate zoom toward face
+      if (zoomBox && targetBox) {
+        zoomBox.x += (targetBox.x - zoomBox.x) * 0.08;
+        zoomBox.y += (targetBox.y - zoomBox.y) * 0.08;
+        zoomBox.w += (targetBox.w - zoomBox.w) * 0.08;
+        zoomBox.h += (targetBox.h - zoomBox.h) * 0.08;
+      }
+      drawVideoZoomed();
+
+      if (state === 'found') {
+        // Pulsing face box, waiting to start scan
+        drawZoomedFaceBox('#00d4ff', 0.6 + 0.3*Math.sin(glowPhase*2));
+        drawCorners('#00d4ff', 0.7 + 0.2*Math.sin(glowPhase));
+        return;
+      }
+
+      if (state === 'scanning') {
+        drawCorners('#00d4ff', 0.85 + 0.12*Math.sin(glowPhase));
+
+        // Sweep line moves top → bottom once
+        if (!scanDone) {
+          scanY += 2.2;
+          const pct = Math.min(scanY / H, 1);
+          progEl.style.width = (pct * 90) + '%';
+
+          // Draw sweep line
+          const grad = ctx.createLinearGradient(0, scanY-24, 0, scanY+24);
+          grad.addColorStop(0,   'rgba(0,212,255,0)');
+          grad.addColorStop(0.5, `rgba(0,212,255,${0.65 + 0.2*Math.sin(glowPhase*3)})`);
+          grad.addColorStop(1,   'rgba(0,212,255,0)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, scanY-24, W, 48);
+
+          // Trailing glow behind sweep
+          ctx.fillStyle = 'rgba(0,212,255,0.07)';
+          ctx.fillRect(0, 0, W, scanY);
+          ctx.fillStyle = 'rgba(0,255,200,0.35)';
+          ctx.fillRect(0, scanY-2, W, 4);
+
+          if (scanY >= H) {
+            scanDone = true;
+            finishScan();
           }
         }
-        out[y*ROI_W + x] = sum;
+        return;
       }
     }
-    return out;
-  }
 
-  // Encode: for each orientation, response>0 → bit 1, ≤0 → bit 0
-  // Result: Uint8Array of length 6 * ROI_W * ROI_H bits packed into bytes
-  function encodePalmCode(gray) {
-    const totalBits  = GABOR_ANGLES.length * ROI_W * ROI_H;
-    const code       = new Uint8Array(Math.ceil(totalBits / 8));
-    let bitIdx = 0;
-    for (let k = 0; k < GABOR_KERNELS.length; k++) {
-      const resp = convolve(gray, GABOR_KERNELS[k]);
-      for (let i = 0; i < resp.length; i++) {
-        if (resp[i] > 0) code[bitIdx >> 3] |= (1 << (bitIdx & 7));
-        bitIdx++;
-      }
+    if (state === 'done') {
+      drawVideoZoomed();
+      drawResultOverlay();
     }
-    return code;
   }
 
-  // Hamming distance between two palmcodes (fraction of differing bits, 0=identical)
-  function hammingDistance(a, b) {
-    if (!a || !b || a.length !== b.length) return 1;
-    let diff = 0;
-    for (let i = 0; i < a.length; i++) {
-      let xor = a[i] ^ b[i];
-      while (xor) { diff += xor & 1; xor >>= 1; }
-    }
-    return diff / (a.length * 8);
-  }
-
-  // Extract palmcode from any image/canvas/video source
-  function extractPalmCode(src) {
-    const gray = extractROI(src);
-    return encodePalmCode(gray);
-  }
-
-  // ── Enroll from static image files ───────────────
-  async function enrollAllPalms() {
-    for (const src of PALM_IMG_SRCS) {
-      try {
-        const code = await palmCodeFromImageSrc(src);
-        if (code) {
-          palmCodes.push(code);
-          console.log(`[PalmAuth] Gabor enrolled: ${src}`);
-        }
-      } catch(e) {
-        console.warn(`[PalmAuth] Skipped ${src}:`, e.message);
-      }
-    }
-    return palmCodes.length > 0;
-  }
-
-  function palmCodeFromImageSrc(src) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => resolve(extractPalmCode(img));
-      img.onerror = () => resolve(null);
-      img.src = src + '?v=' + Date.now();
-    });
-  }
-
-  // ── Compare live canvas against stored palmcodes ──
-  // Returns true if ANY stored code matches (Hamming < threshold)
-  function comparePalm() {
-    if (!palmCodes.length) return false;
-    const live = extractPalmCode(canvas);
-    let best = 1;
-    for (const ref of palmCodes) {
-      const d = hammingDistance(ref, live);
-      console.log('[PalmAuth] Hamming distance:', d.toFixed(4));
-      if (d < best) best = d;
-    }
-    console.log('[PalmAuth] Best Hamming:', best.toFixed(4));
-    // Academic threshold: HD < 0.35 = same palm
-    // We use 0.38 to tolerate slight camera/lighting variation
-    return best < 0.38;
-  }
-
-  // ── Draw current video frame (full canvas) ──
-  function drawVideoFrame() {
-    if (!video || video.readyState < 2) return;
+  // Draw full mirrored video onto canvas
+  function drawVideoFull() {
     ctx.save();
-    ctx.translate(CANVAS_W, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, CANVAS_W, CANVAS_H);
+    ctx.translate(W, 0); ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, W, H);
     ctx.restore();
   }
 
-  // ── Scan line animation ───────────────────────────
-  function startScan() {
-    if (scanActive) return;
-    scanActive = true;
-    scanY = 0;
-    scanProgress = 0;
-    setStatus('SCANNING PALM GEOMETRY…', 'scanning');
-    subEl.textContent = 'HOLD STILL — BIOMETRIC SCAN IN PROGRESS';
-    animateScan();
-  }
-
-  function animateScan() {
-    if (!scanActive) return;
-    scanY += 2.2;
-    scanProgress = Math.min(100, (scanY / CANVAS_H) * 100);
-    progEl.style.width = scanProgress + '%';
-    if (scanY >= CANVAS_H) {
-      scanActive = false;
-      scanComplete = true;
-      finishScan();
-      return;
-    }
-    scanAnimId = requestAnimationFrame(animateScan);
-  }
-
-  function drawScanLine(y) {
-    if (!scanActive) return;
-    // Scan beam gradient
-    const grad = ctx.createLinearGradient(0, y - 20, 0, y + 20);
-    grad.addColorStop(0, 'transparent');
-    grad.addColorStop(0.4, 'rgba(0,212,255,0.08)');
-    grad.addColorStop(0.5, 'rgba(0,212,255,0.7)');
-    grad.addColorStop(0.6, 'rgba(0,212,255,0.08)');
-    grad.addColorStop(1, 'transparent');
+  // Draw zoomed-in portion of video centered on face
+  function drawVideoZoomed() {
+    if (!zoomBox) { drawVideoFull(); return; }
+    const vw = video.videoWidth, vh = video.videoHeight;
+    // zoomBox is in canvas coords (mirrored), convert to video source coords
+    const scaleX = vw / W, scaleY = vh / H;
+    // Mirror X back for source
+    const sx = (W - zoomBox.x - zoomBox.w) * scaleX;
+    const sy = zoomBox.y * scaleY;
+    const sw = zoomBox.w * scaleX;
+    const sh = zoomBox.h * scaleY;
     ctx.save();
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, y - 20, CANVAS_W, 40);
+    ctx.translate(W, 0); ctx.scale(-1, 1);
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
+    ctx.restore();
+  }
 
-    // Bright scan line
+  // Face box drawn over the full zoomed canvas (face fills frame)
+  function drawZoomedFaceBox(color, alpha) {
+    const pad = 12;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = 1.8;
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = color; ctx.shadowBlur = 14;
+    ctx.setLineDash([6, 3]);
+    ctx.strokeRect(pad, pad, W - pad*2, H - pad*2);
+    ctx.restore();
+  }
+
+  function drawResultOverlay() {
+    ctx.save();
+    ctx.fillStyle = '#00ff8822'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#00ff88'; ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#00ff88'; ctx.shadowBlur = 24; ctx.setLineDash([]);
     ctx.beginPath();
-    ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y);
-    ctx.strokeStyle = 'rgba(0,212,255,0.95)';
-    ctx.lineWidth = 1.5;
-    ctx.shadowColor = '#00d4ff';
-    ctx.shadowBlur = 18;
+    ctx.moveTo(W/2-30, H/2); ctx.lineTo(W/2-8, H/2+24); ctx.lineTo(W/2+34, H/2-24);
     ctx.stroke();
-
-    // Tick marks at scan line
-    for (let x = 0; x < CANVAS_W; x += 20) {
-      ctx.beginPath();
-      ctx.moveTo(x, y - 4); ctx.lineTo(x, y + 4);
-      ctx.strokeStyle = 'rgba(0,212,255,0.4)';
-      ctx.lineWidth = 1;
-      ctx.shadowBlur = 0;
-      ctx.stroke();
-    }
+    drawCorners('#00ff88', 0.9);
     ctx.restore();
   }
 
-  // ── Decorative biometric annotation lines ────────
-  let annoTick = 0;
-  function drawAnnotations() {
-    annoTick++;
-    ctx.save();
-    ctx.font = '6px "Share Tech Mono", monospace';
-    ctx.fillStyle = 'rgba(0,212,255,0.35)';
-    // Palm line labels (decorative)
-    const labels = [
-      {x: PALM_RECT.x + 10, y: PALM_RECT.y + 40, t: 'LIFE LINE'},
-      {x: PALM_RECT.x + 70, y: PALM_RECT.y + 60, t: 'HEAD LINE'},
-      {x: PALM_RECT.x + 30, y: PALM_RECT.y + 85, t: 'HEART LINE'},
-      {x: PALM_RECT.x + 160, y: PALM_RECT.y + 30, t: 'FATE LINE'},
-    ];
-    if ((annoTick >> 3) % 2 === 0) {
-      labels.forEach(l => { ctx.fillText(l.t, l.x, l.y); });
-    }
-    ctx.restore();
-  }
-
-  // ── Hand landmark overlay ─────────────────────────
-  function drawLandmarks(landmarks) {
-    if (!landmarks || !landmarks.length) return;
-    ctx.save();
-    // Mirror landmarks (video is mirrored in clip)
-    landmarks.forEach(pt => {
-      const x = (1 - pt.x) * CANVAS_W;
-      const y = pt.y * CANVAS_H;
-      ctx.beginPath();
-      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0,255,136,0.75)';
-      ctx.shadowColor = '#00ff88';
-      ctx.shadowBlur = 6;
-      ctx.fill();
+  function drawCorners(col, alpha) {
+    ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=2;
+    ctx.globalAlpha=alpha; ctx.shadowColor=col; ctx.shadowBlur=10; ctx.setLineDash([]);
+    const s=24, p=5;
+    [[p,p,1,1],[W-p,p,-1,1],[p,H-p,1,-1],[W-p,H-p,-1,-1]].forEach(([x,y,dx,dy])=>{
+      ctx.beginPath(); ctx.moveTo(x+dx*s,y); ctx.lineTo(x,y); ctx.lineTo(x,y+dy*s); ctx.stroke();
     });
     ctx.restore();
   }
 
-  // ── Main render loop ──────────────────────────────
-  let glowPhase = 0;
-  function render() {
-    if (!document.getElementById('palm-auth') ||
-        document.getElementById('palm-auth').classList.contains('fade-out')) return;
-    requestAnimationFrame(render);
-    glowPhase += 0.03;
-    const outlineAlpha = 0.35 + 0.25 * Math.sin(glowPhase);
-    const outlineColor = handDetected ? '#00ff88' : '#00d4ff';
+  // ── Face detection loop ───────────────────────────
+  async function detect() {
+    if (state !== 'idle') return; // only look for face in idle
+    if (!video.videoWidth) return;
 
-    // Black background
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    const det = await faceapi
+      .detectSingleFace(video, detectOpts);
 
-    if (authResult === 'ok') {
-      drawAuthSuccess();
-      return;
-    }
-    if (authResult === 'fail') {
-      drawAuthFail();
+    if (state !== 'idle') return;
+
+    if (!det) {
+      setStatus('SCANNING FOR FACE…', '');
+      subEl.textContent = 'LOOK DIRECTLY AT THE CAMERA';
+      progEl.style.width = '10%';
       return;
     }
 
-    // Draw camera inside outline
-    drawVideoFrame();
+    // Face found — stop detection, start zoom sequence
+    stopDetection();
+    lastBox = det.box;
 
-    // Scan overlay (scanned region tint)
-    if (scanActive) {
-      ctx.save();
-      ctx.fillStyle = 'rgba(0,212,255,0.04)';
-      ctx.fillRect(0, 0, CANVAS_W, scanY);
-      drawScanLine(scanY);
-      ctx.restore();
-    }
+    // Convert face box from video space to canvas space (mirrored)
+    const sx = W / video.videoWidth, sy = H / video.videoHeight;
+    const pad = 20; // tighter padding to zoom closer on the face
+    const fx = W - (lastBox.x + lastBox.width)  * sx;
+    const fy = lastBox.y * sy;
+    const fw = lastBox.width  * sx;
+    const fh = lastBox.height * sy;
 
-    // Landmark dots
-    if (lastLandmarks) drawLandmarks(lastLandmarks);
+    // Target zoom: face + padding, clamped to canvas
+    const tx = Math.max(0, fx - pad);
+    const ty = Math.max(0, fy - pad);
+    const tw = Math.min(W, fw + pad*2);
+    const th = Math.min(H, fh + pad*2);
 
-    // Annotations
-    if (scanActive || scanComplete) drawAnnotations();
+    zoomBox    = {x:0, y:0, w:W, h:H}; // start from full view
+    targetBox  = {x:tx, y:ty, w:tw, h:th};
 
-    // Corner decorations
-    drawCorners();
+    state = 'found';
+    setStatus('FACE DETECTED — LOCKING ON…', 'scanning');
+    subEl.textContent = 'BIOMETRIC TARGET ACQUIRED';
+    progEl.style.width = '30%';
 
-    // Center crosshair when no hand
-    if (!handDetected && !detectionReady) {
-      drawWaiting();
-    }
+    // Wait for zoom animation to settle (~1.2s), then start sweep
+    await sleep(1200);
+    if (state === 'found') startSweep();
   }
 
-  function drawCorners() {
-    const corners = [[0,0],[CANVAS_W,0],[CANVAS_W,CANVAS_H],[0,CANVAS_H]];
-    const dirs = [[1,1],[-1,1],[-1,-1],[1,-1]];
-    ctx.save();
-    ctx.strokeStyle = 'rgba(0,212,255,0.7)';
-    ctx.lineWidth = 1.5;
-    ctx.shadowColor = '#00d4ff';
-    ctx.shadowBlur = 6;
-    ctx.setLineDash([]);
-    corners.forEach(([cx, cy], i) => {
-      const [dx, dy] = dirs[i];
-      ctx.beginPath(); ctx.moveTo(cx + dx*3, cy); ctx.lineTo(cx + dx*20, cy); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx, cy + dy*3); ctx.lineTo(cx, cy + dy*20); ctx.stroke();
-    });
-    ctx.restore();
+  function startSweep() {
+    state   = 'scanning';
+    scanY   = 0;
+    scanDone= false;
+    setStatus('SCANNING FACIAL GEOMETRY…', 'scanning');
+    subEl.textContent = 'NEURAL PATTERN ANALYSIS IN PROGRESS';
   }
 
-  function drawWaiting() {
-    // Pulsing center target
-    const cx = CANVAS_W/2, cy = CANVAS_H/2;
-    ctx.save();
-    ctx.strokeStyle = `rgba(0,212,255,${0.15 + 0.08*Math.sin(glowPhase*2)})`;
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3,3]);
-    ctx.beginPath(); ctx.arc(cx, cy, 30, 0, Math.PI*2); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx-40, cy); ctx.lineTo(cx+40, cy); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx, cy-40); ctx.lineTo(cx, cy+40); ctx.stroke();
-    ctx.restore();
-  }
-
-  function drawAuthSuccess() {
-    ctx.save();
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-    // Green glow wash
-    ctx.fillStyle = `rgba(0,255,136,${0.06 + 0.05*Math.sin(glowPhase)})`;
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-    // Big checkmark
-    ctx.strokeStyle = '#00ff88';
-    ctx.lineWidth = 3;
-    ctx.shadowColor = '#00ff88';
-    ctx.shadowBlur = 24;
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.moveTo(CANVAS_W/2 - 28, CANVAS_H/2 - 5);
-    ctx.lineTo(CANVAS_W/2 - 8, CANVAS_H/2 + 20);
-    ctx.lineTo(CANVAS_W/2 + 32, CANVAS_H/2 - 22);
-    ctx.stroke();
-    drawCorners();
-    ctx.restore();
-  }
-
-  function drawAuthFail() {
-    ctx.save();
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-    ctx.strokeStyle = '#ff3d3d';
-    ctx.lineWidth = 2.5;
-    ctx.shadowColor = '#ff3d3d';
-    ctx.shadowBlur = 20;
-    ctx.setLineDash([]);
-    const cx = CANVAS_W/2, cy = CANVAS_H/2;
-    ctx.beginPath(); ctx.moveTo(cx-22, cy-22); ctx.lineTo(cx+22, cy+22); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx+22, cy-22); ctx.lineTo(cx-22, cy+22); ctx.stroke();
-    ctx.restore();
-  }
-
-  // ── Status helpers ────────────────────────────────
-  function setStatus(text, type) {
-    statusEl.textContent = text;
-    statusEl.className = type || '';
-  }
-
-  // ── Complete scan — Gabor palmcode comparison ────
   async function finishScan() {
-    setStatus('ANALYZING CREASE PATTERNS…', 'scanning');
+    const match = await verifyFaceMatch();
+    if (!match.ok) {
+      state = 'idle';
+      scanDone = false;
+      zoomBox = targetBox = null;
+      progEl.style.width = '0%';
+      progEl.style.background = 'var(--c)';
+      progEl.style.boxShadow = '0 0 10px var(--c)';
+      setStatus('IDENTITY MISMATCH — ACCESS DENIED', 'fail');
+      subEl.textContent = match.reason || 'FACE NOT RECOGNISED';
+      if (!detInterval) detInterval = setInterval(detect, 800);
+      return;
+    }
+
+    state = 'done';
     progEl.style.width = '100%';
-    await new Promise(r => setTimeout(r, 600));
-
-    const match = comparePalm();
-
-    if (match) {
-      // Auth accepted — kill camera immediately
-      if (video.srcObject) {
-        video.srcObject.getTracks().forEach(t => t.stop());
-        video.srcObject = null;
-      }
-      if (camera && camera.stop) camera.stop();
-      authResult = 'ok';
-      setStatus('▸ IDENTITY CONFIRMED — AUTHORIZATION ACCEPTED', 'ok');
-      subEl.textContent = 'WELCOME BACK, AKSHAT. LAUNCHING COMMAND CENTER…';
-      progEl.style.width = '100%';
-      progEl.style.background = 'var(--cg)';
-      progEl.style.boxShadow = '0 0 12px var(--cg)';
-      await new Promise(r => setTimeout(r, 2200));
-      launchCommandCenter();
-    } else {
-      authResult = 'fail';
-      setStatus('▸ IDENTITY MISMATCH — ACCESS DENIED', 'fail');
-      subEl.textContent = 'UNAUTHORIZED BIOMETRIC — SYSTEM LOCKED';
-      progEl.style.width = '100%';
-      progEl.style.background = 'var(--cr)';
-      showEnrollButton();
-      await new Promise(r => setTimeout(r, 2800));
-      // Reset for retry
-      authResult = null;
-      scanComplete = false;
-      scanActive = false;
-      handDetected = false;
-      lastLandmarks = null;
-      scanY = 0;
-      scanProgress = 0;
-      progEl.style.width = '0';
-      progEl.style.background = 'var(--c)';
-      progEl.style.boxShadow = '0 0 8px var(--c)';
-      setStatus('PLACE PALM WITHIN OUTLINE', '');
-      subEl.textContent = 'PLACE YOUR RIGHT PALM FLAT WITHIN THE OUTLINE';
-    }
+    progEl.style.background = 'var(--cg)';
+    progEl.style.boxShadow = '0 0 14px var(--cg)';
+    setStatus(`▸ IDENTITY CONFIRMED — MATCH ${Math.round((1-match.distance)*100)}%`, 'ok');
+    subEl.textContent = 'WELCOME BACK. LAUNCHING COMMAND CENTER…';
+    stopCamera();
+    await sleep(2000);
+    launchCommandCenter();
   }
 
-  // ── IndexedDB palm store ──────────────────────────
-  const IDB_NAME = 'akshat_biometric', IDB_STORE = 'palms', IDB_VER = 1;
-
-  function openDB() {
-    return new Promise((res, rej) => {
-      const req = indexedDB.open(IDB_NAME, IDB_VER);
-      req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE, {keyPath:'id',autoIncrement:true});
-      req.onsuccess = e => res(e.target.result);
-      req.onerror  = e => rej(e);
-    });
+  function stopDetection() {
+    if (detInterval) { clearInterval(detInterval); detInterval = null; }
+  }
+  function stopCamera() {
+    if (video.srcObject) { video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject=null; }
   }
 
-  async function idbSaveFingerprint(fp, snapshot) {
-    const db = await openDB();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).add({fp, snapshot, ts: Date.now()});
-      tx.oncomplete = res; tx.onerror = rej;
-    });
-  }
-
-  async function idbLoadFingerprints() {
-    const db = await openDB();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(IDB_STORE, 'readonly');
-      const req = tx.objectStore(IDB_STORE).getAll();
-      req.onsuccess = () => res(req.result || []);
-      req.onerror = rej;
-    });
-  }
-
-  // ── Enroll from live camera ───────────────────────
-  window.palmEnrollNow = async function() {
-    const btn = document.getElementById('pa-enroll-btn');
-    btn.style.display = 'none';
-    setStatus('EXTRACTING CREASE PATTERN…', 'scanning');
-    await new Promise(r => setTimeout(r, 200));
-    const code = extractPalmCode(canvas);
-    const snapshot = canvas.toDataURL('image/jpeg', 0.7);
-    await idbSaveFingerprint(Array.from(code), snapshot);
-    const wasEmpty = palmCodes.length === 0;
-    palmCodes.push(code);
-    console.log('[PalmAuth] Gabor palmcode enrolled. Total refs:', palmCodes.length);
-
-    if (wasEmpty) {
-      if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
-      if (camera && camera.stop) camera.stop();
-      authResult = 'ok';
-      setStatus('▸ PALM ENROLLED & AUTHORIZED', 'ok');
-      subEl.textContent = 'CREASE PATTERN REGISTERED · WELCOME, AKSHAT';
-      progEl.style.width = '100%';
-      progEl.style.background = 'var(--cg)';
-      progEl.style.boxShadow = '0 0 12px var(--cg)';
-      await new Promise(r => setTimeout(r, 2200));
-      launchCommandCenter();
-    } else {
-      setStatus('ENROLLED — RESCANNING…', 'scanning');
-      subEl.textContent = 'CREASE PATTERN SAVED · VERIFYING';
-      authResult = null;
-      scanComplete = false;
-      scanActive = false;
-      handDetected = false;
-      scanY = 0;
-      scanProgress = 0;
-      progEl.style.width = '0';
-      progEl.style.background = 'var(--c)';
-      progEl.style.boxShadow = '0 0 8px var(--c)';
-      setTimeout(() => {
-        setStatus('PLACE PALM IN VIEW', '');
-        subEl.textContent = 'PRESENT YOUR PALM TO THE CAMERA';
-      }, 1200);
-    }
-  };
-
-  function showEnrollButton() {
-    const btn = document.getElementById('pa-enroll-btn');
-    if (btn) btn.style.display = 'inline-block';
-  }
-
-  // ── Launch command center ─────────────────────────
   function launchCommandCenter() {
     const el = document.getElementById('palm-auth');
     el.classList.add('fade-out');
-    setTimeout(() => {
-      el.style.display = 'none';
+    setTimeout(()=>{
+      el.style.display='none';
       document.getElementById('setup-modal').classList.add('hidden');
-      startBoot();
-      initAudioViz();
+      startBoot(); initAudioViz();
     }, 900);
   }
 
-  // ── MediaPipe Hands setup ─────────────────────────
-  async function initHandDetection() {
-    try {
-      // Check MediaPipe available
-      if (typeof Hands === 'undefined') throw new Error('MP not loaded');
-
-      const hands = new Hands({locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${f}`});
-      hands.setOptions({
-        maxNumHands: 1,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.65,
-        minTrackingConfidence: 0.55
-      });
-
-      // Named callback so enrollPalmFromImage can temporarily swap it
-      hands.onResults(onHandResults);
-      mpHands = hands;
-
-      const cam = new Camera(video, {
-        onFrame: async () => { await hands.send({image: video}); },
-        width: 640, height: 480
-      });
-      cam.start();
-      camera = cam;
-      detectionReady = true;
-
-      // Enroll from palm.jpeg / palm2.jpeg / palm3.jpeg via Gabor
-      setStatus('LOADING REFERENCE IMAGES…', '');
-      const enrolled = await enrollAllPalms();
-      if (enrolled) {
-        setStatus('PLACE PALM IN VIEW', '');
-        subEl.textContent = `GABOR SCANNER READY — ${palmCodes.length} REFERENCE(S) LOADED`;
-      } else {
-        setStatus('NO REFERENCES FOUND — ENROLL YOUR PALM', 'fail');
-        subEl.textContent = 'HOLD YOUR PALM UP TO THE CAMERA AND CLICK ENROLL';
-        showEnrollButton();
-      }
-    } catch(e) {
-      // MediaPipe failed to load — no fallback, hard deny
-      noMpFallback = true;
-      setStatus('BIOMETRIC SYSTEM OFFLINE — ACCESS DENIED', 'fail');
-      subEl.textContent = 'MEDIAPIPE UNAVAILABLE — CANNOT AUTHENTICATE';
-    }
-  }
-
-  // ── Live hand results callback (named for re-use) ─
-  function onHandResults(results) {
-    if (authResult || scanComplete) return;
-    const detected = results.multiHandLandmarks && results.multiHandLandmarks.length > 0;
-    if (detected) {
-      lastLandmarks = results.multiHandLandmarks[0];
-      if (handLostTimeout) { clearTimeout(handLostTimeout); handLostTimeout = null; }
-      if (!handDetected) {
-        handDetected = true;
-        setStatus('PALM DETECTED — INITIATING SCAN…', '');
-      }
-      if (!scanActive && !scanComplete) {
-        setTimeout(startScan, 400);
-      }
-    } else {
-      if (handDetected && !scanActive) {
-        handLostTimeout = setTimeout(() => {
-          handDetected = false;
-          lastLandmarks = null;
-          setStatus('PLACE PALM IN VIEW', '');
-          subEl.textContent = 'PRESENT YOUR PALM TO THE CAMERA';
-        }, 800);
-      }
-    }
-  }
-
-  // ── Fallback: MediaPipe unavailable — hard deny ───
-  function setupFallbackCamera() {
-    setStatus('BIOMETRIC SYSTEM OFFLINE — ACCESS DENIED', 'fail');
-    subEl.textContent = 'CANNOT AUTHENTICATE WITHOUT MEDIAPIPE';
-  }
-
-  // ── Init ──────────────────────────────────────────
+  // ── Init ─────────────────────────────────────────
   async function init() {
-    setStatus('INITIALIZING GABOR SCANNER…', '');
-    subEl.textContent = 'LOADING CREASE ANALYSIS ENGINE';
+    setStatus('LOADING NEURAL MODELS…', '');
+    subEl.textContent = 'INITIALISING FACE DETECTION ENGINE';
 
-    // Load any previously enrolled palmcodes from IndexedDB
     try {
-      const stored = await idbLoadFingerprints();
-      if (stored.length) {
-        stored.forEach(r => {
-          // Restore as Uint8Array (was saved as plain Array)
-          palmCodes.push(r.fp instanceof Uint8Array ? r.fp : new Uint8Array(r.fp));
-        });
-        console.log(`[PalmAuth] Loaded ${stored.length} palmcode(s) from IndexedDB`);
-      }
-    } catch(e) { console.warn('[PalmAuth] IDB load failed', e); }
+      await Promise.all([
+        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+      ]);
+      console.log('[FaceAuth] Model loaded');
+    } catch(e) {
+      setStatus('MODEL LOAD FAILED — CHECK CONNECTION', 'fail');
+      subEl.textContent = e.message; return;
+    }
 
-    render();
-    await initHandDetection();
+    const refLoaded = await loadReferenceFace();
+    if (!refLoaded) {
+      setStatus('REFERENCE face.jpeg NOT READY', 'fail');
+      subEl.textContent = 'PLACE A CLEAR FACE IMAGE IN face.jpeg';
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:'user'}});
+      video.srcObject = stream;
+      await new Promise(r => { video.onloadedmetadata = r; });
+      video.play();
+    } catch(e) {
+      setStatus('CAMERA ACCESS DENIED', 'fail');
+      subEl.textContent = 'ALLOW CAMERA PERMISSION AND RELOAD'; return;
+    }
+
+    renderLoop();
+    detInterval = setInterval(detect, 800);
+    setStatus('SCANNING FOR FACE…', '');
+    subEl.textContent = 'LOOK DIRECTLY AT THE CAMERA';
+    progEl.style.width = '10%';
   }
 
   window.addEventListener('load', init);
