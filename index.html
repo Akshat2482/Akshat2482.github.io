@@ -12,8 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+
 <style>
 :root{--c:#00d4ff;--cr:#ff3d3d;--cg:#00ff88;--cy:#ffb700;--bg:rgba(0,10,22,.92);--border:rgba(0,212,255,.2);}
 
@@ -1498,8 +1497,7 @@ function initAudioViz() {
   const PALM_RECT = {x:68, y:140, w:220, h:190, r:22};
 
   const PALM_IMG_SRCS = ['palm.jpeg', 'palm2.jpeg', 'palm3.jpeg'];
-  let palmEmbeddings = []; // stored MobileNet embedding arrays
-  let mobileNetModel = null;
+  let palmCodes = []; // stored Gabor palm codes (Uint8Array bitplanes)
   let handDetected = false;
   let scanY = 0;
   let scanActive = false;
@@ -1522,85 +1520,159 @@ function initAudioViz() {
   const subEl   = document.getElementById('palm-sub');
   const progEl  = document.getElementById('palm-prog');
 
-  // ── MobileNet embedding extraction ───────────────
-  // Renders image into a 224x224 offscreen canvas, runs through MobileNet,
-  // returns the 1024-dim penultimate-layer feature vector as plain Array
-  async function getEmbedding(imageSource) {
-    if (!mobileNetModel) return null;
-    return tf.tidy(() => {
-      // Resize to 224x224 and normalize
-      const tmp = document.createElement('canvas');
-      tmp.width = tmp.height = 224;
-      const tc = tmp.getContext('2d');
-      tc.drawImage(imageSource, 0, 0, 224, 224);
-      const tensor = tf.browser.fromPixels(tmp)
-        .toFloat()
-        .div(127.5)
-        .sub(1)
-        .expandDims(0); // [1, 224, 224, 3]
-      // infer(tensor, true) returns embedding BEFORE final classification layer
-      const embedding = mobileNetModel.infer(tensor, true);
-      return Array.from(embedding.dataSync());
-    });
+  // ═══════════════════════════════════════════════════
+  //  GABOR PALMPRINT ENGINE
+  //  Crops the palm ROI, applies 6-orientation Gabor
+  //  filter bank, encodes responses into a binary
+  //  palmcode, compares via Hamming distance.
+  //  Matches academic IEE/HKPU palmprint algorithms.
+  // ═══════════════════════════════════════════════════
+
+  const GABOR_SIZE   = 35;   // kernel size (odd)
+  const GABOR_SIGMA  = 5.6;  // Gaussian envelope
+  const GABOR_LAMBDA = 9.0;  // wavelength (crease spacing)
+  const GABOR_GAMMA  = 0.5;  // aspect ratio
+  const GABOR_ANGLES = [0, 30, 60, 90, 120, 150].map(d => d * Math.PI / 180);
+  const ROI_W = 128, ROI_H = 128; // normalised palm ROI
+
+  // Build one Gabor kernel (returns Float64Array, ROI_W×ROI_H not needed — size×size)
+  function buildGaborKernel(theta) {
+    const half = (GABOR_SIZE - 1) / 2;
+    const k = new Float64Array(GABOR_SIZE * GABOR_SIZE);
+    let idx = 0;
+    for (let y = -half; y <= half; y++) {
+      for (let x = -half; x <= half; x++) {
+        const xp =  x * Math.cos(theta) + y * Math.sin(theta);
+        const yp = -x * Math.sin(theta) + y * Math.cos(theta);
+        const gauss = Math.exp(-(xp*xp + GABOR_GAMMA*GABOR_GAMMA*yp*yp) / (2*GABOR_SIGMA*GABOR_SIGMA));
+        const wave  = Math.cos(2 * Math.PI * xp / GABOR_LAMBDA);
+        k[idx++] = gauss * wave;
+      }
+    }
+    return k;
   }
 
-  // ── Cosine similarity ─────────────────────────────
-  function cosineSimilarity(a, b) {
-    if (!a || !b || a.length !== b.length) return 0;
-    let dot = 0, normA = 0, normB = 0;
-    for (let i = 0; i < a.length; i++) {
-      dot   += a[i] * b[i];
-      normA += a[i] * a[i];
-      normB += b[i] * b[i];
+  // Pre-compute all 6 kernels once at startup
+  const GABOR_KERNELS = GABOR_ANGLES.map(buildGaborKernel);
+
+  // Extract grayscale ROI from center of canvas/image at ROI_W×ROI_H
+  function extractROI(src) {
+    const tmp = document.createElement('canvas');
+    tmp.width = ROI_W; tmp.height = ROI_H;
+    const tc = tmp.getContext('2d');
+    // Draw center crop (palm region, skip top 10% fingers, bottom 10% wrist)
+    const sw = src.videoWidth || src.naturalWidth || src.width  || CANVAS_W;
+    const sh = src.videoHeight|| src.naturalHeight|| src.height || CANVAS_H;
+    const cropX = sw * 0.10, cropY = sh * 0.20;
+    const cropW = sw * 0.80, cropH = sh * 0.65;
+    tc.drawImage(src, cropX, cropY, cropW, cropH, 0, 0, ROI_W, ROI_H);
+    const id = tc.getImageData(0, 0, ROI_W, ROI_H).data;
+    // Grayscale float array + local histogram equalization
+    const gray = new Float64Array(ROI_W * ROI_H);
+    for (let i = 0; i < ROI_W * ROI_H; i++)
+      gray[i] = (id[i*4]*0.299 + id[i*4+1]*0.587 + id[i*4+2]*0.114);
+    // Normalize 0–1
+    let mn = 255, mx = 0;
+    gray.forEach(v => { if(v<mn) mn=v; if(v>mx) mx=v; });
+    const rng = mx - mn || 1;
+    for (let i = 0; i < gray.length; i++) gray[i] = (gray[i] - mn) / rng;
+    return gray;
+  }
+
+  // Convolve gray[ROI_W×ROI_H] with kernel[GABOR_SIZE×GABOR_SIZE]
+  function convolve(gray, kernel) {
+    const half = (GABOR_SIZE - 1) / 2;
+    const out  = new Float64Array(ROI_W * ROI_H);
+    for (let y = 0; y < ROI_H; y++) {
+      for (let x = 0; x < ROI_W; x++) {
+        let sum = 0;
+        for (let ky = -half; ky <= half; ky++) {
+          for (let kx = -half; kx <= half; kx++) {
+            const sy = Math.min(ROI_H-1, Math.max(0, y+ky));
+            const sx = Math.min(ROI_W-1, Math.max(0, x+kx));
+            sum += gray[sy*ROI_W + sx] * kernel[(ky+half)*GABOR_SIZE + (kx+half)];
+          }
+        }
+        out[y*ROI_W + x] = sum;
+      }
     }
-    const denom = Math.sqrt(normA) * Math.sqrt(normB);
-    return denom === 0 ? 0 : dot / denom;
+    return out;
+  }
+
+  // Encode: for each orientation, response>0 → bit 1, ≤0 → bit 0
+  // Result: Uint8Array of length 6 * ROI_W * ROI_H bits packed into bytes
+  function encodePalmCode(gray) {
+    const totalBits  = GABOR_ANGLES.length * ROI_W * ROI_H;
+    const code       = new Uint8Array(Math.ceil(totalBits / 8));
+    let bitIdx = 0;
+    for (let k = 0; k < GABOR_KERNELS.length; k++) {
+      const resp = convolve(gray, GABOR_KERNELS[k]);
+      for (let i = 0; i < resp.length; i++) {
+        if (resp[i] > 0) code[bitIdx >> 3] |= (1 << (bitIdx & 7));
+        bitIdx++;
+      }
+    }
+    return code;
+  }
+
+  // Hamming distance between two palmcodes (fraction of differing bits, 0=identical)
+  function hammingDistance(a, b) {
+    if (!a || !b || a.length !== b.length) return 1;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) {
+      let xor = a[i] ^ b[i];
+      while (xor) { diff += xor & 1; xor >>= 1; }
+    }
+    return diff / (a.length * 8);
+  }
+
+  // Extract palmcode from any image/canvas/video source
+  function extractPalmCode(src) {
+    const gray = extractROI(src);
+    return encodePalmCode(gray);
   }
 
   // ── Enroll from static image files ───────────────
   async function enrollAllPalms() {
-    // NOTE: do NOT reset palmEmbeddings — IDB ones already loaded
     for (const src of PALM_IMG_SRCS) {
       try {
-        const emb = await embedFromImageSrc(src);
-        if (emb) {
-          palmEmbeddings.push(emb);
-          console.log(`[PalmAuth] MobileNet enrolled: ${src}`);
+        const code = await palmCodeFromImageSrc(src);
+        if (code) {
+          palmCodes.push(code);
+          console.log(`[PalmAuth] Gabor enrolled: ${src}`);
         }
       } catch(e) {
         console.warn(`[PalmAuth] Skipped ${src}:`, e.message);
       }
     }
-    return palmEmbeddings.length > 0;
+    return palmCodes.length > 0;
   }
 
-  function embedFromImageSrc(src) {
+  function palmCodeFromImageSrc(src) {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.onload = async () => {
-        const emb = await getEmbedding(img);
-        resolve(emb);
-      };
+      img.onload = () => resolve(extractPalmCode(img));
       img.onerror = () => resolve(null);
       img.src = src + '?v=' + Date.now();
     });
   }
 
-  // ── Compare live canvas frame against stored embeddings ──
-  async function comparePalm() {
-    if (!palmEmbeddings.length) return false;
-    if (!mobileNetModel) return false;
-    const liveEmb = await getEmbedding(canvas);
-    if (!liveEmb) return false;
-    let best = 0;
-    for (const ref of palmEmbeddings) {
-      const score = cosineSimilarity(ref, liveEmb);
-      console.log('[PalmAuth] Cosine similarity:', score.toFixed(4));
-      if (score > best) best = score;
+  // ── Compare live canvas against stored palmcodes ──
+  // Returns true if ANY stored code matches (Hamming < threshold)
+  function comparePalm() {
+    if (!palmCodes.length) return false;
+    const live = extractPalmCode(canvas);
+    let best = 1;
+    for (const ref of palmCodes) {
+      const d = hammingDistance(ref, live);
+      console.log('[PalmAuth] Hamming distance:', d.toFixed(4));
+      if (d < best) best = d;
     }
-    console.log('[PalmAuth] Best score:', best.toFixed(4));
-    return best >= 0.82; // MobileNet threshold — tight but lighting-tolerant
+    console.log('[PalmAuth] Best Hamming:', best.toFixed(4));
+    // Academic threshold: HD < 0.35 = same palm
+    // We use 0.38 to tolerate slight camera/lighting variation
+    return best < 0.38;
   }
 
   // ── Draw current video frame (full canvas) ──
@@ -1833,13 +1905,13 @@ function initAudioViz() {
     statusEl.className = type || '';
   }
 
-  // ── Complete scan — MobileNet embedding comparison ──
+  // ── Complete scan — Gabor palmcode comparison ────
   async function finishScan() {
-    setStatus('RUNNING NEURAL ANALYSIS…', 'scanning');
+    setStatus('ANALYZING CREASE PATTERNS…', 'scanning');
     progEl.style.width = '100%';
     await new Promise(r => setTimeout(r, 600));
 
-    const match = await comparePalm();
+    const match = comparePalm();
 
     if (match) {
       // Auth accepted — kill camera immediately
@@ -1915,30 +1987,21 @@ function initAudioViz() {
   window.palmEnrollNow = async function() {
     const btn = document.getElementById('pa-enroll-btn');
     btn.style.display = 'none';
-    if (!mobileNetModel) {
-      setStatus('NEURAL MODEL NOT READY — WAIT…', 'fail');
-      setTimeout(() => showEnrollButton(), 2000);
-      return;
-    }
-    setStatus('EXTRACTING NEURAL SIGNATURE…', 'scanning');
-    const emb = await getEmbedding(canvas);
-    if (!emb) {
-      setStatus('EMBEDDING FAILED — TRY AGAIN', 'fail');
-      setTimeout(() => showEnrollButton(), 2000);
-      return;
-    }
+    setStatus('EXTRACTING CREASE PATTERN…', 'scanning');
+    await new Promise(r => setTimeout(r, 200));
+    const code = extractPalmCode(canvas);
     const snapshot = canvas.toDataURL('image/jpeg', 0.7);
-    await idbSaveFingerprint(emb, snapshot);
-    const wasEmpty = palmEmbeddings.length === 0;
-    palmEmbeddings.push(emb);
-    console.log('[PalmAuth] MobileNet embedding enrolled. Total refs:', palmEmbeddings.length);
+    await idbSaveFingerprint(Array.from(code), snapshot);
+    const wasEmpty = palmCodes.length === 0;
+    palmCodes.push(code);
+    console.log('[PalmAuth] Gabor palmcode enrolled. Total refs:', palmCodes.length);
 
     if (wasEmpty) {
       if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
       if (camera && camera.stop) camera.stop();
       authResult = 'ok';
       setStatus('▸ PALM ENROLLED & AUTHORIZED', 'ok');
-      subEl.textContent = 'NEURAL SIGNATURE REGISTERED · WELCOME, AKSHAT';
+      subEl.textContent = 'CREASE PATTERN REGISTERED · WELCOME, AKSHAT';
       progEl.style.width = '100%';
       progEl.style.background = 'var(--cg)';
       progEl.style.boxShadow = '0 0 12px var(--cg)';
@@ -1946,7 +2009,7 @@ function initAudioViz() {
       launchCommandCenter();
     } else {
       setStatus('ENROLLED — RESCANNING…', 'scanning');
-      subEl.textContent = 'NEURAL SIGNATURE SAVED · VERIFYING';
+      subEl.textContent = 'CREASE PATTERN SAVED · VERIFYING';
       authResult = null;
       scanComplete = false;
       scanActive = false;
@@ -2006,12 +2069,12 @@ function initAudioViz() {
       camera = cam;
       detectionReady = true;
 
-      // Enroll from palm.jpeg / palm2.jpeg / palm3.jpeg via MobileNet
+      // Enroll from palm.jpeg / palm2.jpeg / palm3.jpeg via Gabor
       setStatus('LOADING REFERENCE IMAGES…', '');
       const enrolled = await enrollAllPalms();
       if (enrolled) {
         setStatus('PLACE PALM IN VIEW', '');
-        subEl.textContent = `NEURAL BIOMETRIC READY — ${palmEmbeddings.length} REFERENCE(S) LOADED`;
+        subEl.textContent = `GABOR SCANNER READY — ${palmCodes.length} REFERENCE(S) LOADED`;
       } else {
         setStatus('NO REFERENCES FOUND — ENROLL YOUR PALM', 'fail');
         subEl.textContent = 'HOLD YOUR PALM UP TO THE CAMERA AND CLICK ENROLL';
@@ -2059,25 +2122,18 @@ function initAudioViz() {
 
   // ── Init ──────────────────────────────────────────
   async function init() {
-    setStatus('LOADING NEURAL MODEL…', '');
-    subEl.textContent = 'INITIALIZING MOBILENET — PLEASE WAIT';
+    setStatus('INITIALIZING GABOR SCANNER…', '');
+    subEl.textContent = 'LOADING CREASE ANALYSIS ENGINE';
 
-    // Load MobileNet
-    try {
-      mobileNetModel = await mobilenet.load({ version: 2, alpha: 1.0 });
-      console.log('[PalmAuth] MobileNet loaded');
-    } catch(e) {
-      setStatus('NEURAL MODEL FAILED TO LOAD', 'fail');
-      subEl.textContent = 'CHECK NETWORK CONNECTION';
-      return;
-    }
-
-    // Load any previously enrolled embeddings from IndexedDB
+    // Load any previously enrolled palmcodes from IndexedDB
     try {
       const stored = await idbLoadFingerprints();
       if (stored.length) {
-        stored.forEach(r => palmEmbeddings.push(r.fp));
-        console.log(`[PalmAuth] Loaded ${stored.length} embedding(s) from IndexedDB`);
+        stored.forEach(r => {
+          // Restore as Uint8Array (was saved as plain Array)
+          palmCodes.push(r.fp instanceof Uint8Array ? r.fp : new Uint8Array(r.fp));
+        });
+        console.log(`[PalmAuth] Loaded ${stored.length} palmcode(s) from IndexedDB`);
       }
     } catch(e) { console.warn('[PalmAuth] IDB load failed', e); }
 
