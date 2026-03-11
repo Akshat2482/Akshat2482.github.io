@@ -10,8 +10,32 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
 <link rel="icon" href="favicon.ico"/>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
 <style>
 :root{--c:#00d4ff;--cr:#ff3d3d;--cg:#00ff88;--cy:#ffb700;--bg:rgba(0,10,22,.92);--border:rgba(0,212,255,.2);}
+
+/* ══ PALM AUTH ══ */
+#palm-auth{position:fixed;inset:0;background:#000;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:opacity .9s ease;}
+#palm-auth.fade-out{opacity:0;pointer-events:none;}
+#palm-canvas{display:block;position:relative;z-index:1;}
+.palm-header{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:.38em;color:rgba(0,212,255,.45);text-transform:uppercase;margin-bottom:18px;position:relative;z-index:2;}
+.palm-header-logo{font-size:13px;font-weight:900;letter-spacing:.28em;color:#fff;text-shadow:0 0 24px var(--c);display:flex;align-items:center;gap:10px;margin-bottom:5px;}
+.palm-header-logo span{color:var(--cr);text-shadow:0 0 16px var(--cr);}
+#palm-status{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.22em;color:rgba(0,212,255,.65);margin-top:18px;text-align:center;min-height:18px;transition:color .3s;}
+#palm-status.ok{color:var(--cg);text-shadow:0 0 12px var(--cg);}
+#palm-status.fail{color:var(--cr);text-shadow:0 0 12px var(--cr);}
+#palm-status.scanning{color:var(--cy);text-shadow:0 0 10px var(--cy);}
+.palm-sub{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:.18em;color:rgba(0,212,255,.3);margin-top:6px;text-align:center;}
+.palm-corner{position:absolute;width:18px;height:18px;pointer-events:none;}
+.palm-corner::before,.palm-corner::after{content:'';position:absolute;background:var(--c);box-shadow:0 0 4px var(--c);}
+.palm-corner::before{width:100%;height:1.5px;}.palm-corner::after{width:1.5px;height:100%;}
+#palm-auth-wrap{position:relative;display:inline-block;}
+.palm-progress-bar{width:220px;height:2px;background:rgba(0,212,255,.1);border-radius:2px;margin-top:10px;overflow:hidden;}
+.palm-progress-fill{height:100%;width:0%;background:var(--c);box-shadow:0 0 8px var(--c);border-radius:2px;transition:width .1s linear;}
+#palm-biometric-lines{position:absolute;inset:0;pointer-events:none;z-index:10;}
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Orbitron',sans-serif;color:var(--c);}
 body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,212,255,.016) 2px,rgba(0,212,255,.016) 4px);pointer-events:none;z-index:9000;}
@@ -259,8 +283,20 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 </head>
 <body>
 
-<!-- ══ SETUP MODAL ══ -->
-
+<!-- ══ PALM BIOMETRIC AUTH ══ -->
+<div id="palm-auth">
+  <div class="palm-header-logo">AKSHAT <span>INDUSTRIES</span></div>
+  <div class="palm-header">BIOMETRIC AUTHENTICATION REQUIRED</div>
+  <div id="palm-auth-wrap">
+    <video id="palm-video" autoplay playsinline muted style="display:none;"></video>
+    <canvas id="palm-canvas" width="340" height="400"></canvas>
+    <svg id="palm-biometric-lines" width="340" height="400" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+  <div id="palm-status">INITIALIZING BIOMETRIC SCANNER…</div>
+  <div class="palm-sub" id="palm-sub">PLACE YOUR RIGHT PALM FLAT WITHIN THE OUTLINE</div>
+  <div class="palm-progress-bar"><div class="palm-progress-fill" id="palm-prog"></div></div>
+  <button id="pa-enroll-btn" style="display:none;margin-top:10px;background:rgba(255,183,0,.1);border:1px solid var(--cy);color:var(--cy);font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:.22em;padding:9px 22px;border-radius:3px;cursor:pointer;transition:.2s;" onclick="window.palmEnrollNow()">⊕ ENROLL THIS PALM</button>
+</div>
 
 <!-- ══ SETUP MODAL ══ -->
 <div id="setup-modal">
@@ -1446,13 +1482,616 @@ function initAudioViz() {
 }
 
 // ═══════════════════════════════════════
-//  START
+//  PALM BIOMETRIC AUTHENTICATION
 // ═══════════════════════════════════════
-window.addEventListener('load', () => {
-  document.getElementById('setup-modal').classList.add('hidden');
-  startBoot();
-  initAudioViz();
-});
+(function() {
+  const CANVAS_W = 340, CANVAS_H = 400;
+  // Palm outline path definition (hand silhouette) — coords for 340x400 canvas
+  // Palm region: roughly lower 60% of canvas, fingers upper 40%
+  const FINGER_TIPS = [
+    {x:82,  y:20,  w:28, h:110, r:14}, // pinky
+    {x:118, y:6,   w:30, h:130, r:15}, // ring
+    {x:156, y:0,   w:32, h:140, r:16}, // middle
+    {x:196, y:10,  w:30, h:130, r:15}, // index
+    {x:244, y:60,  w:28, h:90,  r:14}, // thumb (angled)
+  ];
+  const PALM_RECT = {x:68, y:140, w:220, h:190, r:22};
+
+  const PALM_IMG_SRCS = ['palm.jpeg', 'palm2.jpeg', 'palm3.jpeg'];
+  let palmEmbeddings = []; // stored MobileNet embedding arrays
+  let mobileNetModel = null;
+  let handDetected = false;
+  let scanY = 0;
+  let scanActive = false;
+  let scanComplete = false;
+  let scanProgress = 0;
+  let authResult = null;
+  let scanAnimId = null;
+  let mpHands = null;
+  let camera = null;
+  let lastLandmarks = null;
+  let handLostTimeout = null;
+  let detectionReady = false;
+  let noMpFallback = false;
+
+  const video   = document.getElementById('palm-video');
+  const canvas  = document.getElementById('palm-canvas');
+  const ctx     = canvas.getContext('2d');
+  const svgEl   = document.getElementById('palm-biometric-lines');
+  const statusEl= document.getElementById('palm-status');
+  const subEl   = document.getElementById('palm-sub');
+  const progEl  = document.getElementById('palm-prog');
+
+  // ── MobileNet embedding extraction ───────────────
+  // Renders image into a 224x224 offscreen canvas, runs through MobileNet,
+  // returns the 1024-dim penultimate-layer feature vector as plain Array
+  async function getEmbedding(imageSource) {
+    if (!mobileNetModel) return null;
+    return tf.tidy(() => {
+      // Resize to 224x224 and normalize
+      const tmp = document.createElement('canvas');
+      tmp.width = tmp.height = 224;
+      const tc = tmp.getContext('2d');
+      tc.drawImage(imageSource, 0, 0, 224, 224);
+      const tensor = tf.browser.fromPixels(tmp)
+        .toFloat()
+        .div(127.5)
+        .sub(1)
+        .expandDims(0); // [1, 224, 224, 3]
+      // infer(tensor, true) returns embedding BEFORE final classification layer
+      const embedding = mobileNetModel.infer(tensor, true);
+      return Array.from(embedding.dataSync());
+    });
+  }
+
+  // ── Cosine similarity ─────────────────────────────
+  function cosineSimilarity(a, b) {
+    if (!a || !b || a.length !== b.length) return 0;
+    let dot = 0, normA = 0, normB = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot   += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+    const denom = Math.sqrt(normA) * Math.sqrt(normB);
+    return denom === 0 ? 0 : dot / denom;
+  }
+
+  // ── Enroll from static image files ───────────────
+  async function enrollAllPalms() {
+    // NOTE: do NOT reset palmEmbeddings — IDB ones already loaded
+    for (const src of PALM_IMG_SRCS) {
+      try {
+        const emb = await embedFromImageSrc(src);
+        if (emb) {
+          palmEmbeddings.push(emb);
+          console.log(`[PalmAuth] MobileNet enrolled: ${src}`);
+        }
+      } catch(e) {
+        console.warn(`[PalmAuth] Skipped ${src}:`, e.message);
+      }
+    }
+    return palmEmbeddings.length > 0;
+  }
+
+  function embedFromImageSrc(src) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = async () => {
+        const emb = await getEmbedding(img);
+        resolve(emb);
+      };
+      img.onerror = () => resolve(null);
+      img.src = src + '?v=' + Date.now();
+    });
+  }
+
+  // ── Compare live canvas frame against stored embeddings ──
+  async function comparePalm() {
+    if (!palmEmbeddings.length) return false;
+    if (!mobileNetModel) return false;
+    const liveEmb = await getEmbedding(canvas);
+    if (!liveEmb) return false;
+    let best = 0;
+    for (const ref of palmEmbeddings) {
+      const score = cosineSimilarity(ref, liveEmb);
+      console.log('[PalmAuth] Cosine similarity:', score.toFixed(4));
+      if (score > best) best = score;
+    }
+    console.log('[PalmAuth] Best score:', best.toFixed(4));
+    return best >= 0.82; // MobileNet threshold — tight but lighting-tolerant
+  }
+
+  // ── Draw current video frame (full canvas) ──
+  function drawVideoFrame() {
+    if (!video || video.readyState < 2) return;
+    ctx.save();
+    ctx.translate(CANVAS_W, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, CANVAS_W, CANVAS_H);
+    ctx.restore();
+  }
+
+  // ── Scan line animation ───────────────────────────
+  function startScan() {
+    if (scanActive) return;
+    scanActive = true;
+    scanY = 0;
+    scanProgress = 0;
+    setStatus('SCANNING PALM GEOMETRY…', 'scanning');
+    subEl.textContent = 'HOLD STILL — BIOMETRIC SCAN IN PROGRESS';
+    animateScan();
+  }
+
+  function animateScan() {
+    if (!scanActive) return;
+    scanY += 2.2;
+    scanProgress = Math.min(100, (scanY / CANVAS_H) * 100);
+    progEl.style.width = scanProgress + '%';
+    if (scanY >= CANVAS_H) {
+      scanActive = false;
+      scanComplete = true;
+      finishScan();
+      return;
+    }
+    scanAnimId = requestAnimationFrame(animateScan);
+  }
+
+  function drawScanLine(y) {
+    if (!scanActive) return;
+    // Scan beam gradient
+    const grad = ctx.createLinearGradient(0, y - 20, 0, y + 20);
+    grad.addColorStop(0, 'transparent');
+    grad.addColorStop(0.4, 'rgba(0,212,255,0.08)');
+    grad.addColorStop(0.5, 'rgba(0,212,255,0.7)');
+    grad.addColorStop(0.6, 'rgba(0,212,255,0.08)');
+    grad.addColorStop(1, 'transparent');
+    ctx.save();
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, y - 20, CANVAS_W, 40);
+
+    // Bright scan line
+    ctx.beginPath();
+    ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y);
+    ctx.strokeStyle = 'rgba(0,212,255,0.95)';
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = '#00d4ff';
+    ctx.shadowBlur = 18;
+    ctx.stroke();
+
+    // Tick marks at scan line
+    for (let x = 0; x < CANVAS_W; x += 20) {
+      ctx.beginPath();
+      ctx.moveTo(x, y - 4); ctx.lineTo(x, y + 4);
+      ctx.strokeStyle = 'rgba(0,212,255,0.4)';
+      ctx.lineWidth = 1;
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── Decorative biometric annotation lines ────────
+  let annoTick = 0;
+  function drawAnnotations() {
+    annoTick++;
+    ctx.save();
+    ctx.font = '6px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(0,212,255,0.35)';
+    // Palm line labels (decorative)
+    const labels = [
+      {x: PALM_RECT.x + 10, y: PALM_RECT.y + 40, t: 'LIFE LINE'},
+      {x: PALM_RECT.x + 70, y: PALM_RECT.y + 60, t: 'HEAD LINE'},
+      {x: PALM_RECT.x + 30, y: PALM_RECT.y + 85, t: 'HEART LINE'},
+      {x: PALM_RECT.x + 160, y: PALM_RECT.y + 30, t: 'FATE LINE'},
+    ];
+    if ((annoTick >> 3) % 2 === 0) {
+      labels.forEach(l => { ctx.fillText(l.t, l.x, l.y); });
+    }
+    ctx.restore();
+  }
+
+  // ── Hand landmark overlay ─────────────────────────
+  function drawLandmarks(landmarks) {
+    if (!landmarks || !landmarks.length) return;
+    ctx.save();
+    // Mirror landmarks (video is mirrored in clip)
+    landmarks.forEach(pt => {
+      const x = (1 - pt.x) * CANVAS_W;
+      const y = pt.y * CANVAS_H;
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,255,136,0.75)';
+      ctx.shadowColor = '#00ff88';
+      ctx.shadowBlur = 6;
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // ── Main render loop ──────────────────────────────
+  let glowPhase = 0;
+  function render() {
+    if (!document.getElementById('palm-auth') ||
+        document.getElementById('palm-auth').classList.contains('fade-out')) return;
+    requestAnimationFrame(render);
+    glowPhase += 0.03;
+    const outlineAlpha = 0.35 + 0.25 * Math.sin(glowPhase);
+    const outlineColor = handDetected ? '#00ff88' : '#00d4ff';
+
+    // Black background
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    if (authResult === 'ok') {
+      drawAuthSuccess();
+      return;
+    }
+    if (authResult === 'fail') {
+      drawAuthFail();
+      return;
+    }
+
+    // Draw camera inside outline
+    drawVideoFrame();
+
+    // Scan overlay (scanned region tint)
+    if (scanActive) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,212,255,0.04)';
+      ctx.fillRect(0, 0, CANVAS_W, scanY);
+      drawScanLine(scanY);
+      ctx.restore();
+    }
+
+    // Landmark dots
+    if (lastLandmarks) drawLandmarks(lastLandmarks);
+
+    // Annotations
+    if (scanActive || scanComplete) drawAnnotations();
+
+    // Corner decorations
+    drawCorners();
+
+    // Center crosshair when no hand
+    if (!handDetected && !detectionReady) {
+      drawWaiting();
+    }
+  }
+
+  function drawCorners() {
+    const corners = [[0,0],[CANVAS_W,0],[CANVAS_W,CANVAS_H],[0,CANVAS_H]];
+    const dirs = [[1,1],[-1,1],[-1,-1],[1,-1]];
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,212,255,0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = '#00d4ff';
+    ctx.shadowBlur = 6;
+    ctx.setLineDash([]);
+    corners.forEach(([cx, cy], i) => {
+      const [dx, dy] = dirs[i];
+      ctx.beginPath(); ctx.moveTo(cx + dx*3, cy); ctx.lineTo(cx + dx*20, cy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, cy + dy*3); ctx.lineTo(cx, cy + dy*20); ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  function drawWaiting() {
+    // Pulsing center target
+    const cx = CANVAS_W/2, cy = CANVAS_H/2;
+    ctx.save();
+    ctx.strokeStyle = `rgba(0,212,255,${0.15 + 0.08*Math.sin(glowPhase*2)})`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.arc(cx, cy, 30, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx-40, cy); ctx.lineTo(cx+40, cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy-40); ctx.lineTo(cx, cy+40); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawAuthSuccess() {
+    ctx.save();
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    // Green glow wash
+    ctx.fillStyle = `rgba(0,255,136,${0.06 + 0.05*Math.sin(glowPhase)})`;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    // Big checkmark
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = '#00ff88';
+    ctx.shadowBlur = 24;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(CANVAS_W/2 - 28, CANVAS_H/2 - 5);
+    ctx.lineTo(CANVAS_W/2 - 8, CANVAS_H/2 + 20);
+    ctx.lineTo(CANVAS_W/2 + 32, CANVAS_H/2 - 22);
+    ctx.stroke();
+    drawCorners();
+    ctx.restore();
+  }
+
+  function drawAuthFail() {
+    ctx.save();
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.strokeStyle = '#ff3d3d';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#ff3d3d';
+    ctx.shadowBlur = 20;
+    ctx.setLineDash([]);
+    const cx = CANVAS_W/2, cy = CANVAS_H/2;
+    ctx.beginPath(); ctx.moveTo(cx-22, cy-22); ctx.lineTo(cx+22, cy+22); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx+22, cy-22); ctx.lineTo(cx-22, cy+22); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Status helpers ────────────────────────────────
+  function setStatus(text, type) {
+    statusEl.textContent = text;
+    statusEl.className = type || '';
+  }
+
+  // ── Complete scan — MobileNet embedding comparison ──
+  async function finishScan() {
+    setStatus('RUNNING NEURAL ANALYSIS…', 'scanning');
+    progEl.style.width = '100%';
+    await new Promise(r => setTimeout(r, 600));
+
+    const match = await comparePalm();
+
+    if (match) {
+      // Auth accepted — kill camera immediately
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+      }
+      if (camera && camera.stop) camera.stop();
+      authResult = 'ok';
+      setStatus('▸ IDENTITY CONFIRMED — AUTHORIZATION ACCEPTED', 'ok');
+      subEl.textContent = 'WELCOME BACK, AKSHAT. LAUNCHING COMMAND CENTER…';
+      progEl.style.width = '100%';
+      progEl.style.background = 'var(--cg)';
+      progEl.style.boxShadow = '0 0 12px var(--cg)';
+      await new Promise(r => setTimeout(r, 2200));
+      launchCommandCenter();
+    } else {
+      authResult = 'fail';
+      setStatus('▸ IDENTITY MISMATCH — ACCESS DENIED', 'fail');
+      subEl.textContent = 'UNAUTHORIZED BIOMETRIC — SYSTEM LOCKED';
+      progEl.style.width = '100%';
+      progEl.style.background = 'var(--cr)';
+      showEnrollButton();
+      await new Promise(r => setTimeout(r, 2800));
+      // Reset for retry
+      authResult = null;
+      scanComplete = false;
+      scanActive = false;
+      handDetected = false;
+      lastLandmarks = null;
+      scanY = 0;
+      scanProgress = 0;
+      progEl.style.width = '0';
+      progEl.style.background = 'var(--c)';
+      progEl.style.boxShadow = '0 0 8px var(--c)';
+      setStatus('PLACE PALM WITHIN OUTLINE', '');
+      subEl.textContent = 'PLACE YOUR RIGHT PALM FLAT WITHIN THE OUTLINE';
+    }
+  }
+
+  // ── IndexedDB palm store ──────────────────────────
+  const IDB_NAME = 'akshat_biometric', IDB_STORE = 'palms', IDB_VER = 1;
+
+  function openDB() {
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(IDB_NAME, IDB_VER);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE, {keyPath:'id',autoIncrement:true});
+      req.onsuccess = e => res(e.target.result);
+      req.onerror  = e => rej(e);
+    });
+  }
+
+  async function idbSaveFingerprint(fp, snapshot) {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).add({fp, snapshot, ts: Date.now()});
+      tx.oncomplete = res; tx.onerror = rej;
+    });
+  }
+
+  async function idbLoadFingerprints() {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).getAll();
+      req.onsuccess = () => res(req.result || []);
+      req.onerror = rej;
+    });
+  }
+
+  // ── Enroll from live camera ───────────────────────
+  window.palmEnrollNow = async function() {
+    const btn = document.getElementById('pa-enroll-btn');
+    btn.style.display = 'none';
+    if (!mobileNetModel) {
+      setStatus('NEURAL MODEL NOT READY — WAIT…', 'fail');
+      setTimeout(() => showEnrollButton(), 2000);
+      return;
+    }
+    setStatus('EXTRACTING NEURAL SIGNATURE…', 'scanning');
+    const emb = await getEmbedding(canvas);
+    if (!emb) {
+      setStatus('EMBEDDING FAILED — TRY AGAIN', 'fail');
+      setTimeout(() => showEnrollButton(), 2000);
+      return;
+    }
+    const snapshot = canvas.toDataURL('image/jpeg', 0.7);
+    await idbSaveFingerprint(emb, snapshot);
+    const wasEmpty = palmEmbeddings.length === 0;
+    palmEmbeddings.push(emb);
+    console.log('[PalmAuth] MobileNet embedding enrolled. Total refs:', palmEmbeddings.length);
+
+    if (wasEmpty) {
+      if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
+      if (camera && camera.stop) camera.stop();
+      authResult = 'ok';
+      setStatus('▸ PALM ENROLLED & AUTHORIZED', 'ok');
+      subEl.textContent = 'NEURAL SIGNATURE REGISTERED · WELCOME, AKSHAT';
+      progEl.style.width = '100%';
+      progEl.style.background = 'var(--cg)';
+      progEl.style.boxShadow = '0 0 12px var(--cg)';
+      await new Promise(r => setTimeout(r, 2200));
+      launchCommandCenter();
+    } else {
+      setStatus('ENROLLED — RESCANNING…', 'scanning');
+      subEl.textContent = 'NEURAL SIGNATURE SAVED · VERIFYING';
+      authResult = null;
+      scanComplete = false;
+      scanActive = false;
+      handDetected = false;
+      scanY = 0;
+      scanProgress = 0;
+      progEl.style.width = '0';
+      progEl.style.background = 'var(--c)';
+      progEl.style.boxShadow = '0 0 8px var(--c)';
+      setTimeout(() => {
+        setStatus('PLACE PALM IN VIEW', '');
+        subEl.textContent = 'PRESENT YOUR PALM TO THE CAMERA';
+      }, 1200);
+    }
+  };
+
+  function showEnrollButton() {
+    const btn = document.getElementById('pa-enroll-btn');
+    if (btn) btn.style.display = 'inline-block';
+  }
+
+  // ── Launch command center ─────────────────────────
+  function launchCommandCenter() {
+    const el = document.getElementById('palm-auth');
+    el.classList.add('fade-out');
+    setTimeout(() => {
+      el.style.display = 'none';
+      document.getElementById('setup-modal').classList.add('hidden');
+      startBoot();
+      initAudioViz();
+    }, 900);
+  }
+
+  // ── MediaPipe Hands setup ─────────────────────────
+  async function initHandDetection() {
+    try {
+      // Check MediaPipe available
+      if (typeof Hands === 'undefined') throw new Error('MP not loaded');
+
+      const hands = new Hands({locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${f}`});
+      hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.65,
+        minTrackingConfidence: 0.55
+      });
+
+      // Named callback so enrollPalmFromImage can temporarily swap it
+      hands.onResults(onHandResults);
+      mpHands = hands;
+
+      const cam = new Camera(video, {
+        onFrame: async () => { await hands.send({image: video}); },
+        width: 640, height: 480
+      });
+      cam.start();
+      camera = cam;
+      detectionReady = true;
+
+      // Enroll from palm.jpeg / palm2.jpeg / palm3.jpeg via MobileNet
+      setStatus('LOADING REFERENCE IMAGES…', '');
+      const enrolled = await enrollAllPalms();
+      if (enrolled) {
+        setStatus('PLACE PALM IN VIEW', '');
+        subEl.textContent = `NEURAL BIOMETRIC READY — ${palmEmbeddings.length} REFERENCE(S) LOADED`;
+      } else {
+        setStatus('NO REFERENCES FOUND — ENROLL YOUR PALM', 'fail');
+        subEl.textContent = 'HOLD YOUR PALM UP TO THE CAMERA AND CLICK ENROLL';
+        showEnrollButton();
+      }
+    } catch(e) {
+      // MediaPipe failed to load — no fallback, hard deny
+      noMpFallback = true;
+      setStatus('BIOMETRIC SYSTEM OFFLINE — ACCESS DENIED', 'fail');
+      subEl.textContent = 'MEDIAPIPE UNAVAILABLE — CANNOT AUTHENTICATE';
+    }
+  }
+
+  // ── Live hand results callback (named for re-use) ─
+  function onHandResults(results) {
+    if (authResult || scanComplete) return;
+    const detected = results.multiHandLandmarks && results.multiHandLandmarks.length > 0;
+    if (detected) {
+      lastLandmarks = results.multiHandLandmarks[0];
+      if (handLostTimeout) { clearTimeout(handLostTimeout); handLostTimeout = null; }
+      if (!handDetected) {
+        handDetected = true;
+        setStatus('PALM DETECTED — INITIATING SCAN…', '');
+      }
+      if (!scanActive && !scanComplete) {
+        setTimeout(startScan, 400);
+      }
+    } else {
+      if (handDetected && !scanActive) {
+        handLostTimeout = setTimeout(() => {
+          handDetected = false;
+          lastLandmarks = null;
+          setStatus('PLACE PALM IN VIEW', '');
+          subEl.textContent = 'PRESENT YOUR PALM TO THE CAMERA';
+        }, 800);
+      }
+    }
+  }
+
+  // ── Fallback: MediaPipe unavailable — hard deny ───
+  function setupFallbackCamera() {
+    setStatus('BIOMETRIC SYSTEM OFFLINE — ACCESS DENIED', 'fail');
+    subEl.textContent = 'CANNOT AUTHENTICATE WITHOUT MEDIAPIPE';
+  }
+
+  // ── Init ──────────────────────────────────────────
+  async function init() {
+    setStatus('LOADING NEURAL MODEL…', '');
+    subEl.textContent = 'INITIALIZING MOBILENET — PLEASE WAIT';
+
+    // Load MobileNet
+    try {
+      mobileNetModel = await mobilenet.load({ version: 2, alpha: 1.0 });
+      console.log('[PalmAuth] MobileNet loaded');
+    } catch(e) {
+      setStatus('NEURAL MODEL FAILED TO LOAD', 'fail');
+      subEl.textContent = 'CHECK NETWORK CONNECTION';
+      return;
+    }
+
+    // Load any previously enrolled embeddings from IndexedDB
+    try {
+      const stored = await idbLoadFingerprints();
+      if (stored.length) {
+        stored.forEach(r => palmEmbeddings.push(r.fp));
+        console.log(`[PalmAuth] Loaded ${stored.length} embedding(s) from IndexedDB`);
+      }
+    } catch(e) { console.warn('[PalmAuth] IDB load failed', e); }
+
+    render();
+    await initHandDetection();
+  }
+
+  window.addEventListener('load', init);
+})();
+
+// ═══════════════════════════════════════
+//  START (called after palm auth)
+// ═══════════════════════════════════════
+
 </script>
 </body>
 </html>
