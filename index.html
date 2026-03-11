@@ -1550,19 +1550,22 @@ function initAudioViz() {
   }
 
   async function loadReferenceFace() {
-    try {
-      const img = await faceapi.fetchImage('face.jpeg');
-      const ref = await faceapi
-        .detectSingleFace(img)
-        .withFaceLandmarks()
-        .withFaceDescriptor();
-      if (ref?.descriptor) {
-        referenceDescriptor = ref.descriptor;
-        console.log('[FaceAuth] reference face loaded');
-        return true;
+    const candidates = ['face.jpg','face2.jpg','face3.jpg','face.jpeg','face2.jpeg','face3.jpeg'];
+    for (const name of candidates) {
+      try {
+        const img = await faceapi.fetchImage(name);
+        const ref = await faceapi
+          .detectSingleFace(img)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+        if (ref?.descriptor) {
+          referenceDescriptor = ref.descriptor;
+          console.log('[FaceAuth] reference face loaded from', name);
+          return true;
+        }
+      } catch(e) {
+        console.warn('[FaceAuth] reference face missing/unreadable', name, e?.message||e);
       }
-    } catch(e) {
-      console.warn('[FaceAuth] reference face missing/unreadable', e);
     }
     referenceDescriptor = null;
     return false;
@@ -1758,7 +1761,7 @@ function initAudioViz() {
 
     // Convert face box from video space to canvas space (mirrored)
     const sx = W / video.videoWidth, sy = H / video.videoHeight;
-    const pad = 20; // tighter padding to zoom closer on the face
+    const pad = 80; // looser framing to zoom less on the face
     const fx = W - (lastBox.x + lastBox.width)  * sx;
     const fy = lastBox.y * sy;
     const fw = lastBox.width  * sx;
