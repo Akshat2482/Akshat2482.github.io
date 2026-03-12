@@ -19,8 +19,8 @@
 #palm-auth{position:fixed;inset:0;background:#000;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:opacity .9s ease;}
 #palm-auth.fade-out{opacity:0;pointer-events:none;}
 #palm-auth-wrap{position:relative;display:inline-block;width:340px;height:260px;}
-#palm-video{position:absolute;top:0;left:0;width:340px;height:260px;object-fit:cover;border-radius:4px;transform:scaleX(-1);}
-#palm-canvas{position:absolute;top:0;left:0;width:340px;height:260px;z-index:2;border-radius:4px;}
+#palm-video{position:absolute;top:0;left:0;width:340px;height:260px;object-fit:cover;border-radius:4px;transform:scaleX(-1);opacity:0;pointer-events:none;}
+#palm-canvas{position:absolute;top:0;left:0;width:340px;height:260px;z-index:2;border-radius:4px;background:#000;}
 .palm-header{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:.38em;color:rgba(0,212,255,.45);text-transform:uppercase;margin-bottom:18px;position:relative;z-index:2;}
 .palm-header-logo{font-size:13px;font-weight:900;letter-spacing:.28em;color:#fff;text-shadow:0 0 24px var(--c);display:flex;align-items:center;gap:10px;margin-bottom:5px;}
 .palm-header-logo span{color:var(--cr);text-shadow:0 0 16px var(--cr);}
@@ -1495,6 +1495,7 @@ function initAudioViz() {
   let scanDone   = false;
   let glowPhase  = 0;
   let detInterval= null;
+  let lastLandmarks = null;
   let referenceDescriptor = null;
   const MATCH_THRESHOLD = 0.50; // tighter match = closer to 0
 
@@ -1603,6 +1604,7 @@ function initAudioViz() {
       .withFaceLandmarks()
       .withFaceDescriptor();
     if (!live?.descriptor) return { ok:false, reason:'LIVE FACE NOT CLEAR' };
+    lastLandmarks = live.landmarks;
     const distance = faceapi.euclideanDistance(live.descriptor, referenceDescriptor);
     return distance < MATCH_THRESHOLD
       ? { ok:true, distance }
@@ -1614,6 +1616,7 @@ function initAudioViz() {
     requestAnimationFrame(renderLoop);
     ctx.clearRect(0, 0, W, H);
     glowPhase += 0.05;
+    const fx = (Math.sin(glowPhase*0.7)+1)/2;
 
     if (!video.videoWidth) return;
 
@@ -1633,6 +1636,7 @@ function initAudioViz() {
         zoomBox.h += (targetBox.h - zoomBox.h) * 0.08;
       }
       drawVideoZoomed();
+      drawLandmarkMesh(lastLandmarks);
 
       if (state === 'found') {
         // Pulsing face box, waiting to start scan
@@ -1646,23 +1650,46 @@ function initAudioViz() {
 
         // Sweep line moves top → bottom once
         if (!scanDone) {
-          scanY += 2.2;
+          scanY += 1.2; // slower sweep speed
           const pct = Math.min(scanY / H, 1);
           progEl.style.width = (pct * 90) + '%';
 
-          // Draw sweep line
-          const grad = ctx.createLinearGradient(0, scanY-24, 0, scanY+24);
-          grad.addColorStop(0,   'rgba(0,212,255,0)');
-          grad.addColorStop(0.5, `rgba(0,212,255,${0.65 + 0.2*Math.sin(glowPhase*3)})`);
-          grad.addColorStop(1,   'rgba(0,212,255,0)');
+          // Primary sweep beam
+          const grad = ctx.createLinearGradient(0, scanY-30, 0, scanY+30);
+          grad.addColorStop(0,   'rgba(0,255,255,0)');
+          grad.addColorStop(0.3, `rgba(0,255,255,${0.4+0.25*fx})`);
+          grad.addColorStop(0.5, `rgba(0,255,180,${0.8+0.15*Math.sin(glowPhase*4)})`);
+          grad.addColorStop(0.7, `rgba(0,255,255,${0.4+0.25*fx})`);
+          grad.addColorStop(1,   'rgba(0,255,255,0)');
           ctx.fillStyle = grad;
-          ctx.fillRect(0, scanY-24, W, 48);
+          ctx.fillRect(0, scanY-30, W, 60);
 
-          // Trailing glow behind sweep
-          ctx.fillStyle = 'rgba(0,212,255,0.07)';
+          // Core laser line
+          ctx.fillStyle = 'rgba(0,255,220,0.6)';
+          ctx.fillRect(0, scanY-1.5, W, 3);
+
+          // Holographic side shards
+          ctx.save();
+          ctx.globalAlpha = 0.7;
+          ctx.strokeStyle = 'rgba(0,200,255,0.6)';
+          ctx.lineWidth = 1;
+          for (let i=0;i<6;i++){
+            const x = (i/6)*W + (Math.sin(glowPhase*2+i)*8);
+            ctx.beginPath();
+            ctx.moveTo(x, scanY-16);
+            ctx.lineTo(x+12, scanY+8);
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          // Digital wake
+          ctx.fillStyle = 'rgba(0,255,200,0.08)';
           ctx.fillRect(0, 0, W, scanY);
-          ctx.fillStyle = 'rgba(0,255,200,0.35)';
-          ctx.fillRect(0, scanY-2, W, 4);
+          ctx.fillStyle = 'rgba(0,255,255,0.18)';
+          for (let i=0;i<12;i++){
+            const x = (i/12)*W + (glowPhase*10 % 12);
+            ctx.fillRect(x, scanY-28, 2, 12);
+          }
 
           if (scanY >= H) {
             scanDone = true;
@@ -1675,6 +1702,7 @@ function initAudioViz() {
 
     if (state === 'done') {
       drawVideoZoomed();
+      drawLandmarkMesh(lastLandmarks);
       drawResultOverlay();
     }
   }
@@ -1682,6 +1710,7 @@ function initAudioViz() {
   // Draw full mirrored video onto canvas
   function drawVideoFull() {
     ctx.save();
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
     ctx.translate(W, 0); ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, W, H);
     ctx.restore();
@@ -1699,6 +1728,7 @@ function initAudioViz() {
     const sw = zoomBox.w * scaleX;
     const sh = zoomBox.h * scaleY;
     ctx.save();
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
     ctx.translate(W, 0); ctx.scale(-1, 1);
     ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
     ctx.restore();
@@ -1710,9 +1740,55 @@ function initAudioViz() {
     ctx.save();
     ctx.strokeStyle = color; ctx.lineWidth = 1.8;
     ctx.globalAlpha = alpha;
-    ctx.shadowColor = color; ctx.shadowBlur = 14;
-    ctx.setLineDash([6, 3]);
+    ctx.shadowColor = color; ctx.shadowBlur = 18;
+    ctx.setLineDash([8, 4]);
     ctx.strokeRect(pad, pad, W - pad*2, H - pad*2);
+    ctx.restore();
+  }
+
+  function mapPoint(pt) {
+    const sx = W / video.videoWidth, sy = H / video.videoHeight;
+    let x = W - pt.x * sx; // mirror
+    let y = pt.y * sy;
+    if (zoomBox) {
+      const nx = (x - zoomBox.x) / zoomBox.w;
+      const ny = (y - zoomBox.y) / zoomBox.h;
+      if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return null;
+      x = nx * W; y = ny * H;
+    }
+    return {x,y};
+  }
+
+  function drawLandmarkMesh(landmarks) {
+    if (!landmarks || !video.videoWidth) return;
+    const regions = [
+      landmarks.getJawOutline(),
+      landmarks.getLeftEyeBrow(),
+      landmarks.getRightEyeBrow(),
+      landmarks.getNose(),
+      landmarks.getLeftEye(),
+      landmarks.getRightEye(),
+      landmarks.getMouth()
+    ];
+    ctx.save();
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = 'rgba(0,255,255,0.9)';
+    ctx.strokeStyle = 'rgba(0,255,200,0.6)';
+    ctx.lineWidth = 1;
+
+    regions.forEach(region=>{
+      const mapped = region.map(mapPoint).filter(Boolean);
+      if (!mapped.length) return;
+      // points
+      mapped.forEach(p=>{
+        ctx.beginPath(); ctx.arc(p.x, p.y, 1.9, 0, Math.PI*2); ctx.fill();
+      });
+      // lines
+      ctx.beginPath();
+      mapped.forEach((p,i)=>{ if (i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+      ctx.closePath();
+      ctx.stroke();
+    });
     ctx.restore();
   }
 
@@ -1744,7 +1820,8 @@ function initAudioViz() {
     if (!video.videoWidth) return;
 
     const det = await faceapi
-      .detectSingleFace(video, detectOpts);
+      .detectSingleFace(video, detectOpts)
+      .withFaceLandmarks();
 
     if (state !== 'idle') return;
 
@@ -1757,7 +1834,8 @@ function initAudioViz() {
 
     // Face found — stop detection, start zoom sequence
     stopDetection();
-    lastBox = det.box;
+    lastBox = det.detection.box;
+    lastLandmarks = det.landmarks;
 
     // Convert face box from video space to canvas space (mirrored)
     const sx = W / video.videoWidth, sy = H / video.videoHeight;
@@ -1806,6 +1884,7 @@ function initAudioViz() {
       setStatus('IDENTITY MISMATCH — ACCESS DENIED', 'fail');
       subEl.textContent = match.reason || 'FACE NOT RECOGNISED';
       enrollBtn.style.display = 'block';
+      lastLandmarks = null;
       if (!detInterval) detInterval = setInterval(detect, 800);
       return;
     }
