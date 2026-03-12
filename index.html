@@ -1636,7 +1636,6 @@ function initAudioViz() {
         zoomBox.h += (targetBox.h - zoomBox.h) * 0.08;
       }
       drawVideoZoomed();
-      drawLandmarkMesh(lastLandmarks);
 
       if (state === 'found') {
         // Pulsing face box, waiting to start scan
@@ -1650,46 +1649,23 @@ function initAudioViz() {
 
         // Sweep line moves top → bottom once
         if (!scanDone) {
-          scanY += 1.2; // slower sweep speed
+          scanY += 0.8; // even slower sweep speed
           const pct = Math.min(scanY / H, 1);
           progEl.style.width = (pct * 90) + '%';
 
-          // Primary sweep beam
-          const grad = ctx.createLinearGradient(0, scanY-30, 0, scanY+30);
-          grad.addColorStop(0,   'rgba(0,255,255,0)');
-          grad.addColorStop(0.3, `rgba(0,255,255,${0.4+0.25*fx})`);
-          grad.addColorStop(0.5, `rgba(0,255,180,${0.8+0.15*Math.sin(glowPhase*4)})`);
-          grad.addColorStop(0.7, `rgba(0,255,255,${0.4+0.25*fx})`);
-          grad.addColorStop(1,   'rgba(0,255,255,0)');
+          // Cyan sweep beam (top → bottom)
+          const grad = ctx.createLinearGradient(0, scanY-28, 0, scanY+28);
+          grad.addColorStop(0,   'rgba(0,212,255,0)');
+          grad.addColorStop(0.45, `rgba(0,212,255,${0.35 + 0.25*Math.sin(glowPhase*3)})`);
+          grad.addColorStop(0.5,  `rgba(0,255,255,${0.7 + 0.2*Math.sin(glowPhase*4)})`);
+          grad.addColorStop(0.55, `rgba(0,212,255,${0.35 + 0.25*Math.sin(glowPhase*3)})`);
+          grad.addColorStop(1,   'rgba(0,212,255,0)');
           ctx.fillStyle = grad;
-          ctx.fillRect(0, scanY-30, W, 60);
+          ctx.fillRect(0, scanY-28, W, 56);
 
-          // Core laser line
-          ctx.fillStyle = 'rgba(0,255,220,0.6)';
-          ctx.fillRect(0, scanY-1.5, W, 3);
-
-          // Holographic side shards
-          ctx.save();
-          ctx.globalAlpha = 0.7;
-          ctx.strokeStyle = 'rgba(0,200,255,0.6)';
-          ctx.lineWidth = 1;
-          for (let i=0;i<6;i++){
-            const x = (i/6)*W + (Math.sin(glowPhase*2+i)*8);
-            ctx.beginPath();
-            ctx.moveTo(x, scanY-16);
-            ctx.lineTo(x+12, scanY+8);
-            ctx.stroke();
-          }
-          ctx.restore();
-
-          // Digital wake
-          ctx.fillStyle = 'rgba(0,255,200,0.08)';
+          // Trailing glow behind sweep
+          ctx.fillStyle = 'rgba(0,212,255,0.07)';
           ctx.fillRect(0, 0, W, scanY);
-          ctx.fillStyle = 'rgba(0,255,255,0.18)';
-          for (let i=0;i<12;i++){
-            const x = (i/12)*W + (glowPhase*10 % 12);
-            ctx.fillRect(x, scanY-28, 2, 12);
-          }
 
           if (scanY >= H) {
             scanDone = true;
@@ -1702,7 +1678,6 @@ function initAudioViz() {
 
     if (state === 'done') {
       drawVideoZoomed();
-      drawLandmarkMesh(lastLandmarks);
       drawResultOverlay();
     }
   }
