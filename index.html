@@ -18,9 +18,9 @@
 /* ══ PALM AUTH ══ */
 #palm-auth{position:fixed;inset:0;background:#000;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:opacity .9s ease;}
 #palm-auth.fade-out{opacity:0;pointer-events:none;}
-#palm-auth-wrap{position:relative;display:inline-block;width:340px;height:260px;}
-#palm-video{position:absolute;top:0;left:0;width:340px;height:260px;object-fit:cover;border-radius:4px;transform:scaleX(-1);opacity:0;pointer-events:none;}
-#palm-canvas{position:absolute;top:0;left:0;width:340px;height:260px;z-index:2;border-radius:4px;background:#000;}
+#palm-auth-wrap{position:relative;display:inline-block;width:560px;height:420px;}
+#palm-video{position:absolute;top:0;left:0;width:560px;height:420px;object-fit:cover;border-radius:4px;opacity:0;pointer-events:none;}
+#palm-canvas{position:absolute;top:0;left:0;width:560px;height:420px;z-index:2;border-radius:4px;background:#000;}
 .palm-header{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:.38em;color:rgba(0,212,255,.45);text-transform:uppercase;margin-bottom:18px;position:relative;z-index:2;}
 .palm-header-logo{font-size:13px;font-weight:900;letter-spacing:.28em;color:#fff;text-shadow:0 0 24px var(--c);display:flex;align-items:center;gap:10px;margin-bottom:5px;}
 .palm-header-logo span{color:var(--cr);text-shadow:0 0 16px var(--cr);}
@@ -29,9 +29,9 @@
 #palm-status.fail{color:var(--cr);text-shadow:0 0 12px var(--cr);}
 #palm-status.scanning{color:var(--cy);text-shadow:0 0 10px var(--cy);}
 .palm-sub{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:.18em;color:rgba(0,212,255,.3);margin-top:6px;text-align:center;}
-.palm-progress-bar{width:340px;height:2px;background:rgba(0,212,255,.1);border-radius:2px;margin-top:10px;overflow:hidden;}
+.palm-progress-bar{width:560px;height:2px;background:rgba(0,212,255,.1);border-radius:2px;margin-top:10px;overflow:hidden;}
 .palm-progress-fill{height:100%;width:0%;background:var(--c);box-shadow:0 0 8px var(--c);border-radius:2px;transition:width .4s ease;}
-#enroll-btn{margin-top:12px;width:340px;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.6);color:#fff;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:.18em;padding:10px;border-radius:4px;cursor:pointer;display:none;transition:.2s;box-shadow:0 0 18px rgba(0,212,255,.18);}
+#enroll-btn{margin-top:12px;width:560px;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.6);color:#fff;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:.18em;padding:10px;border-radius:4px;cursor:pointer;display:none;transition:.2s;box-shadow:0 0 18px rgba(0,212,255,.18);}
 #enroll-btn:hover{background:rgba(0,212,255,.22);box-shadow:0 0 26px rgba(0,212,255,.28);}
 #enroll-btn:disabled{opacity:0.6;cursor:not-allowed;box-shadow:none;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -287,7 +287,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   <div class="palm-header">FACIAL RECOGNITION — IDENTITY VERIFICATION</div>
   <div id="palm-auth-wrap">
     <video id="palm-video" autoplay playsinline muted></video>
-    <canvas id="palm-canvas" width="340" height="260"></canvas>
+    <canvas id="palm-canvas" width="560" height="420"></canvas>
   </div>
   <div id="palm-status">INITIALIZING NEURAL SCANNER…</div>
   <div class="palm-sub" id="palm-sub">LOADING FACE RECOGNITION MODELS</div>
@@ -1483,7 +1483,7 @@ function initAudioViz() {
 //  FACE BIOMETRIC AUTHENTICATION
 // ═══════════════════════════════════════
 (function() {
-  const W = 340, H = 260;
+  const W = 560, H = 420;
   const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
 
   // State machine: 'idle' → 'found' → 'scanning' → 'done'
@@ -1612,33 +1612,30 @@ function initAudioViz() {
   }
 
   // ── Render loop — runs every frame ───────────────
+  let irisAngle = 0;
   function renderLoop() {
     requestAnimationFrame(renderLoop);
     ctx.clearRect(0, 0, W, H);
-    glowPhase += 0.05;
-    const fx = (Math.sin(glowPhase*0.7)+1)/2;
+    glowPhase += 0.04;
 
     if (!video.videoWidth) return;
 
     if (state === 'idle') {
-      // Full camera view, scanning corners
       drawVideoFull();
-      drawCorners('#00d4ff', 0.5 + 0.2*Math.sin(glowPhase));
+      drawCorners('#00d4ff', 0.6 + 0.25*Math.sin(glowPhase));
       return;
     }
 
     if (state === 'found' || state === 'scanning') {
-      // Animate zoom toward face
       if (zoomBox && targetBox) {
-        zoomBox.x += (targetBox.x - zoomBox.x) * 0.08;
-        zoomBox.y += (targetBox.y - zoomBox.y) * 0.08;
-        zoomBox.w += (targetBox.w - zoomBox.w) * 0.08;
-        zoomBox.h += (targetBox.h - zoomBox.h) * 0.08;
+        zoomBox.x += (targetBox.x - zoomBox.x) * 0.05;
+        zoomBox.y += (targetBox.y - zoomBox.y) * 0.05;
+        zoomBox.w += (targetBox.w - zoomBox.w) * 0.05;
+        zoomBox.h += (targetBox.h - zoomBox.h) * 0.05;
       }
       drawVideoZoomed();
 
       if (state === 'found') {
-        // Pulsing face box, waiting to start scan
         drawZoomedFaceBox('#00d4ff', 0.6 + 0.3*Math.sin(glowPhase*2));
         drawCorners('#00d4ff', 0.7 + 0.2*Math.sin(glowPhase));
         return;
@@ -1646,14 +1643,11 @@ function initAudioViz() {
 
       if (state === 'scanning') {
         drawCorners('#00d4ff', 0.85 + 0.12*Math.sin(glowPhase));
-
-        // Sweep line moves top → bottom once
         if (!scanDone) {
-          scanY += 0.8; // even slower sweep speed
+          scanY += 2.2; // fast scan
           const pct = Math.min(scanY / H, 1);
           progEl.style.width = (pct * 90) + '%';
 
-          // Cyan sweep beam (top → bottom)
           const grad = ctx.createLinearGradient(0, scanY-28, 0, scanY+28);
           grad.addColorStop(0,   'rgba(0,212,255,0)');
           grad.addColorStop(0.45, `rgba(0,212,255,${0.35 + 0.25*Math.sin(glowPhase*3)})`);
@@ -1663,14 +1657,10 @@ function initAudioViz() {
           ctx.fillStyle = grad;
           ctx.fillRect(0, scanY-28, W, 56);
 
-          // Trailing glow behind sweep
           ctx.fillStyle = 'rgba(0,212,255,0.07)';
           ctx.fillRect(0, 0, W, scanY);
 
-          if (scanY >= H) {
-            scanDone = true;
-            finishScan();
-          }
+          if (scanY >= H) { scanDone = true; finishScan(); }
         }
         return;
       }
@@ -1681,6 +1671,12 @@ function initAudioViz() {
       drawResultOverlay();
     }
   }
+
+  function drawScanGrid(alpha) {}
+  function hexPath(c,x,y,r){}
+  function drawIrisScan(){}
+
+
 
   // Draw full mirrored video onto canvas
   function drawVideoFull() {
@@ -1780,9 +1776,9 @@ function initAudioViz() {
   }
 
   function drawCorners(col, alpha) {
-    ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=2;
-    ctx.globalAlpha=alpha; ctx.shadowColor=col; ctx.shadowBlur=10; ctx.setLineDash([]);
-    const s=24, p=5;
+    ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=2.5;
+    ctx.globalAlpha=alpha; ctx.shadowColor=col; ctx.shadowBlur=16; ctx.setLineDash([]);
+    const s=38, p=6;
     [[p,p,1,1],[W-p,p,-1,1],[p,H-p,1,-1],[W-p,H-p,-1,-1]].forEach(([x,y,dx,dy])=>{
       ctx.beginPath(); ctx.moveTo(x+dx*s,y); ctx.lineTo(x,y); ctx.lineTo(x,y+dy*s); ctx.stroke();
     });
@@ -1814,7 +1810,7 @@ function initAudioViz() {
 
     // Convert face box from video space to canvas space (mirrored)
     const sx = W / video.videoWidth, sy = H / video.videoHeight;
-    const pad = 80; // looser framing to zoom less on the face
+    const pad = 50; // tighter framing to zoom closer on the face
     const fx = W - (lastBox.x + lastBox.width)  * sx;
     const fy = lastBox.y * sy;
     const fw = lastBox.width  * sx;
@@ -1860,7 +1856,7 @@ function initAudioViz() {
       subEl.textContent = match.reason || 'FACE NOT RECOGNISED';
       enrollBtn.style.display = 'block';
       lastLandmarks = null;
-      if (!detInterval) detInterval = setInterval(detect, 800);
+      if (!detInterval) detInterval = setInterval(detect, 1800);
       return;
     }
 
@@ -1929,7 +1925,7 @@ function initAudioViz() {
     }
 
     renderLoop();
-    detInterval = setInterval(detect, 800);
+    detInterval = setInterval(detect, 1800);
     setStatus('SCANNING FOR FACE…', '');
     subEl.textContent = 'LOOK DIRECTLY AT THE CAMERA';
     progEl.style.width = '10%';
