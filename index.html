@@ -11,6 +11,7 @@
 <link rel="icon" href="favicon.ico"/>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/delaunator@5.0.0/delaunator.min.js"></script>
 
 <style>
 :root{--c:#00d4ff;--cr:#ff3d3d;--cg:#00ff88;--cy:#ffb700;--bg:rgba(0,10,22,.92);--border:rgba(0,212,255,.2);}
@@ -24,6 +25,7 @@
 .palm-header{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:.38em;color:rgba(0,212,255,.45);text-transform:uppercase;margin-bottom:18px;position:relative;z-index:2;}
 .palm-header-logo{font-size:13px;font-weight:900;letter-spacing:.28em;color:#fff;text-shadow:0 0 24px var(--c);display:flex;align-items:center;gap:10px;margin-bottom:5px;}
 .palm-header-logo span{color:var(--cr);text-shadow:0 0 16px var(--cr);}
+.palm-logo-text{position:relative;z-index:2;pointer-events:none;}
 #palm-status{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.22em;color:rgba(0,212,255,.65);margin-top:18px;text-align:center;min-height:18px;transition:color .3s;}
 #palm-status.ok{color:var(--cg);text-shadow:0 0 12px var(--cg);}
 #palm-status.fail{color:var(--cr);text-shadow:0 0 12px var(--cr);}
@@ -239,24 +241,10 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .sa-signal.neut{background:rgba(255,183,0,.07);border:1px solid rgba(255,183,0,.25);color:var(--cy);}
 .sa-loading{font-size:8px;letter-spacing:.15em;color:rgba(0,212,255,.5);text-align:center;padding:12px 0;font-family:'Share Tech Mono',monospace;}
 
-/* ══ SEARCH PANEL ══ */
-.search-panel{flex:2.5;display:flex;flex-direction:column;min-height:0;}
-.search-input-row{display:flex;gap:5px;margin-bottom:7px;flex-shrink:0;}
-.search-input{flex:1;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.18);color:#fff;font-family:'Share Tech Mono',monospace;font-size:9px;padding:7px 9px;border-radius:3px;outline:none;}
-.search-input:focus{border-color:var(--c);}
-.search-input::placeholder{color:rgba(0,212,255,.25);}
-.search-btn{background:rgba(0,212,255,.1);border:1px solid var(--c);color:var(--c);font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:.14em;padding:7px 10px;border-radius:3px;cursor:pointer;white-space:nowrap;}
-.search-btn:hover{background:rgba(0,212,255,.2);}
-.search-results{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,212,255,.15) transparent;}
-.search-results::-webkit-scrollbar{width:3px;}
-.search-results::-webkit-scrollbar-thumb{background:rgba(0,212,255,.15);}
-.search-result-item{padding:7px 0;border-bottom:1px solid rgba(0,212,255,.07);}
-.search-result-item:last-child{border-bottom:none;}
-.sri-title{font-size:8.5px;font-weight:700;color:var(--c);letter-spacing:.07em;line-height:1.4;margin-bottom:2px;}
-.sri-snippet{font-size:7.5px;color:rgba(0,212,255,.55);font-family:'Share Tech Mono',monospace;line-height:1.6;}
-.sri-source{font-size:7px;color:rgba(0,212,255,.3);letter-spacing:.1em;margin-top:2px;}
-.search-placeholder{font-size:8px;letter-spacing:.15em;color:rgba(0,212,255,.3);text-align:center;padding:16px 0;font-family:'Share Tech Mono',monospace;line-height:2;}
-.search-loading{font-size:8px;letter-spacing:.15em;color:rgba(0,212,255,.5);text-align:center;padding:12px 0;font-family:'Share Tech Mono',monospace;}
+/* ══ RADAR PANEL ══ */
+.radar-panel{flex:2.5;display:flex;flex-direction:column;min-height:0;padding:0!important;}
+.radar-panel>.pt{padding:8px 13px 5px;margin-bottom:0;}
+#radar-canvas{width:100%;flex:1;display:block;min-height:0;}
 
 /* AUDIO VIZ */
 .viz-wrap{height:150px;position:relative;background:rgba(0,8,20,.65);border:1px solid rgba(0,212,255,.12);border-radius:2px;overflow:hidden;}
@@ -293,7 +281,6 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   <div class="palm-sub" id="palm-sub">LOADING FACE RECOGNITION MODELS</div>
   <div class="palm-progress-bar"><div class="palm-progress-fill" id="palm-prog"></div></div>
   <button id="enroll-btn">ENROLL THIS FACE</button>
-
 </div>
 
 <!-- ══ SETUP MODAL ══ -->
@@ -542,16 +529,10 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
       <div style="margin-top:6px;font-size:7px;letter-spacing:.12em;color:rgba(0,212,255,.45);text-transform:uppercase;">Mic level animates bars; deny mic to pause.</div>
     </div>
 
-    <!-- SEARCH PANEL -->
-    <div class="panel search-panel">
-      <div class="pt">INTEL SEARCH — POWERED BY SERPAPI</div>
-      <div class="search-input-row">
-        <input class="search-input" id="search-input" placeholder="Search anything..." maxlength="200"/>
-        <button class="search-btn" onclick="doSearch()">SEARCH</button>
-      </div>
-      <div class="search-results" id="search-results">
-        <div class="search-placeholder">SEARCH ENGINE ONLINE<br/>AWAITING QUERY, AKSHAT...</div>
-      </div>
+    <!-- REPULSOR RADAR -->
+    <div class="panel radar-panel">
+      <div class="pt">📡 REPULSOR TARGETING RADAR — MARK L</div>
+      <canvas id="radar-canvas"></canvas>
     </div>
 
   </div>
@@ -1488,13 +1469,15 @@ function initAudioViz() {
 
   // State machine: 'idle' → 'found' → 'scanning' → 'done'
   let state      = 'idle';
-  let lastBox    = null;   // face bounding box from detection
-  let zoomBox    = null;   // current animated zoom rect {x,y,w,h}
-  let targetBox  = null;   // target zoom rect (face padded)
+  let lastBox    = null;
+  let zoomBox    = null;
+  let targetBox  = null;
   let scanY      = 0;
+  let scanX      = 0;
   let scanDone   = false;
   let glowPhase  = 0;
   let detInterval= null;
+  let liveTrackInterval = null;   // continuous landmark tracker
   let lastLandmarks = null;
   let referenceDescriptor = null;
   const MATCH_THRESHOLD = 0.50; // tighter match = closer to 0
@@ -1597,6 +1580,33 @@ function initAudioViz() {
     if (!detInterval) detInterval = setInterval(detect, 800);
   }
 
+  // ── Eye Aspect Ratio (EAR) — liveness check ─────────
+  // Uses face-api.js 68-point landmarks:
+  //   Left eye:  36,37,38,39,40,41
+  //   Right eye: 42,43,44,45,46,47
+  // EAR = (‖p1-p5‖ + ‖p2-p4‖) / (2·‖p0-p3‖)
+  // Open eye ≈ 0.25–0.40 · Closed eye < 0.18
+  const EAR_THRESHOLD = 0.20;
+
+  function eyeDist(pts, i, j) {
+    const a = pts[i], b = pts[j];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  function calcEAR(landmarks) {
+    const pts = landmarks.positions;
+    // Left eye
+    const earL = (eyeDist(pts,37,41) + eyeDist(pts,38,40)) / (2 * eyeDist(pts,36,39));
+    // Right eye
+    const earR = (eyeDist(pts,43,47) + eyeDist(pts,44,46)) / (2 * eyeDist(pts,42,45));
+    return (earL + earR) / 2;
+  }
+
+  function eyesAreOpen(landmarks) {
+    if (!landmarks) return false;
+    return calcEAR(landmarks) >= EAR_THRESHOLD;
+  }
+
   async function verifyFaceMatch() {
     if (!referenceDescriptor) return { ok:false, reason:'REFERENCE FACE MISSING' };
     const live = await faceapi
@@ -1605,6 +1615,12 @@ function initAudioViz() {
       .withFaceDescriptor();
     if (!live?.descriptor) return { ok:false, reason:'LIVE FACE NOT CLEAR' };
     lastLandmarks = live.landmarks;
+
+    // ── Liveness: eyes must be open ──
+    if (!eyesAreOpen(live.landmarks)) {
+      return { ok:false, reason:'EYES CLOSED — OPEN EYES TO AUTHENTICATE' };
+    }
+
     const distance = faceapi.euclideanDistance(live.descriptor, referenceDescriptor);
     return distance < MATCH_THRESHOLD
       ? { ok:true, distance }
@@ -1613,6 +1629,9 @@ function initAudioViz() {
 
   // ── Render loop — runs every frame ───────────────
   let irisAngle = 0;
+  let ringAngle  = 0;
+  let meshHoldTimer = null;
+
   function renderLoop() {
     requestAnimationFrame(renderLoop);
     ctx.clearRect(0, 0, W, H);
@@ -1636,31 +1655,102 @@ function initAudioViz() {
       drawVideoZoomed();
 
       if (state === 'found') {
-        drawZoomedFaceBox('#00d4ff', 0.6 + 0.3*Math.sin(glowPhase*2));
+        drawZoomedFaceBox('#00d4ff', 0.5 + 0.3*Math.sin(glowPhase*2));
         drawCorners('#00d4ff', 0.7 + 0.2*Math.sin(glowPhase));
         return;
       }
 
       if (state === 'scanning') {
-        drawCorners('#00d4ff', 0.85 + 0.12*Math.sin(glowPhase));
+        drawCorners('#00d4ff', 0.9 + 0.08*Math.sin(glowPhase));
+
         if (!scanDone) {
-          scanY += 2.2; // fast scan
+          // ── Mid-scan liveness: abort if eyes close ──
+          if (lastLandmarks && !eyesAreOpen(lastLandmarks)) {
+            state = 'idle';
+            scanDone = false;
+            zoomBox = targetBox = null;
+            progEl.style.width = '0%';
+            setStatus('EYES CLOSED — SCAN ABORTED', 'fail');
+            subEl.textContent = 'KEEP EYES OPEN DURING BIOMETRIC SCAN';
+            if (!detInterval) detInterval = setInterval(detect, 1800);
+            return;
+          }
+
+          // 5-second sweep top→bottom: H=420 / (5s * ~60fps) ≈ 1.4 px/frame
+          scanY += 1.4;
           const pct = Math.min(scanY / H, 1);
           progEl.style.width = (pct * 90) + '%';
 
-          const grad = ctx.createLinearGradient(0, scanY-28, 0, scanY+28);
-          grad.addColorStop(0,   'rgba(0,212,255,0)');
-          grad.addColorStop(0.45, `rgba(0,212,255,${0.35 + 0.25*Math.sin(glowPhase*3)})`);
-          grad.addColorStop(0.5,  `rgba(0,255,255,${0.7 + 0.2*Math.sin(glowPhase*4)})`);
-          grad.addColorStop(0.55, `rgba(0,212,255,${0.35 + 0.25*Math.sin(glowPhase*3)})`);
-          grad.addColorStop(1,   'rgba(0,212,255,0)');
-          ctx.fillStyle = grad;
-          ctx.fillRect(0, scanY-28, W, 56);
-
-          ctx.fillStyle = 'rgba(0,212,255,0.07)';
+          // Scanned area tint above the beam
+          ctx.fillStyle = 'rgba(0,180,255,0.045)';
           ctx.fillRect(0, 0, W, scanY);
 
-          if (scanY >= H) { scanDone = true; finishScan(); }
+          // === Rich horizontal scan beam ===
+          const sy = scanY;
+
+          // 1. Wide soft glow behind beam
+          const glowGrad = ctx.createLinearGradient(0, sy-60, 0, sy+60);
+          glowGrad.addColorStop(0,   'rgba(0,180,255,0)');
+          glowGrad.addColorStop(0.4, 'rgba(0,210,255,0.08)');
+          glowGrad.addColorStop(0.5, 'rgba(0,220,255,0.18)');
+          glowGrad.addColorStop(0.6, 'rgba(0,210,255,0.08)');
+          glowGrad.addColorStop(1,   'rgba(0,180,255,0)');
+          ctx.fillStyle = glowGrad;
+          ctx.fillRect(0, sy-60, W, 120);
+
+          // 2. Mid glow
+          const midGrad = ctx.createLinearGradient(0, sy-20, 0, sy+20);
+          midGrad.addColorStop(0,   'rgba(0,212,255,0)');
+          midGrad.addColorStop(0.35,`rgba(0,212,255,${0.4 + 0.15*Math.sin(glowPhase*3)})`);
+          midGrad.addColorStop(0.5, `rgba(80,240,255,${0.7 + 0.15*Math.sin(glowPhase*4)})`);
+          midGrad.addColorStop(0.65,`rgba(0,212,255,${0.4 + 0.15*Math.sin(glowPhase*3)})`);
+          midGrad.addColorStop(1,   'rgba(0,212,255,0)');
+          ctx.fillStyle = midGrad;
+          ctx.fillRect(0, sy-20, W, 40);
+
+          // 3. Bright core line
+          const coreGrad = ctx.createLinearGradient(0, sy-3, 0, sy+3);
+          coreGrad.addColorStop(0,   'rgba(0,212,255,0)');
+          coreGrad.addColorStop(0.5, `rgba(200,255,255,${0.95 + 0.05*Math.sin(glowPhase*5)})`);
+          coreGrad.addColorStop(1,   'rgba(0,212,255,0)');
+          ctx.fillStyle = coreGrad;
+          ctx.fillRect(0, sy-3, W, 6);
+
+          // 4. Bright horizontal line
+          ctx.save();
+          ctx.strokeStyle = `rgba(160,245,255,${0.85 + 0.12*Math.sin(glowPhase*4)})`;
+          ctx.lineWidth = 1.5;
+          ctx.shadowColor = '#00d4ff';
+          ctx.shadowBlur = 18;
+          ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+          ctx.restore();
+
+          // 5. Edge sparks — bright dots at left and right of scan line
+          const sparkAlpha = 0.7 + 0.3*Math.sin(glowPhase*6);
+          ctx.save();
+          ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 20;
+          ctx.fillStyle = `rgba(200,255,255,${sparkAlpha})`;
+          ctx.beginPath(); ctx.arc(4, sy, 3.5, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(W-4, sy, 3.5, 0, Math.PI*2); ctx.fill();
+          // Small secondary sparks
+          ctx.globalAlpha = sparkAlpha * 0.5;
+          ctx.beginPath(); ctx.arc(14, sy, 2, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(W-14, sy, 2, 0, Math.PI*2); ctx.fill();
+          ctx.restore();
+
+          // 6. Data readout text riding the beam
+          ctx.save();
+          ctx.font = 'bold 7px "Share Tech Mono",monospace';
+          ctx.fillStyle = `rgba(0,255,220,${0.75 + 0.15*Math.sin(glowPhase*3)})`;
+          ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 8;
+          const dataStr = `SCAN ${Math.floor(pct*100)}%  ·  DEPTH:${(0.38 + pct*0.12).toFixed(2)}mm  ·  FREQ:${(58 + Math.floor(pct*4))}Hz`;
+          ctx.fillText(dataStr, 10, Math.max(sy - 8, 10));
+          ctx.restore();
+
+          if (scanY >= H) {
+            scanDone = true;
+            setTimeout(() => { finishScan(); }, 2000);
+          }
         }
         return;
       }
@@ -1672,9 +1762,105 @@ function initAudioViz() {
     }
   }
 
-  function drawScanGrid(alpha) {}
-  function hexPath(c,x,y,r){}
-  function drawIrisScan(){}
+  // ── Delaunay triangulation mesh — DENSE, LIVE, no clip ──
+  function drawTriMesh(landmarks) {
+    if (!landmarks || !video.videoWidth) return;
+    const pts = landmarks.positions;
+
+    // Build base 68 points
+    const base = [];
+    for (let i = 0; i < pts.length; i++) {
+      const p = mapPoint(pts[i]);
+      if (p) base.push(p);
+    }
+    if (base.length < 4) return;
+
+    // Densify: add midpoints between every adjacent pair of landmarks
+    // This pushes triangle count from ~130 to ~300+ while staying face-shaped
+    const dense = [...base];
+    // Midpoints between consecutive landmarks (outline groups)
+    const groups = [
+      [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16], // jaw
+      [17,18,19,20,21],   // left brow
+      [22,23,24,25,26],   // right brow
+      [27,28,29,30],      // nose bridge
+      [31,32,33,34,35],   // nose base
+      [36,37,38,39,40,41,36], // left eye (closed)
+      [42,43,44,45,46,47,42], // right eye (closed)
+      [48,49,50,51,52,53,54,55,56,57,58,59,48], // outer mouth
+      [60,61,62,63,64,65,66,67,60],              // inner mouth
+    ];
+    groups.forEach(g => {
+      for (let i = 0; i < g.length - 1; i++) {
+        const a = base[g[i]], b = base[g[i+1]];
+        if (a && b) dense.push({ x: (a.x+b.x)/2, y: (a.y+b.y)/2 });
+      }
+    });
+    // Add centroid of each facial region for interior triangles
+    const regions = [
+      [36,37,38,39,40,41], // left eye interior
+      [42,43,44,45,46,47], // right eye interior
+      [48,49,50,51,52,53,54,55,56,57,58,59], // mouth
+      [27,31,32,33,34,35], // nose
+    ];
+    regions.forEach(r => {
+      const valid = r.map(i => base[i]).filter(Boolean);
+      if (valid.length) {
+        const cx = valid.reduce((s,p)=>s+p.x,0)/valid.length;
+        const cy = valid.reduce((s,p)=>s+p.y,0)/valid.length;
+        dense.push({x:cx, y:cy});
+      }
+    });
+
+    let del;
+    try { del = Delaunator.from(dense, p => p.x, p => p.y); }
+    catch(e) { return; }
+
+    ctx.save();
+    const pulse = (Math.sin(glowPhase * 2) + 1) / 2;
+    ctx.strokeStyle = `rgba(0,220,255,${0.6 + 0.22*pulse})`;
+    ctx.lineWidth = 0.9;
+    ctx.shadowColor = '#00d4ff';
+    ctx.shadowBlur = 8;
+    ctx.globalAlpha = 0.85;
+    ctx.setLineDash([]);
+
+    const tris = del.triangles;
+    const maxEdge = W * 0.45; // tighter cutoff to avoid hull triangles
+    for (let i = 0; i < tris.length; i += 3) {
+      const a = dense[tris[i]];
+      const b = dense[tris[i+1]];
+      const c = dense[tris[i+2]];
+      if (!a || !b || !c) continue;
+      if (Math.hypot(b.x-a.x,b.y-a.y) > maxEdge) continue;
+      if (Math.hypot(c.x-b.x,c.y-b.y) > maxEdge) continue;
+      if (Math.hypot(a.x-c.x,a.y-c.y) > maxEdge) continue;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.lineTo(c.x, c.y);
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── Continuously update landmarks live ───────────────────
+  async function liveTrack() {
+    if (state !== 'found' && state !== 'scanning' && state !== 'done') return;
+    if (!video.videoWidth) return;
+    try {
+      const det = await faceapi
+        .detectSingleFace(video, detectOpts)
+        .withFaceLandmarks();
+      if (det && (state === 'found' || state === 'scanning' || state === 'done')) {
+        lastLandmarks = det.landmarks;
+      }
+    } catch(e) {}
+  }
+
+
+
 
 
 
@@ -1730,38 +1916,7 @@ function initAudioViz() {
     return {x,y};
   }
 
-  function drawLandmarkMesh(landmarks) {
-    if (!landmarks || !video.videoWidth) return;
-    const regions = [
-      landmarks.getJawOutline(),
-      landmarks.getLeftEyeBrow(),
-      landmarks.getRightEyeBrow(),
-      landmarks.getNose(),
-      landmarks.getLeftEye(),
-      landmarks.getRightEye(),
-      landmarks.getMouth()
-    ];
-    ctx.save();
-    ctx.globalAlpha = 0.95;
-    ctx.fillStyle = 'rgba(0,255,255,0.9)';
-    ctx.strokeStyle = 'rgba(0,255,200,0.6)';
-    ctx.lineWidth = 1;
-
-    regions.forEach(region=>{
-      const mapped = region.map(mapPoint).filter(Boolean);
-      if (!mapped.length) return;
-      // points
-      mapped.forEach(p=>{
-        ctx.beginPath(); ctx.arc(p.x, p.y, 1.9, 0, Math.PI*2); ctx.fill();
-      });
-      // lines
-      ctx.beginPath();
-      mapped.forEach((p,i)=>{ if (i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-      ctx.closePath();
-      ctx.stroke();
-    });
-    ctx.restore();
-  }
+  function drawLandmarkMesh(landmarks) { /* replaced by drawTriMesh */ }
 
   function drawResultOverlay() {
     ctx.save();
@@ -1803,6 +1958,14 @@ function initAudioViz() {
       return;
     }
 
+    // ── Liveness gate: reject closed eyes before even starting ──
+    if (!eyesAreOpen(det.landmarks)) {
+      setStatus('EYES CLOSED — OPEN YOUR EYES', 'scanning');
+      subEl.textContent = 'LIVENESS CHECK: KEEP EYES OPEN TO PROCEED';
+      progEl.style.width = '10%';
+      return; // stay in idle, keep polling
+    }
+
     // Face found — stop detection, start zoom sequence
     stopDetection();
     lastBox = det.detection.box;
@@ -1837,10 +2000,12 @@ function initAudioViz() {
 
   function startSweep() {
     state   = 'scanning';
+    scanX   = 0;
     scanY   = 0;
     scanDone= false;
     setStatus('SCANNING FACIAL GEOMETRY…', 'scanning');
     subEl.textContent = 'NEURAL PATTERN ANALYSIS IN PROGRESS';
+    // Play launch1 looping over the logo while scanning
   }
 
   async function finishScan() {
@@ -1867,19 +2032,12 @@ function initAudioViz() {
     setStatus(`▸ IDENTITY CONFIRMED — MATCH ${Math.round((1-match.distance)*100)}%`, 'ok');
     subEl.textContent = 'WELCOME BACK. LAUNCHING COMMAND CENTER…';
     enrollBtn.style.display = 'none';
+    playLaunchVideo();
+  }
+
+  // ── Inline logo video helpers ─────────────────────
+  function playLaunchVideo() {
     stopCamera();
-    await sleep(2000);
-    launchCommandCenter();
-  }
-
-  function stopDetection() {
-    if (detInterval) { clearInterval(detInterval); detInterval = null; }
-  }
-  function stopCamera() {
-    if (video.srcObject) { video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject=null; }
-  }
-
-  function launchCommandCenter() {
     const el = document.getElementById('palm-auth');
     el.classList.add('fade-out');
     setTimeout(()=>{
@@ -1887,6 +2045,20 @@ function initAudioViz() {
       document.getElementById('setup-modal').classList.add('hidden');
       startBoot(); initAudioViz();
     }, 900);
+  }
+
+
+  function stopDetection() {
+    if (detInterval) { clearInterval(detInterval); detInterval = null; }
+    if (liveTrackInterval) { clearInterval(liveTrackInterval); liveTrackInterval = null; }
+  }
+  function stopCamera() {
+    if (video.srcObject) { video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject=null; }
+  }
+
+  function launchCommandCenter() {
+    document.getElementById('setup-modal').classList.add('hidden');
+    startBoot(); initAudioViz();
   }
 
   // ── Init ─────────────────────────────────────────
@@ -1937,8 +2109,325 @@ function initAudioViz() {
 })();
 
 // ═══════════════════════════════════════
-//  START (called after palm auth)
+//  REPULSOR TARGETING RADAR
 // ═══════════════════════════════════════
+(function(){
+  const canvas = document.getElementById('radar-canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, cx, cy, R, t = 0;
+  let sweepAngle = 0;
+  const SWEEP_SPEED = 0.022; // radians per frame
+
+  // ── Blips ──
+  const BLIP_DATA = [
+    { name:'BOGEY-01', threat:'HIGH',     ar:0.38, aa: 0.62 },
+    { name:'BOGEY-02', threat:'CRITICAL', ar:0.55, aa: 1.85 },
+    { name:'BOGEY-03', threat:'MEDIUM',   ar:0.72, aa: 3.10 },
+    { name:'BOGEY-04', threat:'LOW',      ar:0.28, aa: 4.40 },
+    { name:'BOGEY-05', threat:'HIGH',     ar:0.60, aa: 5.20 },
+    { name:'BOGEY-06', threat:'LOW',      ar:0.82, aa: 0.20 },
+  ];
+  const THREAT_COL = { LOW:'#00ff88', MEDIUM:'#ffb700', HIGH:'#ff6600', CRITICAL:'#ff2222' };
+
+  let blips = [];
+  function initBlips(){
+    blips = BLIP_DATA.map((b,i) => ({
+      ...b,
+      // position in polar: r fraction, angle
+      r: b.ar, a: b.aa,
+      // drift slowly
+      vr: (Math.random()-0.5)*0.0002,
+      va: (Math.random()-0.5)*0.0003,
+      // fade-in after sweep hits
+      alpha: 0,
+      lastHit: -999,
+      lockPct: 0,
+      locked: false,
+    }));
+  }
+
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    W = canvas.width  = rect.width;
+    H = canvas.height = rect.height;
+    cx = W/2; cy = H/2;
+    R  = Math.min(W, H) * 0.28; // radar radius
+  }
+
+  // ── Draw outer ring with tick marks ──
+  function drawOuterRing(){
+    ctx.save();
+    // dark bg
+    ctx.fillStyle = 'rgba(0,4,14,0.96)';
+    ctx.fillRect(0,0,W,H);
+
+    // outer bezel arc (not full — match reference: arc from ~200° to ~340° top, gaps at sides)
+    // actually draw full ring with two bright accent arcs
+    ctx.strokeStyle = 'rgba(0,180,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx,cy,R+14,0,Math.PI*2); ctx.stroke();
+
+    // bright accent arcs (top-left and bottom-right like reference)
+    ctx.strokeStyle = 'rgba(0,220,255,0.9)';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 8;
+    // top-left arc ~200°–290°
+    ctx.beginPath(); ctx.arc(cx,cy,R+14, 3.49, 5.06); ctx.stroke();
+    // bottom-right arc ~20°–100°
+    ctx.beginPath(); ctx.arc(cx,cy,R+14, 0.35, 1.74); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // tick marks around ring
+    for(let deg=0; deg<360; deg++){
+      const rad = deg * Math.PI/180;
+      const isMajor = deg % 10 === 0;
+      const len = isMajor ? 8 : 4;
+      const r0 = R+6, r1 = r0+len;
+      ctx.strokeStyle = isMajor ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.28)';
+      ctx.lineWidth = isMajor ? 1.2 : 0.6;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.sin(rad)*r0, cy - Math.cos(rad)*r0);
+      ctx.lineTo(cx + Math.sin(rad)*r1, cy - Math.cos(rad)*r1);
+      ctx.stroke();
+    }
+
+    // cardinal labels N/E/S/W
+    const labels = [['N',0],['E',90],['S',180],['W',270]];
+    ctx.font = 'bold 8px "Orbitron",sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    labels.forEach(([lbl,deg])=>{
+      const rad = deg*Math.PI/180;
+      const lr = R+28;
+      ctx.fillText(lbl, cx+Math.sin(rad)*lr, cy-Math.cos(rad)*lr);
+    });
+    ctx.restore();
+  }
+
+  // ── Draw concentric rings + crosshairs ──
+  function drawGrid(){
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.clip();
+
+    // concentric rings (6 of them)
+    for(let i=1; i<=6; i++){
+      const r = R*(i/6);
+      ctx.strokeStyle = `rgba(0,180,255,${i===3?0.22:0.11})`;
+      ctx.lineWidth = i===3 ? 0.8 : 0.5;
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+    }
+
+    // radial spokes every 30°
+    for(let deg=0; deg<360; deg+=30){
+      const rad = deg*Math.PI/180;
+      ctx.strokeStyle = 'rgba(0,160,255,0.08)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.lineTo(cx+Math.cos(rad)*R, cy+Math.sin(rad)*R);
+      ctx.stroke();
+    }
+
+    // crosshair lines (bright)
+    ctx.strokeStyle = 'rgba(0,200,255,0.35)';
+    ctx.lineWidth = 0.7;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(cx-R,cy); ctx.lineTo(cx+R,cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx,cy-R); ctx.lineTo(cx,cy+R); ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.restore();
+  }
+
+  // ── Draw sweep beam ──
+  function drawSweep(){
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.clip();
+
+    // trailing fade — gradient wedge
+    const trailLen = Math.PI * 0.55; // how wide the trail is
+    const grad = ctx.createConicalGradient
+      ? null // not standard; use manual approach
+      : null;
+
+    // Draw filled arc sweep (trail)
+    const steps = 40;
+    for(let i=0; i<steps; i++){
+      const frac = i/steps;
+      const a0 = sweepAngle - trailLen*(1-frac);
+      const a1 = sweepAngle - trailLen*(1-(frac+1/steps));
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy,R,a0,a1);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(0,200,255,${frac * frac * 0.18})`;
+      ctx.fill();
+    }
+
+    // bright sweep line
+    ctx.strokeStyle = 'rgba(0,230,255,0.95)';
+    ctx.lineWidth = 1.8;
+    ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.lineTo(cx + Math.cos(sweepAngle)*R, cy + Math.sin(sweepAngle)*R);
+    ctx.stroke();
+
+    // centre dot
+    ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,230,255,1)'; ctx.shadowBlur=18; ctx.fill();
+
+    ctx.restore();
+  }
+
+  // ── Draw blips ──
+  function drawBlips(){
+    blips.forEach(b=>{
+      // drift
+      b.r += b.vr; b.a += b.va;
+      if(b.r<0.1) b.r=0.1; if(b.r>0.92) b.r=0.92;
+
+      // check if sweep just passed this blip
+      const blipAngle = b.a % (Math.PI*2);
+      const sw = ((sweepAngle % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+      const ba = (blipAngle + Math.PI*2) % (Math.PI*2);
+      const diff = (sw - ba + Math.PI*2) % (Math.PI*2);
+      if(diff < 0.07){
+        b.lastHit = t;
+        b.alpha = 1.0;
+        if(!b.locked) b.lockPct = Math.min(1, b.lockPct + 0.12);
+        if(b.lockPct >= 1) b.locked = true;
+      }
+
+      // fade blip over time
+      const age = t - b.lastHit;
+      b.alpha = Math.max(0, 1 - age/180);
+      if(b.alpha <= 0) return;
+
+      const bx = cx + Math.cos(b.a) * b.r * R;
+      const by = cy + Math.sin(b.a) * b.r * R;
+      const col = THREAT_COL[b.threat];
+
+      ctx.save();
+      ctx.globalAlpha = b.alpha;
+
+      // blip glow dot
+      ctx.shadowColor = col; ctx.shadowBlur = 14;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(bx,by,3.5,0,Math.PI*2); ctx.fill();
+      // inner bright core
+      ctx.fillStyle = '#fff'; ctx.shadowBlur=4;
+      ctx.beginPath(); ctx.arc(bx,by,1.5,0,Math.PI*2); ctx.fill();
+
+      // lock-on bracket if locked
+      if(b.locked){
+        const bs = 10 + 3*Math.sin(t*0.08);
+        ctx.strokeStyle = col; ctx.lineWidth=1; ctx.shadowBlur=8;
+        ctx.setLineDash([3,2]);
+        ctx.strokeRect(bx-bs/2, by-bs/2, bs, bs);
+        ctx.setLineDash([]);
+        // corner brackets
+        const cs=4; ctx.lineWidth=1.5; ctx.setLineDash([]);
+        [[bx-bs/2,by-bs/2,1,1],[bx+bs/2,by-bs/2,-1,1],[bx-bs/2,by+bs/2,1,-1],[bx+bs/2,by+bs/2,-1,-1]].forEach(([px,py,dx,dy])=>{
+          ctx.beginPath(); ctx.moveTo(px+dx*cs,py); ctx.lineTo(px,py); ctx.lineTo(px,py+dy*cs); ctx.stroke();
+        });
+        // label
+        ctx.font='bold 5.5px "Orbitron",sans-serif';
+        ctx.fillStyle=col; ctx.shadowBlur=4; ctx.shadowColor=col;
+        ctx.textAlign='left';
+        ctx.fillText(b.name, bx+8, by-3);
+        ctx.fillStyle='rgba(0,200,255,0.7)'; ctx.shadowBlur=0;
+        ctx.font='5px "Share Tech Mono",monospace';
+        ctx.fillText('■ LOCKED', bx+8, by+5);
+      } else if(b.lockPct>0){
+        // lock-on progress arc
+        ctx.strokeStyle=col; ctx.lineWidth=1.2; ctx.shadowBlur=6;
+        ctx.beginPath(); ctx.arc(bx,by,9,-Math.PI/2,-Math.PI/2+b.lockPct*Math.PI*2); ctx.stroke();
+        ctx.font='5.5px "Orbitron",sans-serif';
+        ctx.fillStyle=col; ctx.textAlign='left'; ctx.shadowBlur=3;
+        ctx.fillText(b.name, bx+8, by-2);
+        ctx.font='5px "Share Tech Mono",monospace';
+        ctx.fillStyle='rgba(0,200,255,0.6)';
+        ctx.fillText('ACQ '+(b.lockPct*100).toFixed(0)+'%', bx+8, by+6);
+      }
+
+      ctx.restore();
+    });
+  }
+
+  // ── Readouts strip below radar ──
+  function drawReadouts(){
+    const locked  = blips.filter(b=>b.locked).length;
+    const total   = blips.length;
+    const critical= blips.filter(b=>b.threat==='CRITICAL'&&b.alpha>0).length;
+
+    ctx.save();
+    ctx.font = '6.5px "Share Tech Mono",monospace';
+
+    const cols = [
+      { label:'TRACKING', val: total+' BOGEYS',  col:'#00d4ff' },
+      { label:'LOCKED',   val: locked+'/'+total, col:'#00ff88' },
+      { label:'CRITICAL', val: critical,          col: critical>0?'#ff2222':'#00ff88' },
+      { label:'SWEEP',    val: (sweepAngle*180/Math.PI).toFixed(0)+'°', col:'#00d4ff' },
+    ];
+
+    const stripY = cy+R+20;
+    const colW   = W/4;
+
+    cols.forEach((c2,i)=>{
+      const rx = i*colW + colW/2;
+      ctx.textAlign='center';
+      ctx.fillStyle='rgba(0,180,255,0.45)'; ctx.shadowBlur=0;
+      ctx.fillText(c2.label, rx, stripY);
+      ctx.font='bold 8px "Share Tech Mono",monospace';
+      ctx.fillStyle=c2.col; ctx.shadowColor=c2.col; ctx.shadowBlur=5;
+      ctx.fillText(c2.val, rx, stripY+11);
+      ctx.font='6.5px "Share Tech Mono",monospace';
+    });
+
+    // range rings label
+    ctx.textAlign='left'; ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(0,180,255,0.3)';
+    ctx.font='5px "Share Tech Mono",monospace';
+    for(let i=1;i<=3;i++){
+      const lr = R*(i*2/6);
+      ctx.fillText((i*20)+'km', cx+lr+2, cy+4);
+    }
+
+    ctx.restore();
+  }
+
+  function frame(){
+    requestAnimationFrame(frame);
+    t++;
+    sweepAngle += SWEEP_SPEED;
+
+    ctx.clearRect(0,0,W,H);
+    drawOuterRing();
+    drawGrid();
+    drawSweep();
+    drawBlips();
+    drawReadouts();
+  }
+
+  const hudEl = document.getElementById('hud');
+  const obs = new MutationObserver(()=>{
+    if(hudEl.classList.contains('visible')){
+      obs.disconnect();
+      resize();
+      initBlips();
+      frame();
+      window.addEventListener('resize',()=>{ resize(); });
+    }
+  });
+  obs.observe(hudEl,{attributes:true});
+})();
+
+
+
+
+
 
 </script>
 </body>
