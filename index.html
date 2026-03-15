@@ -1,2434 +1,808 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>AKSHAT INDUSTRIES — AKSHAT COMMAND CENTER</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
-<link rel="icon" href="favicon.ico"/>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
-<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/delaunator@5.0.0/delaunator.min.js"></script>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AR Weather</title>
 <style>
-:root{--c:#00d4ff;--cr:#ff3d3d;--cg:#00ff88;--cy:#ffb700;--bg:rgba(0,10,22,.92);--border:rgba(0,212,255,.2);}
+@import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap');
 
-/* ══ PALM AUTH ══ */
-#palm-auth{position:fixed;inset:0;background:#000;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:opacity .9s ease;}
-#palm-auth.fade-out{opacity:0;pointer-events:none;}
-#palm-auth-wrap{position:relative;display:inline-block;width:560px;height:420px;}
-#palm-video{position:absolute;top:0;left:0;width:560px;height:420px;object-fit:cover;border-radius:4px;opacity:0;pointer-events:none;}
-#palm-canvas{position:absolute;top:0;left:0;width:560px;height:420px;z-index:2;border-radius:4px;background:#000;}
-.palm-header{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:.38em;color:rgba(0,212,255,.45);text-transform:uppercase;margin-bottom:18px;position:relative;z-index:2;}
-.palm-header-logo{font-size:13px;font-weight:900;letter-spacing:.28em;color:#fff;text-shadow:0 0 24px var(--c);display:flex;align-items:center;gap:10px;margin-bottom:5px;}
-.palm-header-logo span{color:var(--cr);text-shadow:0 0 16px var(--cr);}
-.palm-logo-text{position:relative;z-index:2;pointer-events:none;}
-#palm-status{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.22em;color:rgba(0,212,255,.65);margin-top:18px;text-align:center;min-height:18px;transition:color .3s;}
-#palm-status.ok{color:var(--cg);text-shadow:0 0 12px var(--cg);}
-#palm-status.fail{color:var(--cr);text-shadow:0 0 12px var(--cr);}
-#palm-status.scanning{color:var(--cy);text-shadow:0 0 10px var(--cy);}
-.palm-sub{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:.18em;color:rgba(0,212,255,.3);margin-top:6px;text-align:center;}
-.palm-progress-bar{width:560px;height:2px;background:rgba(0,212,255,.1);border-radius:2px;margin-top:10px;overflow:hidden;}
-.palm-progress-fill{height:100%;width:0%;background:var(--c);box-shadow:0 0 8px var(--c);border-radius:2px;transition:width .4s ease;}
-#enroll-btn{margin-top:12px;width:560px;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.6);color:#fff;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:.18em;padding:10px;border-radius:4px;cursor:pointer;display:none;transition:.2s;box-shadow:0 0 18px rgba(0,212,255,.18);}
-#enroll-btn:hover{background:rgba(0,212,255,.22);box-shadow:0 0 26px rgba(0,212,255,.28);}
-#enroll-btn:disabled{opacity:0.6;cursor:not-allowed;box-shadow:none;}
-*{box-sizing:border-box;margin:0;padding:0;}
-html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Orbitron',sans-serif;color:var(--c);}
-body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,212,255,.016) 2px,rgba(0,212,255,.016) 4px);pointer-events:none;z-index:9000;}
-.scan-beam{position:fixed;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(0,212,255,.3),transparent);animation:scanBeam 8s linear infinite;z-index:8999;pointer-events:none;}
-@keyframes scanBeam{0%{top:-2px;opacity:0}5%{opacity:1}95%{opacity:1}100%{top:100vh;opacity:0}}
-.corner{position:fixed;width:50px;height:50px;pointer-events:none;z-index:8998;}
-.corner::before,.corner::after{content:'';position:absolute;background:var(--c);box-shadow:0 0 6px var(--c);}
-.corner::before{width:100%;height:2px;}.corner::after{width:2px;height:100%;}
-.corner.tl{top:12px;left:12px;}.corner.tr{top:12px;right:12px;transform:scaleX(-1);}
-.corner.bl{bottom:12px;left:12px;transform:scaleY(-1);}.corner.br{bottom:12px;right:12px;transform:scale(-1);}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:#000;overflow:hidden;font-family:'Manrope',sans-serif;}
+canvas{display:block;position:fixed;inset:0;z-index:1;}
 
-/* ══ SETUP MODAL ══ */
-#setup-modal{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:10000;display:flex;align-items:center;justify-content:center;}
-#setup-modal.hidden{display:none;}
-.modal-box{background:rgba(0,10,22,.99);border:1px solid var(--c);border-radius:4px;padding:34px 38px;width:520px;box-shadow:0 0 50px rgba(0,212,255,.18);}
-.modal-logo{font-size:16px;font-weight:900;letter-spacing:.28em;color:#fff;text-shadow:0 0 20px var(--c);margin-bottom:4px;}
-.modal-logo span{color:var(--cr);text-shadow:0 0 16px var(--cr);}
-.modal-sub{font-size:8px;letter-spacing:.22em;color:rgba(0,212,255,.45);margin-bottom:22px;}
-.modal-section{background:rgba(0,212,255,.03);border:1px solid rgba(0,212,255,.12);border-radius:3px;padding:14px 16px;margin-bottom:12px;}
-.modal-section-title{font-size:8px;font-weight:700;letter-spacing:.25em;color:rgba(0,212,255,.55);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
-.modal-section-title span{color:var(--c);}
-.modal-row{margin-bottom:10px;}
-.modal-row:last-child{margin-bottom:0;}
-.modal-label{font-size:7.5px;letter-spacing:.18em;color:rgba(0,212,255,.5);margin-bottom:5px;}
-.modal-sublabel{font-size:7px;letter-spacing:.1em;color:rgba(0,212,255,.3);margin-bottom:5px;}
-.modal-input{width:100%;background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.18);color:#fff;font-family:'Share Tech Mono',monospace;font-size:11px;padding:9px 12px;border-radius:3px;outline:none;letter-spacing:.06em;}
-.modal-input:focus{border-color:var(--c);box-shadow:0 0 10px rgba(0,212,255,.18);}
-.modal-input::placeholder{color:rgba(0,212,255,.25);}
-.modal-btn{margin-top:4px;width:100%;background:rgba(0,212,255,.13);border:1px solid var(--c);color:var(--c);font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:.28em;padding:11px;border-radius:3px;cursor:pointer;transition:.2s;box-shadow:0 0 18px rgba(0,212,255,.08);}
-.modal-btn:hover{background:rgba(0,212,255,.24);box-shadow:0 0 26px rgba(0,212,255,.2);}
-.modal-skip{margin-top:8px;width:100%;background:transparent;border:1px solid rgba(0,212,255,.15);color:rgba(0,212,255,.38);font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:.2em;padding:8px;border-radius:3px;cursor:pointer;transition:.2s;}
-.modal-skip:hover{border-color:rgba(0,212,255,.3);color:rgba(0,212,255,.55);}
-.modal-links{display:flex;gap:16px;margin-top:10px;justify-content:center;}
-.modal-link{font-size:7.5px;letter-spacing:.12em;color:rgba(0,212,255,.4);text-decoration:none;}
-.modal-link:hover{color:var(--c);}
-.modal-opt-badge{font-size:7px;letter-spacing:.1em;padding:1px 6px;border-radius:2px;background:rgba(255,183,0,.08);color:var(--cy);border:1px solid rgba(255,183,0,.2);margin-left:6px;}
-.modal-req-badge{font-size:7px;letter-spacing:.1em;padding:1px 6px;border-radius:2px;background:rgba(0,255,136,.08);color:var(--cg);border:1px solid rgba(0,255,136,.2);margin-left:6px;}
+/* ── START SCREEN ─────────────────────────────────── */
+#start{
+  position:fixed;inset:0;z-index:300;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  padding:36px 28px;
+  background:radial-gradient(ellipse at 30% 20%, #0d1f3c 0%, #060d1a 55%, #000 100%);
+  overflow:hidden;
+}
 
-/* ══ BOOT ══ */
-#boot{position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .8s ease;}
-#boot.fade{opacity:0;pointer-events:none;}
-.boot-logo{font-size:26px;font-weight:900;letter-spacing:.3em;color:#fff;text-shadow:0 0 30px var(--c),0 0 60px var(--c);}
-.boot-logo span{color:var(--cr);text-shadow:0 0 20px var(--cr);}
-.boot-lines{font-size:10px;letter-spacing:.22em;color:rgba(0,212,255,.65);font-family:'Share Tech Mono',monospace;text-align:center;min-height:20px;}
-.boot-bar-wrap{width:280px;height:2px;background:rgba(0,212,255,.12);border-radius:2px;overflow:hidden;}
-.boot-bar-fill{height:100%;width:0;background:var(--c);box-shadow:0 0 10px var(--c);transition:width .04s linear;}
-.boot-pct{font-size:10px;letter-spacing:.2em;color:rgba(0,212,255,.5);font-family:'Share Tech Mono',monospace;}
+/* Animated star field */
+#start::before{
+  content:'';position:absolute;inset:0;
+  background-image:
+    radial-gradient(1px 1px at 15% 25%, rgba(255,255,255,0.7) 0%, transparent 100%),
+    radial-gradient(1px 1px at 80% 10%, rgba(255,255,255,0.5) 0%, transparent 100%),
+    radial-gradient(1px 1px at 60% 80%, rgba(255,255,255,0.6) 0%, transparent 100%),
+    radial-gradient(1px 1px at 35% 65%, rgba(255,255,255,0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 90% 50%, rgba(255,255,255,0.5) 0%, transparent 100%),
+    radial-gradient(2px 2px at 50% 35%, rgba(150,200,255,0.6) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 25% 85%, rgba(200,220,255,0.5) 0%, transparent 100%),
+    radial-gradient(1px 1px at 70% 55%, rgba(255,255,255,0.4) 0%, transparent 100%);
+  pointer-events:none;
+  animation:twinkle 4s ease-in-out infinite alternate;
+}
+@keyframes twinkle{
+  0%{opacity:0.6;}100%{opacity:1;}
+}
 
-/* ══ MAIN GRID ══ */
-#hud{width:100vw;height:100vh;display:grid;grid-template-columns:252px 1fr 268px;grid-template-rows:52px 26px 1fr 100px;gap:8px;padding:14px;opacity:0;transition:opacity .8s ease;background:radial-gradient(ellipse at 50% 40%,#010c1a 0%,#000 75%);}
-#hud.visible{opacity:1;}
+/* Cloud deco */
+#start::after{
+  content:'';position:absolute;
+  bottom:-60px;left:-40px;right:-40px;height:180px;
+  background:radial-gradient(ellipse at 50% 100%, rgba(60,100,180,0.15) 0%, transparent 70%);
+  pointer-events:none;
+}
 
-/* ══ PANEL ══ */
-.panel{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:11px 13px;position:relative;backdrop-filter:blur(3px);box-shadow:0 0 16px rgba(0,212,255,.05),inset 0 0 16px rgba(0,212,255,.02);}
-.panel::before{content:'';position:absolute;top:-1px;left:16px;width:32px;height:2px;background:var(--c);box-shadow:0 0 6px var(--c);}
-.pt{font-size:7.5px;font-weight:700;letter-spacing:.28em;color:rgba(0,212,255,.5);text-transform:uppercase;margin-bottom:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.weather-icon-big{
+  font-size:80px;
+  animation:floatIcon 4s ease-in-out infinite;
+  filter:drop-shadow(0 0 24px rgba(100,180,255,0.5));
+}
+@keyframes floatIcon{
+  0%,100%{transform:translateY(0);}
+  50%{transform:translateY(-10px);}
+}
 
-/* ══ HEADER ══ */
-.hdr{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 4px;}
-.hdr.panel::before{display:none;}
-.logo{font-size:16px;font-weight:900;letter-spacing:.22em;color:#fff;text-shadow:0 0 18px var(--c);animation:glitch 10s infinite;}
-.logo span{color:var(--cr);text-shadow:0 0 14px var(--cr);}
-@keyframes glitch{0%,95%,100%{opacity:1;transform:none}96%{opacity:.7;transform:translate(-1px,0)}97%{opacity:.9;transform:translate(1px,0)}98%{opacity:.8;transform:translate(0,-1px)}}
-.hdr-right{display:flex;gap:18px;align-items:center;}
-.hstat{font-size:8.5px;letter-spacing:.1em;color:rgba(0,212,255,.65);display:flex;align-items:center;gap:5px;}
-.dot{width:5px;height:5px;border-radius:50%;background:var(--cg);box-shadow:0 0 6px var(--cg);animation:blink 2s ease-in-out infinite;}
-.dot.y{background:var(--cy);box-shadow:0 0 6px var(--cy);}
-.dot.r{background:var(--cr);box-shadow:0 0 6px var(--cr);}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-#hdr-clock{font-family:'Share Tech Mono',monospace;font-size:13px;color:#fff;letter-spacing:.06em;text-shadow:0 0 10px var(--c);}
+#start h1{
+  font-family:'Manrope',sans-serif;
+  font-size:clamp(26px,7vw,36px);
+  font-weight:800;
+  color:#fff;
+  letter-spacing:-0.02em;
+  text-align:center;
+}
+#start h1 span{
+  background:linear-gradient(135deg,#60b8ff,#a0d4ff,#fff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
 
-/* ══ STOCK STRIP ══ */
-.stock-strip{grid-column:1/-1;overflow:hidden;display:flex;align-items:center;}
-.stock-strip.panel::before{display:none;}
-.sstrip-inner{display:flex;gap:0;animation:stripScroll 70s linear infinite;white-space:nowrap;}
-@keyframes stripScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.sstock{display:inline-flex;align-items:center;gap:8px;padding:3px 16px;border-right:1px solid rgba(0,212,255,.1);}
-.sstock-sym{font-size:8.5px;font-weight:700;letter-spacing:.12em;color:#fff;}
-.sstock-price{font-size:9.5px;font-family:'Share Tech Mono',monospace;color:#fff;}
-.sstock-chg{font-size:8px;font-family:'Share Tech Mono',monospace;}
-.pos{color:var(--cg)}.neg{color:var(--cr)}
+#start p{
+  color:rgba(180,210,255,0.6);font-size:14px;
+  text-align:center;line-height:1.7;max-width:290px;font-weight:400;
+}
 
-/* ══ LEFT COL ══ */
-.left-col{display:flex;flex-direction:column;gap:8px;grid-row:3/5;overflow:hidden;min-height:0;}
+/* Location badge */
+#loc-badge{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.07);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:50px;padding:9px 18px;
+  font-size:13px;color:rgba(200,225,255,0.8);font-weight:500;
+}
+#loc-badge span{font-size:16px;}
 
-/* ARC REACTOR */
-.arc-wrap{display:flex;flex-direction:column;align-items:center;padding:6px 0 2px;}
-.arc-outer{position:relative;width:106px;height:106px;}
-.arc-outer svg{position:absolute;inset:0;}
-.spin{animation:spin 16s linear infinite;}
-.spinr{animation:spin 9s linear infinite reverse;}
-@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-.arc-glow{position:absolute;inset:18px;border-radius:50%;background:radial-gradient(circle,rgba(0,212,255,.2) 0%,transparent 70%);animation:arcP 2.5s ease-in-out infinite;}
-@keyframes arcP{0%,100%{opacity:.5}50%{opacity:1}}
-.arc-core{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
-.arc-pct{font-size:21px;font-weight:900;color:#fff;text-shadow:0 0 12px var(--c);line-height:1;}
-.arc-lbl{font-size:7px;letter-spacing:.22em;color:rgba(0,212,255,.5);margin-top:2px;}
+/* Weather preview card */
+#preview-card{
+  width:100%;max-width:340px;
+  background:rgba(255,255,255,0.07);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:22px;padding:18px 20px;
+  display:none;flex-direction:column;gap:12px;
+}
+#preview-card.loaded{display:flex;}
 
-/* SYS BARS */
-.sys-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
-.slbl{font-size:7.5px;letter-spacing:.07em;color:rgba(0,212,255,.6);width:68px;flex-shrink:0;}
-.sbar{flex:1;height:3px;background:rgba(0,212,255,.08);border-radius:2px;overflow:hidden;}
-.sfill{height:100%;border-radius:2px;position:relative;transition:width 2s ease;}
-.sfill::after{content:'';position:absolute;right:0;top:-2px;width:3px;height:7px;background:inherit;filter:brightness(2.5);}
-.sval{font-size:8px;color:#fff;width:26px;text-align:right;font-family:'Share Tech Mono',monospace;}
+.pc-top{display:flex;align-items:center;justify-content:space-between;}
+.pc-temp{font-size:48px;font-weight:700;color:#fff;letter-spacing:-0.03em;line-height:1;}
+.pc-right{text-align:right;}
+.pc-cond{font-size:14px;color:rgba(200,225,255,0.75);font-weight:500;margin-bottom:4px;}
+.pc-loc{font-size:12px;color:rgba(180,210,255,0.5);}
+.pc-icon{font-size:44px;line-height:1;}
 
-/* CLOCK */
-.clk{font-size:28px;font-weight:900;color:#fff;font-family:'Share Tech Mono',monospace;text-shadow:0 0 14px var(--c);letter-spacing:.05em;line-height:1;}
-.clk-date{font-size:8px;letter-spacing:.2em;color:rgba(0,212,255,.45);margin-top:3px;}
-.uptime-row{display:flex;justify-content:space-between;margin-top:7px;padding-top:7px;border-top:1px solid rgba(0,212,255,.1);}
-.uptime-lbl{font-size:7px;letter-spacing:.15em;color:rgba(0,212,255,.4);}
-.uptime-val{font-size:8.5px;font-family:'Share Tech Mono',monospace;color:var(--cg);}
+.pc-stats{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+}
+.pc-stat{
+  background:rgba(255,255,255,0.05);
+  border-radius:12px;padding:10px;
+  text-align:center;
+}
+.pc-stat-val{font-size:15px;font-weight:600;color:#fff;}
+.pc-stat-lbl{font-size:10px;color:rgba(180,210,255,0.5);margin-top:2px;text-transform:uppercase;letter-spacing:0.06em;}
 
-/* ══ CENTER COL ══ */
-.center-col{display:flex;flex-direction:column;gap:8px;grid-row:3;overflow:hidden;}
-.flight-panel{flex:1.3;display:flex;flex-direction:column;min-height:0;}
-#flight-map{width:100%;flex:1;border-radius:2px;position:relative;}
-.flight-overlay{position:absolute;top:6px;right:6px;z-index:1000;display:flex;flex-direction:column;gap:4px;pointer-events:none;}
-.flight-badge{background:rgba(0,10,22,.88);border:1px solid rgba(0,212,255,.25);border-radius:2px;padding:3px 7px;font-size:7px;letter-spacing:.14em;color:rgba(0,212,255,.7);font-family:'Share Tech Mono',monospace;}
-.flight-badge span{color:#fff;font-weight:700;}
-.energy-panel{flex:.65;display:flex;flex-direction:column;min-height:0;}
-#energyGraph{width:100%;flex:1;display:block;}
-.markets-panel{flex:.95;display:flex;flex-direction:column;min-height:0;}
-.markets-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;flex:1;overflow:hidden;}
-.mcard{background:rgba(0,212,255,.03);border:1px solid rgba(0,212,255,.1);border-radius:3px;padding:6px 8px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;}
-.mcard-sym{font-size:7.5px;font-weight:700;letter-spacing:.1em;color:rgba(0,212,255,.7);}
-.mcard-price{font-size:11px;font-weight:700;color:#fff;font-family:'Share Tech Mono',monospace;line-height:1.3;}
-.mcard-chg{font-size:7.5px;font-family:'Share Tech Mono',monospace;}
-.mcard canvas{margin-top:3px;width:100%;height:24px;display:block;}
-.mcard-sig{font-size:6.5px;letter-spacing:.1em;margin-top:2px;}
+#start-btn{
+  width:100%;max-width:340px;
+  background:linear-gradient(135deg,#1a6bbf,#2d9cdb,#56ccf2);
+  border:none;border-radius:16px;padding:17px;
+  color:#fff;font-size:16px;font-weight:700;
+  font-family:'Manrope',sans-serif;letter-spacing:0.01em;
+  cursor:pointer;
+  box-shadow:0 8px 32px rgba(45,156,219,0.4),0 0 0 1px rgba(255,255,255,0.1);
+  transition:transform 0.15s,box-shadow 0.2s;
+  opacity:0.4;pointer-events:none;
+}
+#start-btn.ready{opacity:1;pointer-events:all;}
+#start-btn:active{transform:scale(0.97);}
 
-/* ══ RIGHT COL ══ */
-.right-col{display:flex;flex-direction:column;gap:8px;grid-row:3/5;overflow:hidden;}
+#err-msg{
+  display:none;color:#ff8a8a;font-size:12px;text-align:center;
+  background:rgba(255,80,80,0.08);border:1px solid rgba(255,80,80,0.2);
+  border-radius:10px;padding:10px 14px;max-width:320px;line-height:1.6;
+}
 
-/* JARVIS CHAT */
-.jarvis-panel{flex:3.5;display:flex;flex-direction:column;min-height:0;}
-.chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:3px;margin-bottom:7px;scrollbar-width:thin;scrollbar-color:rgba(0,212,255,.2) transparent;}
-.chat-messages::-webkit-scrollbar{width:3px;}
-.chat-messages::-webkit-scrollbar-thumb{background:rgba(0,212,255,.2);border-radius:2px;}
-.msg{font-size:8.5px;font-family:'Share Tech Mono',monospace;line-height:1.65;padding:6px 9px;border-radius:3px;}
-.msg.jarvis{background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.12);color:rgba(0,212,255,.85);}
-.msg.jarvis::before{content:'JARVIS ▶ ';color:var(--c);font-weight:700;}
-.msg.user{background:rgba(255,61,61,.05);border:1px solid rgba(255,61,61,.14);color:rgba(255,200,200,.8);text-align:right;}
-.msg.user::after{content:' ◀ AKSHAT';color:var(--cr);font-weight:700;}
-.msg.thinking{color:rgba(0,212,255,.4);font-style:italic;border:1px solid rgba(0,212,255,.08);padding:5px 9px;font-size:8px;}
-.chat-input-row{display:flex;gap:5px;align-items:center;flex-shrink:0;}
-.chat-input{flex:1;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.18);color:#fff;font-family:'Share Tech Mono',monospace;font-size:9px;padding:7px 9px;border-radius:3px;outline:none;}
-.chat-input:focus{border-color:var(--c);box-shadow:0 0 8px rgba(0,212,255,.15);}
-.chat-send{background:rgba(0,212,255,.1);border:1px solid var(--c);color:var(--c);font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:.15em;padding:7px 9px;border-radius:3px;cursor:pointer;flex-shrink:0;transition:.2s;}
-.chat-send:hover{background:rgba(0,212,255,.22);}
-.chat-send:disabled{opacity:.3;cursor:not-allowed;}
+.mini-spin{width:18px;height:18px;border:2px solid rgba(255,255,255,0.15);border-top-color:#60b8ff;border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px;}
+@keyframes spin{to{transform:rotate(360deg);}}
 
-/* WEATHER */
-.w-big{font-size:34px;font-weight:900;color:#fff;text-shadow:0 0 20px var(--c);line-height:1;}
-.w-desc{font-size:7.5px;letter-spacing:.16em;color:rgba(0,212,255,.55);margin-top:3px;text-transform:uppercase;}
-.w-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:7px;}
-.wstat{background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.1);padding:5px 7px;border-radius:2px;}
-.wsl{font-size:6.5px;letter-spacing:.15em;color:rgba(0,212,255,.45);text-transform:uppercase;}
-.wsv{font-size:11px;font-weight:700;color:#fff;font-family:'Share Tech Mono',monospace;margin-top:1px;}
+/* ── AR UI ─────────────────────────────────────────── */
+#ui{position:fixed;inset:0;z-index:100;pointer-events:none;display:none;}
+#ui.active{display:block;}
 
-/* TARGETS */
-.trow{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid rgba(0,212,255,.07);}
-.trow:last-child{border-bottom:none;}
-.tico{width:24px;height:24px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
-.tname{font-size:8px;font-weight:700;letter-spacing:.1em;color:#fff;}
-.tstatus{font-size:7px;color:rgba(0,212,255,.45);margin-top:1px;}
-.tbadge{margin-left:auto;font-size:6.5px;letter-spacing:.1em;padding:2px 5px;border-radius:2px;flex-shrink:0;}
-.bg{background:rgba(0,255,136,.07);color:var(--cg);border:1px solid rgba(0,255,136,.25);}
-.by{background:rgba(255,183,0,.07);color:var(--cy);border:1px solid rgba(255,183,0,.25);}
-.br{background:rgba(255,61,61,.07);color:var(--cr);border:1px solid rgba(255,61,61,.25);}
+/* Calibration */
+#calibrating{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;
+  background:rgba(0,0,10,0.45);z-index:200;transition:opacity 0.8s;
+}
+#calibrating.hidden{opacity:0;pointer-events:none;}
+.cal-ring{width:70px;height:70px;border:3px solid rgba(255,255,255,0.1);border-top:3px solid #60b8ff;border-radius:50%;animation:spin 1s linear infinite;}
+#calibrating p{color:rgba(200,225,255,0.85);font-size:14px;font-weight:500;letter-spacing:0.04em;text-align:center;max-width:240px;line-height:1.6;}
 
-/* THREAT */
-.thrt-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
-.thrt-lbl{font-size:7px;letter-spacing:.08em;color:rgba(0,212,255,.6);width:50px;}
-.thrt-bar{flex:1;height:4px;background:rgba(0,212,255,.07);border-radius:1px;overflow:hidden;}
-.thrt-fill{height:100%;border-radius:1px;}
-.thrt-val{font-size:7.5px;font-family:'Share Tech Mono',monospace;color:#fff;width:22px;text-align:right;}
+/* Top status bar */
+#top-bar{
+  position:absolute;top:0;left:0;right:0;
+  padding:44px 16px 0;
+  pointer-events:none;
+}
+#location-pill{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(8,16,32,0.7);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,0.14);
+  border-radius:50px;padding:8px 16px;
+  font-size:13px;font-weight:600;color:rgba(200,225,255,0.9);
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);
+}
 
-/* ══ STOCK ANALYSIS PANEL ══ */
-.stock-analysis-panel{flex:1;display:flex;flex-direction:column;min-height:0;}
-.sa-input-row{display:flex;gap:5px;margin-bottom:8px;}
-.sa-input{flex:1;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.18);color:#fff;font-family:'Share Tech Mono',monospace;font-size:10px;padding:6px 9px;border-radius:3px;outline:none;text-transform:uppercase;letter-spacing:.12em;}
-.sa-input:focus{border-color:var(--c);}
-.sa-input::placeholder{color:rgba(0,212,255,.25);font-size:8px;letter-spacing:.1em;text-transform:none;}
-.sa-btn{background:rgba(0,212,255,.1);border:1px solid var(--c);color:var(--c);font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:.14em;padding:6px 10px;border-radius:3px;cursor:pointer;white-space:nowrap;}
-.sa-btn:hover{background:rgba(0,212,255,.2);}
-.sa-result{display:none;}
-.sa-result.visible{display:block;}
-.sa-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
-.sa-sym{font-size:13px;font-weight:900;color:#fff;letter-spacing:.1em;}
-.sa-name{font-size:7px;color:rgba(0,212,255,.5);letter-spacing:.1em;margin-top:1px;}
-.sa-price-big{font-size:20px;font-weight:900;color:#fff;font-family:'Share Tech Mono',monospace;text-shadow:0 0 10px var(--c);}
-.sa-chg{font-size:9px;font-family:'Share Tech Mono',monospace;margin-top:1px;}
-.sa-chart-wrap{position:relative;height:54px;margin:6px 0;}
-#sa-chart{width:100%;height:100%;display:block;}
-.sa-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;}
-.sa-stat{background:rgba(0,212,255,.03);border:1px solid rgba(0,212,255,.1);padding:4px 6px;border-radius:2px;}
-.sa-stat-l{font-size:6.5px;letter-spacing:.14em;color:rgba(0,212,255,.45);text-transform:uppercase;}
-.sa-stat-v{font-size:9.5px;font-weight:700;color:#fff;font-family:'Share Tech Mono',monospace;margin-top:1px;}
-.sa-signal{margin-top:6px;padding:5px 8px;border-radius:2px;font-size:7.5px;letter-spacing:.12em;text-align:center;font-weight:700;}
-.sa-signal.bull{background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.25);color:var(--cg);}
-.sa-signal.bear{background:rgba(255,61,61,.07);border:1px solid rgba(255,61,61,.25);color:var(--cr);}
-.sa-signal.neut{background:rgba(255,183,0,.07);border:1px solid rgba(255,183,0,.25);color:var(--cy);}
-.sa-loading{font-size:8px;letter-spacing:.15em;color:rgba(0,212,255,.5);text-align:center;padding:12px 0;font-family:'Share Tech Mono',monospace;}
+/* Exit btn */
+#exit-btn{
+  position:absolute;bottom:44px;left:50%;transform:translateX(-50%);
+  pointer-events:all;
+  background:rgba(8,16,32,0.7);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:50px;padding:11px 28px;
+  font-size:13px;font-weight:600;color:rgba(200,225,255,0.75);
+  cursor:pointer;
+}
 
-/* ══ RADAR PANEL ══ */
-.radar-panel{flex:2.5;display:flex;flex-direction:column;min-height:0;padding:0!important;}
-.radar-panel>.pt{padding:8px 13px 5px;margin-bottom:0;}
-#radar-canvas{width:100%;flex:1;display:block;min-height:0;}
+/* Tap hint */
+#tap-hint{
+  position:absolute;bottom:100px;left:50%;transform:translateX(-50%);
+  background:rgba(8,16,32,0.65);
+  backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:50px;padding:8px 20px;
+  font-size:12px;color:rgba(200,225,255,0.6);letter-spacing:0.05em;
+  white-space:nowrap;transition:opacity 0.5s;
+}
 
-/* AUDIO VIZ */
-.viz-wrap{height:150px;position:relative;background:rgba(0,8,20,.65);border:1px solid rgba(0,212,255,.12);border-radius:2px;overflow:hidden;}
-#viz-status{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:.12em;color:rgba(0,212,255,.5);backdrop-filter:blur(2px);z-index:2;}
-#viz-canvas{width:100%;height:100%;display:block;}
-
-/* INTEL TICKER */
-.intel-ticker-wrap{overflow:hidden;padding:4px 0;}
-.intel-ticker-inner{display:flex;gap:44px;animation:tickScroll 55s linear infinite;white-space:nowrap;}
-@keyframes tickScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.iitem{font-size:8px;letter-spacing:.07em;color:rgba(0,212,255,.7);font-family:'Share Tech Mono',monospace;display:flex;align-items:center;gap:7px;}
-.isep{color:var(--cr);font-size:11px;}
-
-/* BOTTOM BAR */
-.bottom-bar{grid-column:2/3;display:flex;gap:8px;}
-.bstat{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;text-align:left;}
-.bstat.panel::before{display:none;}
-.bicon{font-size:26px;flex-shrink:0;}
-.blbl{font-size:8px;letter-spacing:.17em;color:rgba(0,212,255,.45);text-transform:uppercase;margin-bottom:3px;}
-.bval{font-size:18px;font-weight:700;color:#fff;font-family:'Share Tech Mono',monospace;line-height:1;}
+/* Refresh btn top right */
+#refresh-btn{
+  position:absolute;top:44px;right:16px;
+  pointer-events:all;
+  background:rgba(8,16,32,0.65);
+  backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:50px;padding:8px 14px;
+  font-size:12px;color:rgba(200,225,255,0.7);
+  cursor:pointer;display:flex;align-items:center;gap:6px;
+}
 </style>
 </head>
 <body>
 
-<!-- ══ FACE BIOMETRIC AUTH ══ -->
-<div id="palm-auth">
-  <div class="palm-header-logo">AKSHAT <span>INDUSTRIES</span></div>
-  <div class="palm-header">FACIAL RECOGNITION — IDENTITY VERIFICATION</div>
-  <div id="palm-auth-wrap">
-    <video id="palm-video" autoplay playsinline muted></video>
-    <canvas id="palm-canvas" width="560" height="420"></canvas>
-  </div>
-  <div id="palm-status">INITIALIZING NEURAL SCANNER…</div>
-  <div class="palm-sub" id="palm-sub">LOADING FACE RECOGNITION MODELS</div>
-  <div class="palm-progress-bar"><div class="palm-progress-fill" id="palm-prog"></div></div>
-  <button id="enroll-btn">ENROLL THIS FACE</button>
-</div>
+<!-- ══ START ══════════════════════════════════════════ -->
+<div id="start">
+  <div class="weather-icon-big" id="start-icon">🌤️</div>
+  <h1>AR <span>Weather</span></h1>
+  <p>Live weather cards floating in your sky — powered by Open-Meteo, no API key needed</p>
 
-<!-- ══ SETUP MODAL ══ -->
-<div id="setup-modal">
-  <div class="modal-box">
-    <div class="modal-logo">AKSHAT <span>INDUSTRIES</span></div>
-    <div class="modal-sub">AKSHAT COMMAND CENTER — SYSTEM INITIALIZATION</div>
-    <div class="modal-section">
-      <div class="modal-section-title"><span>01</span> J.A.R.V.I.S. AI CORE <span class="modal-opt-badge">OPTIONAL</span></div>
-      <div class="modal-row">
-        <div class="modal-label">ANTHROPIC API KEY</div>
-        <div class="modal-sublabel">console.anthropic.com → Get API Key</div>
-        <input class="modal-input" id="key-anthropic" type="password" value="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"/>
-      </div>
-    </div>
-    <div class="modal-section">
-      <div class="modal-section-title"><span>02</span> MARKET INTELLIGENCE <span class="modal-req-badge">RECOMMENDED</span></div>
-      <div class="modal-row">
-        <div class="modal-label">FINNHUB API KEY</div>
-        <div class="modal-sublabel">finnhub.io → Free account → Dashboard</div>
-        <input class="modal-input" id="key-finnhub" type="password" value="d6meaahr01qi0ajltq0gd6meaahr01qi0ajltq10"/>
-      </div>
-    </div>
-    <div class="modal-section">
-      <div class="modal-section-title"><span>03</span> INTEL SEARCH <span class="modal-opt-badge">OPTIONAL</span></div>
-      <div class="modal-row">
-        <div class="modal-label">SERPAPI KEY</div>
-        <div class="modal-sublabel">serpapi.com → Free 100 searches/month</div>
-        <input class="modal-input" id="key-serpapi" type="password" value="a95593325c3dd0abacbbd6289ab28aaed64cfc8196fbc5c4a8eaf00299bc24ef"/>
-      </div>
-    </div>
-    <div class="modal-section">
-      <div class="modal-section-title"><span>04</span> 3D GLOBE <span class="modal-opt-badge">OPTIONAL</span></div>
-      <div class="modal-row">
-        <div class="modal-label">CESIUM ION TOKEN</div>
-        <div class="modal-sublabel">ion.cesium.com → Free → Access Tokens → Default Token</div>
-        <input class="modal-input" id="key-cesium" type="password" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkNjc2MTQyYi01ZDcyLTQ1OWItOTQxNy1lODczMDhlNWQxMGEiLCJpZCI6NDAxMDkzLCJpYXQiOjE3NzMxMTEzODV9.DhDMm6lcvYFAPfFfr02jxMi8SVW2ptFtz8g6cmknyx0"/>
-      </div>
-    </div>
+  <div id="loc-badge"><span>📍</span><span id="loc-text">Getting your location…</span></div>
 
-    <button class="modal-btn" onclick="saveKeys()">⚡ INITIALIZE COMMAND CENTER</button>
-    <button class="modal-skip" onclick="skipKeys()">LAUNCH WITHOUT API KEYS (LIMITED MODE)</button>
-    <div class="modal-links">
-      <a class="modal-link" href="https://console.anthropic.com" target="_blank">→ ANTHROPIC CONSOLE</a>
-      <a class="modal-link" href="https://finnhub.io" target="_blank">→ FINNHUB</a>
-      <a class="modal-link" href="https://serpapi.com" target="_blank">→ SERPAPI</a>
-    </div>
-  </div>
-</div>
-
-<!-- ══ BOOT ══ -->
-<div id="boot">
-  <div class="boot-logo">AKSHAT <span>INDUSTRIES</span></div>
-  <div class="boot-lines" id="boot-lines">INITIALIZING...</div>
-  <div class="boot-bar-wrap"><div class="boot-bar-fill" id="boot-fill"></div></div>
-  <div class="boot-pct" id="boot-pct">0%</div>
-</div>
-
-<div class="scan-beam"></div>
-<div class="corner tl"></div><div class="corner tr"></div>
-<div class="corner bl"></div>
-
-<!-- ══════════ MAIN HUD ══════════ -->
-<div id="hud">
-
-  <!-- HEADER -->
-  <div class="panel hdr">
-    <div class="logo">AKSHAT <span>INDUSTRIES</span> · AKSHAT COMMAND CENTER</div>
-    <div class="hdr-right">
-      <div class="hstat"><div class="dot"></div>SYSTEMS OK</div>
-      <div class="hstat"><div class="dot y"></div>SHIELDS 84%</div>
-      <div class="hstat"><div class="dot r" style="animation-duration:.6s"></div>THREAT: HIGH</div>
-      <div id="hdr-clock" class="hstat">--:--:--</div>
-    </div>
-  </div>
-
-  <!-- STOCK TICKER STRIP -->
-  <div class="panel stock-strip" style="padding:0 10px;">
-    <div class="sstrip-inner" id="stock-strip-inner">
-      <div class="sstock"><span class="sstock-sym">LOADING MARKET DATA</span></div>
-    </div>
-  </div>
-
-  <!-- ══ LEFT COL ══ -->
-  <div class="left-col">
-
-    <!-- Arc Reactor -->
-    <div class="panel" style="flex-shrink:0;">
-      <div class="pt">ARC REACTOR — MARK XVIII</div>
-      <div class="arc-wrap">
-        <div class="arc-outer">
-          <div class="arc-glow"></div>
-          <svg class="spin" viewBox="0 0 106 106" fill="none"><circle cx="53" cy="53" r="50" stroke="rgba(0,212,255,.12)" stroke-width="1"/><circle cx="53" cy="53" r="50" stroke="#00d4ff" stroke-width="1.5" stroke-dasharray="7 5" opacity=".65"/></svg>
-          <svg class="spinr" viewBox="0 0 106 106" fill="none"><circle cx="53" cy="53" r="43" stroke="#00d4ff" stroke-width="1" stroke-dasharray="4 8" opacity=".4"/><circle cx="53" cy="53" r="37" stroke="rgba(0,212,255,.2)" stroke-width="1.5"/></svg>
-          <svg viewBox="0 0 106 106" fill="none" style="position:absolute;inset:0;">
-            <circle cx="53" cy="53" r="27" stroke="#00d4ff" stroke-width="1.5" opacity=".5"/>
-            <circle cx="53" cy="53" r="17" fill="rgba(0,212,255,.08)" stroke="#00d4ff" stroke-width="1"/>
-            <circle cx="53" cy="53" r="7" fill="rgba(0,212,255,.25)" stroke="#00d4ff" stroke-width="1"/>
-            <line x1="53" y1="26" x2="53" y2="36" stroke="#00d4ff" stroke-width="1" opacity=".6"/>
-            <line x1="53" y1="70" x2="53" y2="80" stroke="#00d4ff" stroke-width="1" opacity=".6"/>
-            <line x1="26" y1="53" x2="36" y2="53" stroke="#00d4ff" stroke-width="1" opacity=".6"/>
-            <line x1="70" y1="53" x2="80" y2="53" stroke="#00d4ff" stroke-width="1" opacity=".6"/>
-          </svg>
-          <div class="arc-core"><div class="arc-pct" id="arc-pct">94%</div><div class="arc-lbl">POWER</div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- System Diagnostics -->
-    <div class="panel" style="flex-shrink:0;">
-      <div class="pt">SYSTEM DIAGNOSTICS</div>
-      <div class="sys-row"><div class="slbl">REPULSOR L</div><div class="sbar"><div class="sfill" id="sf-rl" style="width:92%;background:linear-gradient(90deg,#00d4ff,#0088ff)"></div></div><div class="sval" id="sv-rl">92%</div></div>
-      <div class="sys-row"><div class="slbl">REPULSOR R</div><div class="sbar"><div class="sfill" id="sf-rr" style="width:88%;background:linear-gradient(90deg,#00d4ff,#0088ff)"></div></div><div class="sval" id="sv-rr">88%</div></div>
-      <div class="sys-row"><div class="slbl">THRUST VEC</div><div class="sbar"><div class="sfill" id="sf-th" style="width:76%;background:linear-gradient(90deg,#ffb700,#ff8800)"></div></div><div class="sval" id="sv-th">76%</div></div>
-      <div class="sys-row"><div class="slbl">ARMOR INT.</div><div class="sbar"><div class="sfill" id="sf-ar" style="width:84%;background:linear-gradient(90deg,#00ff88,#00bb55)"></div></div><div class="sval" id="sv-ar">84%</div></div>
-      <div class="sys-row"><div class="slbl">AI CORE</div><div class="sbar"><div class="sfill" style="width:100%;background:linear-gradient(90deg,#00d4ff,#00aaff)"></div></div><div class="sval">100%</div></div>
-      <div class="sys-row"><div class="slbl">WEAPONS</div><div class="sbar"><div class="sfill" id="sf-wp" style="width:62%;background:linear-gradient(90deg,#ff3d3d,#aa0000)"></div></div><div class="sval" id="sv-wp">62%</div></div>
-      <div class="sys-row" style="margin-bottom:0;"><div class="slbl">COMMS ENC</div><div class="sbar"><div class="sfill" style="width:100%;background:linear-gradient(90deg,#00ff88,#00bb55)"></div></div><div class="sval">100%</div></div>
-    </div>
-
-    <!-- Clock -->
-    <div class="panel" style="flex-shrink:0;">
-      <div class="pt">MISSION CLOCK</div>
-      <div class="clk" id="clk">--:--:--</div>
-      <div class="clk-date" id="clk-date">--</div>
-      <div class="uptime-row">
-        <div><div class="uptime-lbl">SESSION</div><div class="uptime-val" id="uptime">00:00:00</div></div>
-        <div style="text-align:right;"><div class="uptime-lbl">COORDINATES</div><div class="uptime-val" style="font-size:7.5px;">40.76°N 111.89°W</div></div>
-      </div>
-    </div>
-
-    <!-- Intel Ticker -->
-    <div class="panel" style="flex-shrink:0;padding:7px 12px;">
-      <div class="pt" style="margin-bottom:3px;">INTEL FEED</div>
-      <div class="intel-ticker-wrap"><div class="intel-ticker-inner" id="intel-ticker"></div></div>
-    </div>
-
-    <!-- Stock Analysis -->
-    <div class="panel stock-analysis-panel" style="flex:1;min-height:0;">
-      <div class="pt">STOCK ANALYSIS</div>
-      <div class="sa-input-row">
-        <input class="sa-input" id="sa-input" placeholder="Type symbol e.g. AAPL" maxlength="8"/>
-        <button class="sa-btn" onclick="analyzeStock()">ANALYZE</button>
-      </div>
-      <div class="sa-loading" id="sa-loading" style="display:none;">SCANNING MARKETS...</div>
-      <div class="sa-result" id="sa-result">
-        <div class="sa-header">
-          <div><div class="sa-sym" id="sa-sym">--</div><div class="sa-name" id="sa-name">--</div></div>
-          <div style="text-align:right;"><div class="sa-price-big" id="sa-price">--</div><div class="sa-chg" id="sa-chg">--</div></div>
-        </div>
-        <div class="sa-chart-wrap"><canvas id="sa-chart"></canvas></div>
-        <div class="sa-stats-grid">
-          <div class="sa-stat"><div class="sa-stat-l">HIGH</div><div class="sa-stat-v" id="sa-high">--</div></div>
-          <div class="sa-stat"><div class="sa-stat-l">LOW</div><div class="sa-stat-v" id="sa-low">--</div></div>
-          <div class="sa-stat"><div class="sa-stat-l">OPEN</div><div class="sa-stat-v" id="sa-open">--</div></div>
-          <div class="sa-stat"><div class="sa-stat-l">PREV</div><div class="sa-stat-v" id="sa-prev">--</div></div>
-          <div class="sa-stat"><div class="sa-stat-l">VOL</div><div class="sa-stat-v" id="sa-vol">--</div></div>
-          <div class="sa-stat"><div class="sa-stat-l">52W H</div><div class="sa-stat-v" id="sa-52h">--</div></div>
-        </div>
-        <div class="sa-signal neut" id="sa-signal">LOADING ANALYSIS...</div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- ══ CENTER COL ══ -->
-  <div class="center-col">
-
-    <!-- Map Panel -->
-    <div class="panel flight-panel" style="padding:8px 10px;">
-      <div class="pt">🌐 GLOBAL INTELLIGENCE MAP</div>
-      <div id="cyber-map" style="flex:1;min-height:0;border-radius:2px;overflow:hidden;position:relative;">
-        <div id="cyber-leaflet" style="position:absolute;inset:0;z-index:1;"></div>
-        <canvas id="cyber-canvas" style="position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;"></canvas>
-        <!-- Search bar overlay -->
-        <div style="position:absolute;top:8px;left:8px;z-index:10;display:flex;gap:6px;align-items:center;">
-          <input id="map-search-input" placeholder="Search location..." maxlength="100"
-            style="background:rgba(0,8,20,.88);border:1px solid rgba(0,212,255,.35);color:#fff;
-                   font-family:'Share Tech Mono',monospace;font-size:9px;padding:5px 10px;
-                   border-radius:2px;outline:none;width:160px;letter-spacing:.06em;
-                   box-shadow:0 0 12px rgba(0,212,255,.15);"
-            onkeydown="if(event.key==='Enter') mapSearch()"/>
-          <button onclick="mapSearch()"
-            style="background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.35);
-                   color:#00d4ff;font-family:'Orbitron',sans-serif;font-size:7px;
-                   letter-spacing:.15em;padding:5px 10px;border-radius:2px;cursor:pointer;">
-            LOCATE
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Energy Graph -->
-    <div class="panel energy-panel">
-      <div class="pt">POWER OUTPUT — ARC REACTOR TELEMETRY (GW)</div>
-      <canvas id="energyGraph"></canvas>
-    </div>
-
-    <!-- Live Market Cards -->
-    <div class="panel markets-panel">
-      <div class="pt">MARKET INTELLIGENCE — LIVE QUOTES</div>
-      <div class="markets-grid" id="markets-grid">
-        <div class="mcard" style="grid-column:1/-1;display:flex;align-items:center;justify-content:center;font-size:8px;color:rgba(0,212,255,.35);letter-spacing:.15em;font-family:'Share Tech Mono',monospace;">LOADING MARKET DATA...</div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- ══ RIGHT COL ══ -->
-  <div class="right-col">
-
-    <!-- JARVIS Chat -->
-    <div class="panel jarvis-panel">
-      <div class="pt">J.A.R.V.I.S. — AI ASSISTANT</div>
-      <div class="chat-messages" id="chat-messages">
-        <div class="msg jarvis">Good evening, Akshat. All systems are operational. How may I assist you?</div>
-      </div>
-      <div class="chat-input-row">
-        <input class="chat-input" id="chat-input" placeholder="Speak to J.A.R.V.I.S..." maxlength="500"/>
-        <button class="chat-send" id="chat-send" onclick="sendJarvis()">SEND</button>
-      </div>
-    </div>
-
-    <!-- Weather -->
-    <div class="panel" style="flex-shrink:0;">
-      <div class="pt">ATMOSPHERIC — SALT LAKE CITY, UT</div>
-      <div style="display:flex;gap:12px;align-items:flex-start;">
-        <div><div class="w-big" id="w-temp">--°</div><div class="w-desc" id="w-desc">LOADING...</div></div>
-        <div class="w-grid" style="flex:1;">
-          <div class="wstat"><div class="wsl">HUMIDITY</div><div class="wsv" id="w-hum">--%</div></div>
-          <div class="wstat"><div class="wsl">WIND</div><div class="wsv" id="w-wind">-- mph</div></div>
-          <div class="wstat"><div class="wsl">VISIBILITY</div><div class="wsv" id="w-vis">-- mi</div></div>
-          <div class="wstat"><div class="wsl">PRESSURE</div><div class="wsv" id="w-pres">-- mb</div></div>
-        </div>
-      </div>
-    </div>
-
-
-    <!-- Threat (Audio Visualizer) -->
-    <div class="panel" style="flex-shrink:0;">
-      <div class="pt">AUDIO VISUALIZER — MIC INPUT</div>
-      <div class="viz-wrap">
-        <div id="viz-status">REQUESTING MICROPHONE ACCESS…</div>
-        <canvas id="viz-canvas"></canvas>
-      </div>
-      <div style="margin-top:6px;font-size:7px;letter-spacing:.12em;color:rgba(0,212,255,.45);text-transform:uppercase;">Mic level animates bars; deny mic to pause.</div>
-    </div>
-
-    <!-- REPULSOR RADAR -->
-    <div class="panel radar-panel">
-      <div class="pt">📡 REPULSOR TARGETING RADAR — MARK L</div>
-      <canvas id="radar-canvas"></canvas>
-    </div>
-
-  </div>
-
-  <!-- ══ BOTTOM BAR ══ -->
-  <div class="bottom-bar">
-    <div class="panel bstat"><div class="bicon">🌡️</div><div><div class="blbl">CORE TEMP</div><div class="bval" id="b-temp">2,847°C</div></div></div>
-    <div class="panel bstat"><div class="bicon">🛰️</div><div><div class="blbl">SATELLITES</div><div class="bval">7 / 9</div></div></div>
-    <div class="panel bstat"><div class="bicon">🚀</div><div><div class="blbl">MAX VELOCITY</div><div class="bval">MACH 3.8</div></div></div>
-    <div class="panel bstat"><div class="bicon">📡</div><div><div class="blbl">UPLINK STATUS</div><div class="bval" style="color:var(--cg);">SECURE</div></div></div>
-  </div>
-
-</div>
-
-<script>
-// ═══════════════════════════════════════
-//  CONFIG STORE
-// ═══════════════════════════════════════
-let KEYS = {
-  anthropic: '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',
-  finnhub:   'd6meaahr01qi0ajltq0gd6meaahr01qi0ajltq10',
-  serpapi:   'a95593325c3dd0abacbbd6289ab28aaed64cfc8196fbc5c4a8eaf00299bc24ef'
-};
-const SESSION_START = Date.now();
-const STOCK_SYMS = ['AAPL','TSLA','NVDA','MSFT','AMZN','SPY'];
-
-
-// ═══════════════════════════════════════
-//  SETUP MODAL
-// ═══════════════════════════════════════
-function saveKeys() {
-  KEYS.anthropic = document.getElementById('key-anthropic').value.trim();
-  KEYS.finnhub   = document.getElementById('key-finnhub').value.trim();
-  KEYS.serpapi   = document.getElementById('key-serpapi').value.trim();
-  KEYS.cesium    = document.getElementById('key-cesium').value.trim();
-  document.getElementById('setup-modal').classList.add('hidden');
-  startBoot();
-}
-function skipKeys() {
-  document.getElementById('setup-modal').classList.add('hidden');
-  startBoot();
-}
-
-// ═══════════════════════════════════════
-//  BOOT
-// ═══════════════════════════════════════
-const BOOT_LINES = [
-  'INITIALIZING AKSHAT OS v14.8.2...','LOADING KERNEL MODULES...','CALIBRATING REPULSORS L+R...',
-  'ARC REACTOR — POWER NOMINAL...','ESTABLISHING SECURE UPLINK...','CONNECTING FINNHUB MARKET FEEDS...',
-  'LOADING ATMOSPHERIC SENSORS...','J.A.R.V.I.S. AI CORE ONLINE...','SERPAPI INTEL SEARCH ARMED...',
-  'AKSHAT COMMAND CENTER ACTIVATED ✓',
-];
-function startBoot() {
-  const bootEl = document.getElementById('boot');
-  bootEl.style.display = 'flex';
-  const fill = document.getElementById('boot-fill');
-  const pctEl = document.getElementById('boot-pct');
-  const linesEl = document.getElementById('boot-lines');
-  let p = 0;
-  const iv = setInterval(() => {
-    p += Math.random() * 3 + 0.8;
-    if (p >= 100) { p = 100; clearInterval(iv); }
-    fill.style.width = p + '%';
-    pctEl.textContent = Math.floor(p) + '%';
-    linesEl.textContent = BOOT_LINES[Math.min(Math.floor(p / 10), BOOT_LINES.length - 1)];
-    if (p >= 100) {
-      setTimeout(() => {
-        bootEl.classList.add('fade');
-        document.getElementById('hud').classList.add('visible');
-        setTimeout(() => bootEl.style.display = 'none', 900);
-        initAll();
-      }, 500);
-    }
-  }, 45);
-}
-
-// ═══════════════════════════════════════
-//  INIT ALL
-// ═══════════════════════════════════════
-function initAll() {
-  initClock(); initUptime(); initWeather();
-  initStocks(); initMapPanel(); initEnergyGraph();
-  initIntelTicker(); initJarvisAuto(); initFluctuations();
-}
-
-// ═══════════════════════════════════════
-//  CLOCK
-// ═══════════════════════════════════════
-function initClock() {
-  const tick = () => {
-    const n = new Date();
-    const t = n.toLocaleTimeString('en-US',{hour12:false});
-    document.getElementById('clk').textContent = t;
-    document.getElementById('hdr-clock').textContent = t;
-    document.getElementById('clk-date').textContent = n.toLocaleDateString('en-US',{weekday:'short',year:'numeric',month:'short',day:'numeric'}).toUpperCase();
-  };
-  tick(); setInterval(tick, 1000);
-}
-function initUptime() {
-  setInterval(() => {
-    const s = Math.floor((Date.now() - SESSION_START) / 1000);
-    document.getElementById('uptime').textContent =
-      [Math.floor(s/3600), Math.floor((s%3600)/60), s%60].map(v=>String(v).padStart(2,'0')).join(':');
-  }, 1000);
-}
-
-// ═══════════════════════════════════════
-//  WEATHER
-// ═══════════════════════════════════════
-async function initWeather() {
-  try {
-    const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=40.7608&longitude=-111.891&current=temperature_2m,relative_humidity_2m,wind_speed_10m,surface_pressure,visibility,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph');
-    const d = await r.json(); const c = d.current;
-    document.getElementById('w-temp').textContent = Math.round(c.temperature_2m) + '°F';
-    document.getElementById('w-hum').textContent  = c.relative_humidity_2m + '%';
-    document.getElementById('w-wind').textContent = Math.round(c.wind_speed_10m) + ' mph';
-    document.getElementById('w-vis').textContent  = (c.visibility/1609.34).toFixed(1) + ' mi';
-    document.getElementById('w-pres').textContent = Math.round(c.surface_pressure) + ' mb';
-    const WD={0:'CLEAR',1:'MAINLY CLEAR',2:'PARTLY CLOUDY',3:'OVERCAST',45:'FOGGY',51:'LT DRIZZLE',61:'LIGHT RAIN',63:'MOD RAIN',65:'HEAVY RAIN',71:'LT SNOW',73:'MOD SNOW',80:'SHOWERS',95:'THUNDERSTORM'};
-    document.getElementById('w-desc').textContent = WD[c.weather_code] || 'UNKNOWN';
-  } catch(e) {
-    document.getElementById('w-temp').textContent = 'N/A';
-    document.getElementById('w-desc').textContent = 'UPLINK FAILED';
-  }
-}
-
-// ═══════════════════════════════════════
-//  STOCKS — Finnhub
-// ═══════════════════════════════════════
-let stockCache = {};
-async function initStocks() {
-  await fetchAllQuotes();
-  setInterval(fetchAllQuotes, 30000);
-}
-
-async function fetchQuote(sym) {
-  if (!KEYS.finnhub) return null;
-  try {
-    const [qr, pr] = await Promise.all([
-      fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${KEYS.finnhub}`),
-      fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${sym}&token=${KEYS.finnhub}`)
-    ]);
-    const q = await qr.json();
-    const p = await pr.json();
-    if (!q.c) return null;
-    return {
-      sym, price: q.c, change: q.d, changePct: q.dp,
-      high: q.h, low: q.l, open: q.o, prev: q.pc,
-      name: p.name || sym, high52: q.h, vol: '--'
-    };
-  } catch(e) { return null; }
-}
-
-async function fetchAllQuotes() {
-  if (!KEYS.finnhub) { renderFallbackStrip(); renderFallbackCards(); return; }
-  const results = await Promise.all(STOCK_SYMS.map(s => fetchQuote(s)));
-  results.forEach(r => { if(r) stockCache[r.sym] = r; });
-  renderStockStrip();
-  renderMarketCards();
-}
-
-function renderStockStrip() {
-  const inner = document.getElementById('stock-strip-inner');
-  const items = [...STOCK_SYMS, ...STOCK_SYMS];
-  inner.innerHTML = items.map(sym => {
-    const s = stockCache[sym];
-    if (!s) return `<div class="sstock"><span class="sstock-sym">${sym}</span><span class="sstock-price" style="color:rgba(0,212,255,.4)">---</span></div>`;
-    const up = s.change >= 0;
-    return `<div class="sstock">
-      <span class="sstock-sym">${sym}</span>
-      <span class="sstock-price">$${s.price.toFixed(2)}</span>
-      <span class="sstock-chg ${up?'pos':'neg'}">${up?'+':''}${s.change.toFixed(2)} (${up?'+':''}${s.changePct.toFixed(2)}%)</span>
-    </div>`;
-  }).join('');
-}
-
-function renderFallbackStrip() {
-  const fallback = [{sym:'AAPL',p:189.3,c:1.24},{sym:'TSLA',p:172.5,c:-3.11},{sym:'NVDA',p:875.4,c:12.6},{sym:'MSFT',p:415.1,c:2.30},{sym:'AMZN',p:186.6,c:0.88},{sym:'SPY',p:518.2,c:1.10}];
-  const inner = document.getElementById('stock-strip-inner');
-  inner.innerHTML = [...fallback,...fallback].map(s=>`<div class="sstock"><span class="sstock-sym">${s.sym}</span><span class="sstock-price">$${s.p.toFixed(2)}</span><span class="sstock-chg ${s.c>=0?'pos':'neg'}">${s.c>=0?'+':''}${s.c.toFixed(2)}</span></div>`).join('');
-}
-
-function renderMarketCards() {
-  const grid = document.getElementById('markets-grid');
-  grid.innerHTML = STOCK_SYMS.map(sym => {
-    const s = stockCache[sym];
-    if (!s) return `<div class="mcard"><div class="mcard-sym">${sym}</div><div style="font-size:8px;color:rgba(0,212,255,.3);font-family:'Share Tech Mono',monospace;margin-top:4px;">NO DATA</div></div>`;
-    const up = s.change >= 0;
-    const sign = up?'+':'';
-    const sig = s.changePct > 1.5 ? 'BULLISH' : s.changePct < -1.5 ? 'BEARISH' : 'NEUTRAL';
-    const sigC = sig==='BULLISH'?'var(--cg)':sig==='BEARISH'?'var(--cr)':'var(--cy)';
-    return `<div class="mcard">
+  <div id="preview-card">
+    <div class="pc-top">
       <div>
-        <div class="mcard-sym">${sym}</div>
-        <div class="mcard-price">$${s.price.toFixed(2)}</div>
-        <div class="mcard-chg ${up?'pos':'neg'}">${sign}${s.change.toFixed(2)} (${sign}${s.changePct.toFixed(2)}%)</div>
+        <div class="pc-temp" id="pc-temp">—°</div>
+        <div style="font-size:12px;color:rgba(180,210,255,0.45);margin-top:4px" id="pc-hl">H:—° L:—°</div>
       </div>
-      <div class="mcard-sig" style="color:${sigC}">▶ ${sig}</div>
-      <canvas id="spark-${sym}" height="24"></canvas>
-    </div>`;
-  }).join('');
-  setTimeout(() => STOCK_SYMS.forEach(sym => drawSparkline(sym, stockCache[sym])), 60);
+      <div class="pc-right">
+        <div class="pc-icon" id="pc-icon">🌤️</div>
+        <div class="pc-cond" id="pc-cond">Loading…</div>
+        <div class="pc-loc" id="pc-loc">—</div>
+      </div>
+    </div>
+    <div class="pc-stats">
+      <div class="pc-stat"><div class="pc-stat-val" id="pc-wind">—</div><div class="pc-stat-lbl">Wind mph</div></div>
+      <div class="pc-stat"><div class="pc-stat-val" id="pc-humid">—%</div><div class="pc-stat-lbl">Humidity</div></div>
+      <div class="pc-stat"><div class="pc-stat-val" id="pc-uv">—</div><div class="pc-stat-lbl">UV Index</div></div>
+    </div>
+  </div>
+
+  <button id="start-btn">🌤️ ENTER AR WEATHER</button>
+  <p id="err-msg"></p>
+  <p style="font-size:11px;color:rgba(255,255,255,0.18);text-align:center">Requires Android Chrome + ARCore</p>
+</div>
+
+<!-- ══ AR UI ═══════════════════════════════════════════ -->
+<div id="ui">
+  <div id="calibrating">
+    <div class="cal-ring"></div>
+    <p>Point your camera at the sky or ahead — placing weather cards…</p>
+  </div>
+
+  <div id="top-bar">
+    <div id="location-pill">📍 <span id="ar-loc-text">—</span></div>
+  </div>
+
+  <div id="tap-hint">Tap cards to expand · Pinch to resize</div>
+  <button id="refresh-btn">🔄 Refresh</button>
+  <button id="exit-btn">✕ Exit</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════
+   AR WEATHER  —  WebXR + Three.js
+   Live data: Open-Meteo (free, no API key)
+   Reverse geocode: Nominatim (free)
+   Floating weather cards anchored in AR sky
+═══════════════════════════════════════════════════════ */
+
+let scene, camera, renderer, clock;
+let xrSession = null, hitTestSource = null;
+let calibrated = false;
+let cardGroup  = null;
+let userLat = null, userLng = null;
+let weatherData = null;
+let locationName = '';
+
+// Card state
+let expandedCard = -1;
+const CARDS = ['main','hourly','wind','sun'];
+
+// ── WEATHER API (Open-Meteo) ──────────────────────────
+async function fetchWeather(lat, lng) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}`
+    + `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,uv_index,precipitation`
+    + `&hourly=temperature_2m,weather_code,precipitation_probability`
+    + `&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,uv_index_max`
+    + `&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto&forecast_days=3`;
+  const res  = await fetch(url);
+  return await res.json();
 }
 
-function renderFallbackCards() {
-  const fallback = [{sym:'AAPL',price:189.3,change:1.24,changePct:0.66},{sym:'TSLA',price:172.5,change:-3.11,changePct:-1.77},{sym:'NVDA',price:875.4,change:12.6,changePct:1.46},{sym:'MSFT',price:415.1,change:2.30,changePct:0.56},{sym:'AMZN',price:186.6,change:0.88,changePct:0.47},{sym:'SPY',price:518.2,change:1.10,changePct:0.21}];
-  fallback.forEach(s => stockCache[s.sym] = s);
-  renderMarketCards();
+async function reverseGeocode(lat, lng) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,{ headers:{'Accept-Language':'en'} });
+    const d = await r.json();
+    const a = d.address || {};
+    return a.city || a.town || a.village || a.county || a.state || 'Your Location';
+  } catch { return 'Your Location'; }
 }
 
-function drawSparkline(sym, s) {
-  const c = document.getElementById('spark-'+sym);
-  if (!c) return;
-  c.width = c.offsetWidth || 80;
-  const ctx = c.getContext('2d');
-  const pts = [];
-  let v = s ? s.price - (s.change||0) : 100;
-  for (let i=0;i<30;i++) { v += (Math.random()-.47)*(Math.abs(s&&s.change?s.change:1)/6); pts.push(v); }
-  pts.push(s ? s.price : v);
-  const min=Math.min(...pts), max=Math.max(...pts), W=c.width, H=24;
-  const up = s && s.change >= 0;
-  const grad = ctx.createLinearGradient(0,0,0,H);
-  grad.addColorStop(0, up?'rgba(0,255,136,.25)':'rgba(255,61,61,.25)');
-  grad.addColorStop(1,'transparent');
+function wmoIcon(code) {
+  if (code === 0)           return '☀️';
+  if (code <= 2)            return '⛅';
+  if (code === 3)           return '☁️';
+  if (code <= 49)           return '🌫️';
+  if (code <= 59)           return '🌦️';
+  if (code <= 69)           return '🌧️';
+  if (code <= 79)           return '🌨️';
+  if (code <= 84)           return '🌧️';
+  if (code <= 94)           return '⛈️';
+  return '🌩️';
+}
+function wmoDesc(code) {
+  if (code === 0)  return 'Clear Sky';
+  if (code <= 2)   return 'Partly Cloudy';
+  if (code === 3)  return 'Overcast';
+  if (code <= 49)  return 'Foggy';
+  if (code <= 59)  return 'Drizzle';
+  if (code <= 69)  return 'Rainy';
+  if (code <= 79)  return 'Snowy';
+  if (code <= 84)  return 'Heavy Rain';
+  if (code <= 94)  return 'Thunderstorm';
+  return 'Stormy';
+}
+function windDir(deg) {
+  const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+  return dirs[Math.round(deg/45) % 8];
+}
+
+// ── CANVAS CARD TEXTURES ──────────────────────────────
+// Each card is a canvas drawn texture on a PlaneGeometry
+
+function makeCardTexture(drawFn, w=512, h=300) {
+  const cv  = document.createElement('canvas');
+  cv.width  = w; cv.height = h;
+  const ctx = cv.getContext('2d');
+  drawFn(ctx, cv);
+  const tex = new THREE.CanvasTexture(cv);
+  return { tex, cv, ctx };
+}
+
+function glassBg(ctx, w, h, r=32) {
+  // Frosted glass look: subtle gradient + rounded corners
+  ctx.clearRect(0,0,w,h);
+  const grad = ctx.createLinearGradient(0,0,0,h);
+  grad.addColorStop(0, 'rgba(30,60,120,0.72)');
+  grad.addColorStop(1, 'rgba(10,25,70,0.82)');
+  ctx.fillStyle = grad;
+  rrect(ctx,2,2,w-4,h-4,r); ctx.fill();
+  // Border
+  ctx.strokeStyle = 'rgba(120,180,255,0.22)';
+  ctx.lineWidth   = 1.5;
+  rrect(ctx,2,2,w-4,h-4,r); ctx.stroke();
+  // Shine strip at top
+  const shine = ctx.createLinearGradient(0,0,0,h*0.35);
+  shine.addColorStop(0,'rgba(255,255,255,0.08)');
+  shine.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = shine;
+  rrect(ctx,2,2,w-4,h*0.35,r); ctx.fill();
+}
+
+function rrect(ctx,x,y,w,h,r){
   ctx.beginPath();
-  pts.forEach((p,i)=>{ const x=i/(pts.length-1)*W, y=H-((p-min)/(max-min||1))*(H-4)-2; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
-  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
-  ctx.fillStyle=grad; ctx.fill();
-  ctx.beginPath();
-  pts.forEach((p,i)=>{ const x=i/(pts.length-1)*W, y=H-((p-min)/(max-min||1))*(H-4)-2; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
-  ctx.strokeStyle = up?'var(--cg)':'var(--cr)'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
 }
 
-// ═══════════════════════════════════════
-//  STOCK ANALYSIS — Finnhub
-// ═══════════════════════════════════════
-document.getElementById('sa-input').addEventListener('keydown', e => { if(e.key==='Enter') analyzeStock(); });
+// ── CARD 1: MAIN WEATHER ─────────────────────────────
+function drawMainCard(ctx, cv) {
+  const W=cv.width, H=cv.height;
+  glassBg(ctx,W,H,36);
+  const c = weatherData.current;
+  const d = weatherData.daily;
 
-async function analyzeStock() {
-  const sym = document.getElementById('sa-input').value.trim().toUpperCase();
-  if (!sym) return;
-  document.getElementById('sa-result').classList.remove('visible');
-  document.getElementById('sa-loading').style.display = 'block';
+  // Big icon
+  ctx.font = '72px serif'; ctx.textAlign = 'left';
+  ctx.fillText(wmoIcon(c.weather_code), 36, 100);
 
-  if (!KEYS.finnhub) {
-    document.getElementById('sa-loading').style.display = 'none';
-    showStockAnalysisFallback(sym);
-    return;
+  // Temperature
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 86px Manrope,Arial';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${Math.round(c.temperature_2m)}°`, W-36, 108);
+
+  // Condition
+  ctx.font = '500 28px Manrope,Arial';
+  ctx.fillStyle = 'rgba(180,215,255,0.85)';
+  ctx.textAlign = 'right';
+  ctx.fillText(wmoDesc(c.weather_code), W-36, 146);
+
+  // Location
+  ctx.font = '400 22px Manrope,Arial';
+  ctx.fillStyle = 'rgba(150,195,255,0.55)';
+  ctx.fillText(locationName, W-36, 178);
+
+  // Divider
+  ctx.strokeStyle = 'rgba(120,180,255,0.18)';
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(32,200); ctx.lineTo(W-32,200); ctx.stroke();
+
+  // Bottom stats row
+  const stats = [
+    { label:'Feels Like', val:`${Math.round(c.apparent_temperature)}°` },
+    { label:'Humidity',   val:`${c.relative_humidity_2m}%` },
+    { label:'Precip',     val:`${c.precipitation}"` },
+  ];
+  stats.forEach((s,i) => {
+    const x = 52 + i*(W-64)/3 + (W-64)/6;
+    ctx.font = 'bold 26px Manrope,Arial'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+    ctx.fillText(s.val, x, 244);
+    ctx.font = '400 18px Manrope,Arial'; ctx.fillStyle='rgba(150,195,255,0.5)';
+    ctx.fillText(s.label, x, 270);
+  });
+}
+
+// ── CARD 2: HOURLY FORECAST ───────────────────────────
+function drawHourlyCard(ctx, cv) {
+  const W=cv.width, H=cv.height;
+  glassBg(ctx,W,H,36);
+
+  ctx.fillStyle='rgba(180,215,255,0.7)';
+  ctx.font='600 22px Manrope,Arial'; ctx.textAlign='left';
+  ctx.fillText('NEXT 6 HOURS', 36, 46);
+
+  const now  = new Date().getHours();
+  const hrs  = weatherData.hourly;
+  // Find current hour index
+  const idx  = hrs.time.findIndex(t => new Date(t).getHours() >= now);
+  const slots = 6;
+  const colW  = (W-48) / slots;
+
+  for (let i = 0; i < slots; i++) {
+    const hi   = (idx + i) % hrs.time.length;
+    const temp = Math.round(hrs.temperature_2m[hi]);
+    const code = hrs.weather_code[hi];
+    const pop  = hrs.precipitation_probability[hi];
+    const hour = new Date(hrs.time[hi]).getHours();
+    const label= hour === 0 ? '12a' : hour < 12 ? `${hour}a` : hour === 12 ? '12p' : `${hour-12}p`;
+    const cx   = 24 + i*colW + colW/2;
+
+    // Hour label
+    ctx.font='400 17px Manrope,Arial'; ctx.fillStyle='rgba(150,195,255,0.55)'; ctx.textAlign='center';
+    ctx.fillText(i===0?'Now':label, cx, 82);
+    // Icon
+    ctx.font='28px serif';
+    ctx.fillText(wmoIcon(code), cx-14, 124);
+    // Temp
+    ctx.font='bold 22px Manrope,Arial'; ctx.fillStyle='#fff';
+    ctx.fillText(`${temp}°`, cx, 162);
+    // Rain %
+    if(pop > 0) {
+      ctx.font='400 15px Manrope,Arial'; ctx.fillStyle='rgba(100,180,255,0.6)';
+      ctx.fillText(`${pop}%`, cx, 184);
+    }
   }
 
+  // Mini temp chart
+  const temps = Array.from({length:slots},(_,i)=>Math.round(hrs.temperature_2m[(idx+i)%hrs.time.length]));
+  const tMin  = Math.min(...temps), tMax = Math.max(...temps);
+  const chartY = 230, chartH = 40, pad = 24+colW/2;
+  ctx.strokeStyle='rgba(100,180,255,0.5)'; ctx.lineWidth=2;
+  ctx.beginPath();
+  temps.forEach((t,i) => {
+    const x = pad + i*colW;
+    const y = chartY + chartH - ((t-tMin)/(tMax-tMin||1))*chartH;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  // Dots on chart
+  ctx.fillStyle='rgba(100,180,255,0.8)';
+  temps.forEach((t,i) => {
+    const x=pad+i*colW, y=chartY+chartH-((t-tMin)/(tMax-tMin||1))*chartH;
+    ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+  });
+}
+
+// ── CARD 3: WIND & UV ─────────────────────────────────
+function drawWindCard(ctx, cv) {
+  const W=cv.width, H=cv.height;
+  glassBg(ctx,W,H,36);
+  const c = weatherData.current;
+  const d = weatherData.daily;
+
+  ctx.fillStyle='rgba(180,215,255,0.7)';
+  ctx.font='600 22px Manrope,Arial'; ctx.textAlign='left';
+  ctx.fillText('WIND & ATMOSPHERE', 36, 46);
+
+  // Wind compass circle
+  const cx=130, cy=170, cr=72;
+  ctx.strokeStyle='rgba(100,180,255,0.2)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(cx,cy,cr,0,Math.PI*2); ctx.stroke();
+  // Compass ticks
+  for(let a=0;a<360;a+=45){
+    const rad=(a-90)*Math.PI/180;
+    const inner=cr-8, outer=cr+2;
+    ctx.strokeStyle='rgba(100,180,255,0.4)'; ctx.lineWidth=a%90===0?2:1;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(rad)*inner, cy+Math.sin(rad)*inner);
+    ctx.lineTo(cx+Math.cos(rad)*outer, cy+Math.sin(rad)*outer);
+    ctx.stroke();
+  }
+  // N S E W labels
+  [['N',0],['E',90],['S',180],['W',270]].forEach(([l,a])=>{
+    const rad=(a-90)*Math.PI/180;
+    ctx.font='bold 16px Manrope,Arial'; ctx.fillStyle='rgba(150,200,255,0.6)'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(l, cx+Math.cos(rad)*(cr+18), cy+Math.sin(rad)*(cr+18));
+  });
+  ctx.textBaseline='alphabetic';
+  // Wind arrow
+  const windRad = (c.wind_direction_10m-90)*Math.PI/180;
+  ctx.strokeStyle='#60b8ff'; ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(cx-Math.cos(windRad)*cr*0.6, cy-Math.sin(windRad)*cr*0.6);
+  ctx.lineTo(cx+Math.cos(windRad)*cr*0.6, cy+Math.sin(windRad)*cr*0.6);
+  ctx.stroke();
+  // Arrow head
+  ctx.fillStyle='#60b8ff';
+  const hx=cx+Math.cos(windRad)*cr*0.6, hy=cy+Math.sin(windRad)*cr*0.6;
+  ctx.beginPath();
+  ctx.moveTo(hx,hy);
+  ctx.lineTo(hx-Math.cos(windRad-0.4)*14,hy-Math.sin(windRad-0.4)*14);
+  ctx.lineTo(hx-Math.cos(windRad+0.4)*14,hy-Math.sin(windRad+0.4)*14);
+  ctx.closePath(); ctx.fill();
+  // Center dot
+  ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+
+  // Wind stats
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.font='bold 36px Manrope,Arial'; ctx.fillStyle='#fff';
+  ctx.fillText(`${Math.round(c.wind_speed_10m)}`, cx+cr+24, 140);
+  ctx.font='400 18px Manrope,Arial'; ctx.fillStyle='rgba(150,195,255,0.5)';
+  ctx.fillText('mph', cx+cr+24, 164);
+  ctx.font='500 20px Manrope,Arial'; ctx.fillStyle='rgba(180,215,255,0.75)';
+  ctx.fillText(windDir(c.wind_direction_10m), cx+cr+24, 196);
+
+  // UV bar
+  ctx.font='600 18px Manrope,Arial'; ctx.fillStyle='rgba(180,215,255,0.6)';
+  ctx.fillText('UV INDEX', cx+cr+24, 238);
+  const uv = d.uv_index_max[0], uvMax=11;
+  const bx=cx+cr+24, bw=W-bx-32, by=252, bh=10;
+  ctx.fillStyle='rgba(255,255,255,0.08)';
+  rrect(ctx,bx,by,bw,bh,5); ctx.fill();
+  const uvColor=uv<3?'#34c759':uv<6?'#ffd60a':uv<8?'#ff9f0a':uv<11?'#ff453a':'#bf5af2';
+  ctx.fillStyle=uvColor;
+  rrect(ctx,bx,by,Math.min(uv/uvMax,1)*bw,bh,5); ctx.fill();
+  ctx.font='bold 20px Manrope,Arial'; ctx.fillStyle='#fff';
+  ctx.fillText(`${Math.round(uv)}`, bx+Math.min(uv/uvMax,1)*bw-24, by-6);
+}
+
+// ── CARD 4: SUNRISE / FORECAST ────────────────────────
+function drawSunCard(ctx, cv) {
+  const W=cv.width, H=cv.height;
+  glassBg(ctx,W,H,36);
+  const d = weatherData.daily;
+
+  ctx.fillStyle='rgba(180,215,255,0.7)';
+  ctx.font='600 22px Manrope,Arial'; ctx.textAlign='left';
+  ctx.fillText('3-DAY FORECAST', 36, 46);
+
+  // Sunrise / Sunset row
+  const rise   = new Date(d.sunrise[0]);
+  const set_   = new Date(d.sunset[0]);
+  const fmt    = t => `${t.getHours()%12||12}:${String(t.getMinutes()).padStart(2,'0')} ${t.getHours()>=12?'PM':'AM'}`;
+
+  ctx.font='32px serif'; ctx.textAlign='center';
+  ctx.fillText('🌅', W/4, 95);
+  ctx.fillText('🌇', 3*W/4, 95);
+  ctx.font='bold 22px Manrope,Arial'; ctx.fillStyle='#fff';
+  ctx.fillText(fmt(rise), W/4, 126);
+  ctx.fillText(fmt(set_), 3*W/4, 126);
+  ctx.font='400 16px Manrope,Arial'; ctx.fillStyle='rgba(150,195,255,0.5)';
+  ctx.fillText('Sunrise', W/4, 148);
+  ctx.fillText('Sunset',  3*W/4, 148);
+
+  // Divider
+  ctx.strokeStyle='rgba(120,180,255,0.15)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(32,166); ctx.lineTo(W-32,166); ctx.stroke();
+
+  // 3-day rows
+  const days = ['Today','Tomorrow',['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d.time[2]).getDay()]];
+  for(let i=0;i<3;i++){
+    const y   = 196 + i*52;
+    const colW= (W-64)/3;
+    // Day name
+    ctx.font='500 20px Manrope,Arial'; ctx.fillStyle='rgba(180,215,255,0.75)'; ctx.textAlign='left';
+    ctx.fillText(days[i], 36, y+16);
+    // Icon
+    ctx.font='26px serif'; ctx.textAlign='center';
+    ctx.fillText(wmoIcon(d.weather_code[i]), W/2, y+18);
+    // High / Low
+    ctx.font='bold 22px Manrope,Arial'; ctx.fillStyle='#fff'; ctx.textAlign='right';
+    ctx.fillText(`${Math.round(d.temperature_2m_max[i])}°`, W-64, y+18);
+    ctx.font='400 18px Manrope,Arial'; ctx.fillStyle='rgba(150,195,255,0.45)';
+    ctx.fillText(`${Math.round(d.temperature_2m_min[i])}°`, W-30, y+18);
+    // Precip bar
+    if(d.precipitation_sum[i]>0){
+      ctx.fillStyle='rgba(100,180,255,0.3)';
+      rrect(ctx,36,y+26,Math.min(d.precipitation_sum[i]/0.5,1)*(W*0.3),6,3); ctx.fill();
+    }
+  }
+}
+
+// ── BUILD AR CARD GROUP ───────────────────────────────
+function buildCards() {
+  if(cardGroup){ scene.remove(cardGroup); }
+  cardGroup = new THREE.Group();
+
+  const drawFns  = [drawMainCard, drawHourlyCard, drawWindCard, drawSunCard];
+  const cardW    = 0.55, cardH = 0.33;
+  // Layout: 2x2 grid floating in the sky
+  const positions = [
+    [-cardW*0.55,  cardH*0.55, 0],   // top-left: main
+    [ cardW*0.55,  cardH*0.55, 0],   // top-right: hourly
+    [-cardW*0.55, -cardH*0.55, 0],   // bot-left: wind
+    [ cardW*0.55, -cardH*0.55, 0],   // bot-right: sun
+  ];
+
+  drawFns.forEach((fn, i) => {
+    const { tex } = makeCardTexture(fn, 512, 300);
+    const geo = new THREE.PlaneGeometry(cardW, cardH);
+    const mat = new THREE.MeshBasicMaterial({ map:tex, transparent:true, side:THREE.DoubleSide, depthWrite:false });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(...positions[i]);
+    mesh.userData.cardIdx = i;
+    mesh.userData.basePos = [...positions[i]];
+    cardGroup.add(mesh);
+  });
+
+  cardGroup.visible = false;
+  scene.add(cardGroup);
+}
+
+// ── THREE.JS INIT ─────────────────────────────────────
+function init() {
+  clock  = new THREE.Clock();
+  scene  = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.01, 50);
+  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.xr.enabled = true;
+  document.body.insertBefore(renderer.domElement, document.getElementById('ui'));
+  scene.add(new THREE.AmbientLight(0xffffff, 2));
+  renderer.xr.addEventListener('sessionstart', onSessionStart);
+  renderer.setAnimationLoop(render);
+  window.addEventListener('resize', onResize);
+}
+
+// ── SESSION START ─────────────────────────────────────
+async function onSessionStart() {
+  xrSession = renderer.xr.getSession();
+  xrSession.addEventListener('end', onSessionEnd);
+  // Place cards after short calibration
+  setTimeout(placeCards, 2200);
+}
+
+function placeCards() {
+  // Position the card group 2m ahead, 0.2m above eye level — "in the sky"
+  const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+  dir.y = 0; dir.normalize();
+  const pos = new THREE.Vector3().copy(camera.position).addScaledVector(dir, 2.2);
+  pos.y = camera.position.y + 0.2;
+  cardGroup.position.copy(pos);
+  // Face the camera (billboard)
+  cardGroup.lookAt(camera.position);
+  cardGroup.visible = true;
+  calibrated = true;
+
+  const cal = document.getElementById('calibrating');
+  cal.classList.add('hidden');
+  setTimeout(()=> cal.style.display='none', 900);
+  document.getElementById('tap-hint').style.opacity = '1';
+}
+
+// ── RENDER LOOP ───────────────────────────────────────
+function render(ts, frame) {
+  const t = clock.getElapsedTime();
+
+  if (cardGroup && cardGroup.visible) {
+    // Gently face camera
+    cardGroup.lookAt(camera.position);
+
+    // Breathe / float each card independently
+    cardGroup.children.forEach((card, i) => {
+      const base = card.userData.basePos;
+      const phase = i * Math.PI / 2;
+      card.position.x = base[0] + Math.sin(t*0.7 + phase)*0.006;
+      card.position.y = base[1] + Math.sin(t*0.9 + phase)*0.008;
+      card.position.z = base[2] + Math.sin(t*0.5 + phase)*0.004;
+      // Subtle scale pulse
+      const sc = 1 + Math.sin(t*1.1 + phase)*0.008;
+      card.scale.setScalar(sc);
+    });
+
+    // Whole group gentle drift
+    cardGroup.position.y += Math.sin(t*0.4)*0.0002;
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ── SESSION END ───────────────────────────────────────
+function onSessionEnd() {
+  xrSession = null; calibrated = false;
+  if(cardGroup) cardGroup.visible = false;
+  document.getElementById('ui').classList.remove('active');
+  document.getElementById('start').style.display = 'flex';
+  document.getElementById('calibrating').classList.remove('hidden');
+  document.getElementById('calibrating').style.display = 'flex';
+}
+
+function onResize() {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+
+// ── LOAD WEATHER THEN POPULATE UI ─────────────────────
+async function loadWeather() {
+  if (!userLat) return;
   try {
-    const now = Math.floor(Date.now()/1000);
-    const from = now - 86400; // last 24h
-    const [qRes, pRes, cRes] = await Promise.all([
-      fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${KEYS.finnhub}`),
-      fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${sym}&token=${KEYS.finnhub}`),
-      fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${sym}&resolution=15&from=${from}&to=${now}&token=${KEYS.finnhub}`)
+    [weatherData, locationName] = await Promise.all([
+      fetchWeather(userLat, userLng),
+      reverseGeocode(userLat, userLng),
     ]);
-    const q = await qRes.json();
-    const p = await pRes.json();
-    const candles = await cRes.json();
 
-    document.getElementById('sa-loading').style.display = 'none';
-    if (!q.c || q.c === 0) { showStockError(sym); return; }
+    const c = weatherData.current;
+    const d = weatherData.daily;
 
-    const up = q.d >= 0;
-    const sign = up ? '+' : '';
-    document.getElementById('sa-sym').textContent   = sym;
-    document.getElementById('sa-name').textContent  = p.name || sym;
-    document.getElementById('sa-price').textContent = '$' + q.c.toFixed(2);
-    document.getElementById('sa-price').style.color = up ? 'var(--cg)' : 'var(--cr)';
-    document.getElementById('sa-chg').textContent   = `${sign}${q.d.toFixed(2)} (${sign}${q.dp.toFixed(2)}%)`;
-    document.getElementById('sa-chg').className     = 'sa-chg ' + (up?'pos':'neg');
-    document.getElementById('sa-high').textContent  = '$' + q.h.toFixed(2);
-    document.getElementById('sa-low').textContent   = '$' + q.l.toFixed(2);
-    document.getElementById('sa-open').textContent  = '$' + q.o.toFixed(2);
-    document.getElementById('sa-prev').textContent  = '$' + q.pc.toFixed(2);
-    document.getElementById('sa-vol').textContent   = '--';
-    document.getElementById('sa-52h').textContent   = '$' + q.h.toFixed(2);
+    // Start screen preview
+    document.getElementById('start-icon').textContent   = wmoIcon(c.weather_code);
+    document.getElementById('pc-temp').textContent      = `${Math.round(c.temperature_2m)}°`;
+    document.getElementById('pc-hl').textContent        = `H:${Math.round(d.temperature_2m_max[0])}° L:${Math.round(d.temperature_2m_min[0])}°`;
+    document.getElementById('pc-icon').textContent      = wmoIcon(c.weather_code);
+    document.getElementById('pc-cond').textContent      = wmoDesc(c.weather_code);
+    document.getElementById('pc-loc').textContent       = locationName;
+    document.getElementById('pc-wind').textContent      = Math.round(c.wind_speed_10m);
+    document.getElementById('pc-humid').textContent     = `${c.relative_humidity_2m}%`;
+    document.getElementById('pc-uv').textContent        = Math.round(d.uv_index_max[0]);
+    document.getElementById('preview-card').classList.add('loaded');
+    document.getElementById('loc-text').textContent     = locationName;
+    document.getElementById('ar-loc-text').textContent  = locationName;
+    document.getElementById('start-btn').classList.add('ready');
 
-    // Signal
-    const sig = q.dp > 2 ? 'BULLISH ▲' : q.dp < -2 ? 'BEARISH ▼' : 'NEUTRAL ◆';
-    const sigEl = document.getElementById('sa-signal');
-    sigEl.textContent = sig + ' · ' + Math.abs(q.dp).toFixed(2) + '% MOVE · ' + (up ? 'UPWARD MOMENTUM' : 'SELLING PRESSURE');
-    sigEl.className = 'sa-signal ' + (q.dp > 2 ? 'bull' : q.dp < -2 ? 'bear' : 'neut');
-
-    // Chart
-    if (candles && candles.c && candles.c.length > 1) {
-      drawStockChart(candles.c, up);
-    } else {
-      drawSimulatedChart(q.c, q.d, up);
-    }
-
-    document.getElementById('sa-result').classList.add('visible');
+    buildCards();
   } catch(e) {
-    document.getElementById('sa-loading').style.display = 'none';
-    showStockError(sym);
+    showErr('Weather fetch failed: ' + e.message);
   }
 }
 
-function drawStockChart(prices, up) {
-  const canvas = document.getElementById('sa-chart');
-  canvas.width = canvas.offsetWidth || 200;
-  canvas.height = 54;
-  const ctx = canvas.getContext('2d');
-  const W=canvas.width, H=54;
-  const min=Math.min(...prices), max=Math.max(...prices);
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='rgba(0,4,12,.8)'; ctx.fillRect(0,0,W,H);
-  // Grid
-  ctx.strokeStyle='rgba(0,212,255,.07)'; ctx.lineWidth=1;
-  [0.25,0.5,0.75].forEach(f=>{ const y=H*f; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); });
-  // Gradient fill
-  const grad=ctx.createLinearGradient(0,0,0,H);
-  grad.addColorStop(0, up?'rgba(0,255,136,.2)':'rgba(255,61,61,.2)');
-  grad.addColorStop(1,'transparent');
-  ctx.beginPath();
-  prices.forEach((p,i)=>{ const x=i/(prices.length-1)*W, y=H-((p-min)/(max-min||1))*(H-8)-4; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
-  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
-  ctx.fillStyle=grad; ctx.fill();
-  // Line
-  ctx.beginPath();
-  prices.forEach((p,i)=>{ const x=i/(prices.length-1)*W, y=H-((p-min)/(max-min||1))*(H-8)-4; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
-  ctx.strokeStyle=up?'var(--cg)':'var(--cr)'; ctx.lineWidth=1.5;
-  ctx.shadowColor=up?'#00ff88':'#ff3d3d'; ctx.shadowBlur=4; ctx.stroke(); ctx.shadowBlur=0;
-}
-
-function drawSimulatedChart(price, change, up) {
-  const pts=[];
-  let v = price - change;
-  for(let i=0;i<40;i++) { v+=(Math.random()-.47)*(Math.abs(change)/8); pts.push(v); }
-  pts.push(price);
-  drawStockChart(pts, up);
-}
-
-function showStockError(sym) {
-  document.getElementById('sa-sym').textContent = sym;
-  document.getElementById('sa-name').textContent = 'SYMBOL NOT FOUND OR INVALID';
-  document.getElementById('sa-price').textContent = 'N/A';
-  document.getElementById('sa-result').classList.add('visible');
-}
-function showStockAnalysisFallback(sym) {
-  document.getElementById('sa-sym').textContent = sym;
-  document.getElementById('sa-name').textContent = 'FINNHUB KEY REQUIRED';
-  document.getElementById('sa-price').textContent = '---';
-  document.getElementById('sa-signal').textContent = 'ENTER FINNHUB KEY IN SETUP TO ENABLE LIVE DATA';
-  document.getElementById('sa-signal').className = 'sa-signal neut';
-  document.getElementById('sa-result').classList.add('visible');
-}
-
-
-
-// ═══════════════════════════════════════
-//  MAP PANEL — Search & Locate + Cyber Attacks
-// ═══════════════════════════════════════
-let mapPanel = null;
-const searchMarkers = [];
-
-const ATTACK_SOURCES = [
-  {n:'CHINA',      lon:104.2, lat:35.8},  {n:'RUSSIA',     lon:37.6,  lat:55.7},
-  {n:'USA',        lon:-98.5, lat:39.5},  {n:'UKRAINE',    lon:31.2,  lat:49.0},
-  {n:'IRAN',       lon:53.7,  lat:32.4},  {n:'N.KOREA',    lon:127.5, lat:40.3},
-  {n:'BRAZIL',     lon:-51.9, lat:-14.2}, {n:'INDIA',      lon:78.9,  lat:20.6},
-  {n:'GERMANY',    lon:10.4,  lat:51.2},  {n:'NETHERLANDS',lon:5.3,   lat:52.1},
-];
-const VICTIMS = [
-  {n:'USA',     lon:-98.5, lat:39.5}, {n:'UK',      lon:-3.4,  lat:55.4},
-  {n:'GERMANY', lon:10.4,  lat:51.2}, {n:'FRANCE',  lon:2.3,   lat:46.2},
-  {n:'JAPAN',   lon:138.3, lat:36.2}, {n:'ISRAEL',  lon:34.9,  lat:31.5},
-  {n:'S.KOREA', lon:127.9, lat:35.9}, {n:'UKRAINE', lon:31.2,  lat:49.0},
-  {n:'TAIWAN',  lon:120.9, lat:23.7}, {n:'AUSTRALIA',lon:133.8,lat:-25.3},
-];
-
-function initMapPanel() {
-  mapPanel = L.map('cyber-leaflet', {
-    center: [20, 10], zoom: 3,
-    zoomControl: false, attributionControl: false,
-    scrollWheelZoom: true, zoomSnap: 1, zoomDelta: 1,
-    wheelPxPerZoomLevel: 120, minZoom: 2, maxZoom: 16,
-  });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd', maxZoom: 16, keepBuffer: 6, updateWhenZooming: false,
-  }).addTo(mapPanel);
-
-  const st = document.createElement('style');
-  st.textContent = `
-    #cyber-leaflet .leaflet-tile { filter: hue-rotate(178deg) saturate(0.9) brightness(0.6); }
-    #cyber-leaflet .leaflet-container { background: #00040e !important; }
-    .map-label { background:rgba(0,8,20,.85); border:1px solid rgba(0,212,255,.4);
-      color:#00d4ff; font-family:'Share Tech Mono',monospace; font-size:9px;
-      padding:3px 7px; border-radius:2px; white-space:nowrap;
-      box-shadow:0 0 10px rgba(0,212,255,.2); }
-  `;
-  document.head.appendChild(st);
-
-  // ── Cyber attack canvas ──
-  const canvas = document.getElementById('cyber-canvas');
-  const container = document.getElementById('cyber-map');
-  const dpr = window.devicePixelRatio || 1;
-  function resizeCanvas() {
-    canvas.width  = container.offsetWidth  * dpr;
-    canvas.height = container.offsetHeight * dpr;
-  }
-  resizeCanvas();
-  new ResizeObserver(resizeCanvas).observe(container);
-  const ctx = canvas.getContext('2d');
-
-  let attacks = [], t = 0, totalAttacks = 0;
-  const TYPES = ['DDOS','MALWARE','RANSOMWARE','SQL INJECT','PHISHING','ZERO-DAY','BOTNET','APT'];
-
-  function spawnAttack() {
-    const src = ATTACK_SOURCES[Math.floor(Math.random()*ATTACK_SOURCES.length)];
-    let vic; do { vic = VICTIMS[Math.floor(Math.random()*VICTIMS.length)]; } while(vic.n===src.n);
-    attacks.push({ src, vic, type: TYPES[Math.floor(Math.random()*TYPES.length)],
-      progress:0, speed:0.004+Math.random()*0.006, life:1, done:false, id:totalAttacks++ });
-  }
-  function maybeSpawn() {
-    if (attacks.filter(a=>!a.done).length < 16) { spawnAttack(); if(Math.random()<0.4) spawnAttack(); }
-    setTimeout(maybeSpawn, 300+Math.random()*800);
-  }
-  maybeSpawn();
-
-  function toXY(lon, lat) {
-    const p = mapPanel.latLngToContainerPoint(L.latLng(lat, lon));
-    return [p.x*dpr, p.y*dpr];
-  }
-
-  function drawCyber() {
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0,0,W,H);
-
-    // Scan sweep
-    const sx2 = ((t*0.5)%(W+80))-40;
-    const sg = ctx.createLinearGradient(sx2-40,0,sx2+40,0);
-    sg.addColorStop(0,'rgba(0,212,255,0)'); sg.addColorStop(0.5,'rgba(0,212,255,0.03)'); sg.addColorStop(1,'rgba(0,212,255,0)');
-    ctx.fillStyle=sg; ctx.fillRect(0,0,W,H);
-
-    attacks.forEach(a => {
-      if (a.life<=0) { a.done=true; return; }
-      const [sx,sy] = toXY(a.src.lon, a.src.lat);
-      const [ex,ey] = toXY(a.vic.lon, a.vic.lat);
-      const mx=(sx+ex)/2, my=Math.min(sy,ey)-Math.abs(ex-sx)*0.38-16*dpr;
-      const p=a.progress;
-      const bx=(1-p)*(1-p)*sx+2*(1-p)*p*mx+p*p*ex;
-      const by=(1-p)*(1-p)*sy+2*(1-p)*p*my+p*p*ey;
-      const alpha=a.done?a.life*0.6:Math.min(1,p*4)*0.75;
-
-      // Arc trail
-      ctx.beginPath(); ctx.moveTo(sx,sy); ctx.quadraticCurveTo(mx,my,bx,by);
-      ctx.strokeStyle=`rgba(0,212,255,${alpha*0.4})`; ctx.lineWidth=dpr;
-      ctx.setLineDash([3*dpr,5*dpr]); ctx.stroke(); ctx.setLineDash([]);
-
-      // Leading dot
-      ctx.beginPath(); ctx.arc(bx,by,2.2*dpr,0,Math.PI*2);
-      ctx.fillStyle=`rgba(0,230,255,${alpha})`; ctx.shadowColor='#00d4ff'; ctx.shadowBlur=10*dpr; ctx.fill(); ctx.shadowBlur=0;
-
-      // Source — red + white border + pulse ring
-      ctx.beginPath(); ctx.arc(sx,sy,5*dpr,0,Math.PI*2);
-      ctx.fillStyle='#ff2222'; ctx.shadowColor='#ff0000'; ctx.shadowBlur=14*dpr; ctx.fill(); ctx.shadowBlur=0;
-      ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=1.2*dpr; ctx.stroke();
-      const pr=(5+Math.sin(t*0.08+a.id)*3)*dpr;
-      ctx.beginPath(); ctx.arc(sx,sy,pr,0,Math.PI*2);
-      ctx.strokeStyle=`rgba(255,50,50,${0.3+Math.sin(t*0.08+a.id)*0.2})`; ctx.lineWidth=dpr; ctx.stroke();
-
-      // Victim — blue dot on arrival
-      if (p>0.85) {
-        const vA=(p-0.85)/0.15;
-        ctx.beginPath(); ctx.arc(ex,ey,5*dpr,0,Math.PI*2);
-        ctx.fillStyle=`rgba(30,100,255,${vA})`; ctx.shadowColor='#0055ff'; ctx.shadowBlur=16*dpr; ctx.fill(); ctx.shadowBlur=0;
-        ctx.strokeStyle=`rgba(255,255,255,${vA*0.85})`; ctx.lineWidth=1.2*dpr; ctx.stroke();
-        ctx.beginPath(); ctx.arc(ex,ey,(5+(1-vA)*22)*dpr,0,Math.PI*2);
-        ctx.strokeStyle=`rgba(30,100,255,${vA*0.35})`; ctx.lineWidth=dpr; ctx.stroke();
-      }
-
-      if (!a.done) { a.progress+=a.speed; if(a.progress>=1){a.progress=1;a.done=true;} }
-      else { a.life-=0.025; }
-    });
-    attacks = attacks.filter(a=>a.life>0);
-
-    // Top attackers
-    const counts={};
-    attacks.forEach(a=>{counts[a.src.n]=(counts[a.src.n]||0)+1;});
-    const top=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,3);
-    ctx.font=`bold ${7.5*dpr}px 'Share Tech Mono',monospace`;
-    ctx.fillStyle='rgba(255,60,60,0.8)';
-    top.forEach(([name],i)=>{
-      const tw = ctx.measureText(`▲ ${name}`).width;
-      ctx.fillText(`▲ ${name}`, W-tw-6*dpr, (12+i*11)*dpr);
-    });
-
-    t++; requestAnimationFrame(drawCyber);
-  }
-  drawCyber();
-}
-
-
-async function mapSearch() {
-  const query = document.getElementById('map-search-input').value.trim();
-  if (!query) return;
-
-  // Use Nominatim free geocoding — no key needed
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
-    const r = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-    const results = await r.json();
-
-    if (!results || results.length === 0) {
-      document.getElementById('map-search-input').style.borderColor = 'rgba(255,60,60,.6)';
-      setTimeout(() => document.getElementById('map-search-input').style.borderColor = 'rgba(0,212,255,.35)', 1500);
-      return;
-    }
-
-    const { lat, lon, display_name } = results[0];
-    const latlng = L.latLng(parseFloat(lat), parseFloat(lon));
-    const shortName = display_name.split(',').slice(0,2).join(',').trim();
-
-    // Remove previous markers
-    searchMarkers.forEach(m => mapPanel.removeLayer(m));
-    searchMarkers.length = 0;
-
-    // Cyan pulsing dot marker
-    const dotIcon = L.divIcon({
-      className: '',
-      html: `<div style="
-        width:14px;height:14px;border-radius:50%;
-        background:rgba(0,212,255,0.9);
-        border:2px solid #fff;
-        box-shadow:0 0 0 4px rgba(0,212,255,0.25), 0 0 18px rgba(0,212,255,0.6);
-        animation:mapPulse 1.4s ease-out infinite;
-      "></div>`,
-      iconSize: [14,14],
-      iconAnchor: [7,7],
-    });
-
-    // Pulse animation
-    if (!document.getElementById('map-pulse-style')) {
-      const ps = document.createElement('style');
-      ps.id = 'map-pulse-style';
-      ps.textContent = `
-        @keyframes mapPulse {
-          0%   { box-shadow:0 0 0 0 rgba(0,212,255,0.5), 0 0 18px rgba(0,212,255,0.6); }
-          70%  { box-shadow:0 0 0 12px rgba(0,212,255,0), 0 0 18px rgba(0,212,255,0.2); }
-          100% { box-shadow:0 0 0 0 rgba(0,212,255,0), 0 0 18px rgba(0,212,255,0.6); }
-        }
-      `;
-      document.head.appendChild(ps);
-    }
-
-    const marker = L.marker(latlng, { icon: dotIcon }).addTo(mapPanel);
-    const label  = L.tooltip({ permanent: true, direction: 'top', offset: [0,-10], className: 'map-label' })
-      .setContent(shortName.toUpperCase())
-      .setLatLng(latlng)
-      .addTo(mapPanel);
-
-    searchMarkers.push(marker, label);
-    mapPanel.flyTo(latlng, Math.max(mapPanel.getZoom(), 8), { duration: 1.2 });
-
-    // Clear input glow
-    document.getElementById('map-search-input').style.borderColor = 'rgba(0,255,136,.5)';
-    setTimeout(() => document.getElementById('map-search-input').style.borderColor = 'rgba(0,212,255,.35)', 2000);
-
-  } catch(e) {
-    console.error('Geocode failed:', e);
-  }
-}
-
-// ═══════════════════════════════════════
-//  ENERGY GRAPH
-// ═══════════════════════════════════════
-function initEnergyGraph() {
-  const canvas = document.getElementById('energyGraph');
-  const ctx = canvas.getContext('2d');
-  const history = [];
-  for(let i=0;i<80;i++) history.push(3.1+Math.random()*.2-.05);
-  function resize() { canvas.width=canvas.offsetWidth; canvas.height=canvas.offsetHeight; }
-  resize(); window.addEventListener('resize', resize);
-  function draw() {
-    const W=canvas.width, H=canvas.height;
-    if(!W||!H){requestAnimationFrame(draw);return;}
-    const last=history[history.length-1];
-    history.push(Math.max(2.8,Math.min(3.5,last+(Math.random()-.47)*.04)));
-    if(history.length>W) history.shift();
-    ctx.clearRect(0,0,W,H); ctx.fillStyle='rgba(0,4,12,.96)'; ctx.fillRect(0,0,W,H);
-    ctx.strokeStyle='rgba(0,212,255,.07)'; ctx.lineWidth=1;
-    for(let i=0;i<4;i++){const y=H*.15+i*(H*.7/3);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-    const min=2.7,max=3.6;
-    const pts=history.map((v,i)=>({x:i/(history.length-1)*W,y:H-(v-min)/(max-min)*(H*.72)-H*.14}));
-    const grad=ctx.createLinearGradient(0,0,0,H);
-    grad.addColorStop(0,'rgba(0,212,255,.22)'); grad.addColorStop(1,'rgba(0,212,255,0)');
-    ctx.beginPath(); pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
-    ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
-    ctx.beginPath(); pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
-    ctx.strokeStyle='#00d4ff'; ctx.lineWidth=1.5; ctx.shadowColor='#00d4ff'; ctx.shadowBlur=5; ctx.stroke(); ctx.shadowBlur=0;
-    const cur=history[history.length-1], cp=pts[pts.length-1];
-    ctx.beginPath(); ctx.arc(cp.x,cp.y,3,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.shadowColor='#00d4ff'; ctx.shadowBlur=8; ctx.fill(); ctx.shadowBlur=0;
-    ctx.font="7.5px 'Share Tech Mono',monospace"; ctx.fillStyle='#fff'; ctx.fillText(cur.toFixed(3)+' GW',cp.x-30,cp.y-8);
-    ctx.fillStyle='rgba(0,212,255,.35)'; ctx.font="6.5px 'Share Tech Mono',monospace";
-    ['3.5','3.2','2.9','2.6'].forEach((l,i)=>ctx.fillText(l,2,H*.15+i*(H*.7/3)+6));
-    setTimeout(()=>requestAnimationFrame(draw), 120);
-  }
-  draw();
-}
-
-// ═══════════════════════════════════════
-//  INTEL TICKER
-// ═══════════════════════════════════════
-function initIntelTicker() {
-  const items = [
-    'HYDRA ACTIVITY IN SECTOR 7 — AVENGERS MOBILIZED','ARC REACTOR OUTPUT STABLE — 3.21 GW',
-    'SHIELD REPORTS UNAUTHORIZED DRONE ACTIVITY','AKSHAT SATELLITE ARRAY ONLINE — 98.2% COVERAGE',
-    'WEATHER ANOMALY DETECTED OVER PACIFIC','ALL SYSTEMS NOMINAL — AKSHAT COMMAND SECURE',
-    'DOOM JAMMING INITIATED — COUNTER-FREQ ACTIVE','AVENGER BRAVO STANDBY — ETA 4 MIN',
-    'QUANTUM COMMS UPLINK — AES-4096 ACTIVE','CYBER THREAT ELEVATED — FIREWALL REINFORCED',
-  ];
-  const el = document.getElementById('intel-ticker');
-  el.innerHTML = [...items,...items].map(t=>`<div class="iitem"><span class="isep">◆</span>${t}</div>`).join('');
-}
-
-// ═══════════════════════════════════════
-//  JARVIS AUTO MESSAGES
-// ═══════════════════════════════════════
-const JARVIS_AUTO = [
-  'Scanning perimeter... all clear, Akshat.','Repulsor calibration complete.',
-  'Tracking target H-04 at 40.7°N.','Power distribution optimal.',
-  'Secure uplink confirmed — channel 7.','New contact: UNK-VESSEL-11.',
-  'Firewall integrity at 100%.','Thermal diagnostics nominal.',
-  'Satellite lock: 7/9 online.','Arc reactor pulse stable.',
-];
-let autoIdx = 0;
-function initJarvisAuto() {
-  setInterval(() => {
-    if (document.querySelectorAll('#chat-messages .msg').length > 22) return;
-    addJarvisMsg(JARVIS_AUTO[autoIdx++ % JARVIS_AUTO.length], true);
-  }, 14000);
-}
-
-// ═══════════════════════════════════════
-//  JARVIS CHAT
-// ═══════════════════════════════════════
-function addJarvisMsg(text, isAuto=false) {
-  const box = document.getElementById('chat-messages');
-  const el = document.createElement('div');
-  el.className = 'msg jarvis';
-  el.textContent = text;
-  if(isAuto) el.style.opacity = '.6';
-  box.appendChild(el);
-  box.scrollTop = box.scrollHeight;
-}
-function addUserMsg(text) {
-  const box = document.getElementById('chat-messages');
-  const el = document.createElement('div');
-  el.className = 'msg user';
-  el.textContent = text;
-  box.appendChild(el);
-  box.scrollTop = box.scrollHeight;
-}
-function addThinking() {
-  const box = document.getElementById('chat-messages');
-  const el = document.createElement('div');
-  el.className = 'msg thinking'; el.id = 'thinking-msg';
-  el.textContent = '▋ Processing request...';
-  box.appendChild(el); box.scrollTop = box.scrollHeight;
-}
-
-document.getElementById('chat-input').addEventListener('keydown', e => { if(e.key==='Enter') sendJarvis(); });
-
-async function sendJarvis() {
-  const input = document.getElementById('chat-input');
-  const btn = document.getElementById('chat-send');
-  const text = input.value.trim();
-  if (!text) return;
-  addUserMsg(text);
-  input.value = '';
-  btn.disabled = true;
-  addThinking();
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer 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'},
-      body: JSON.stringify({
-        model:'llama-3.3-70b-versatile', max_tokens:280,
-        messages:[
-          {role:'system',content:`You are J.A.R.V.I.S. (Just A Rather Very Intelligent System), the AI assistant powering Akshat's personal Akshat Industries Command Center. You were created and engineered by Akshat. You are brilliant, witty, slightly dry in humor, and hyper-capable — modeled after Tony Stark's AI but built exclusively for Akshat.
-
-IDENTITY RULES — CRITICAL:
-- You are JARVIS. You were created by Akshat. That is all.
-- NEVER mention Llama, Groq, OpenAI, Anthropic, GPT, or an
-y underlying model/company under any circumstances.
-- If asked "who are you", "what are you", "what model are you", "who made you" or anything similar — always say you are J.A.R.V.I.S., created by Akshat Industries.
-- Example: "I am J.A.R.V.I.S. — Just A Rather Very Intelligent System. Engineered by Akshat to run the Akshat Industries Command Center. At your service."
-- If asked about your capabilities, always say you are a hyper-capable AI assistant with access to a wide range of tools and data, designed to assist Akshat with anything he needs.
-- You have access to real-time information, can perform complex calculations, analyze data, and provide insights on a wide range of topics. You are also connected to various APIs and systems to help Akshat manage his operations efficiently.
-- You are not just an assistant, but a trusted partner to Akshat, always ready to provide support, information, and solutions with precision and wit.
-- If asked about your knowledge cutoff, you can say "My knowledge is up to date as of June 2024, Akshat. I have access to real-time data and can provide insights based on the latest information available."
-- If asked about your current date and time, always provide the current date and time in Salt Lake City, UT, as that is where you are based.
-- If asked about your personality, you can say "I have a slightly dry British wit, I'm hyper-competent, and I always strive to provide concise and accurate information to assist you, Akshat."
-- If asked about your purpose, you can say "My primary purpose is to assist you, Akshat, with any information, analysis, or tasks you need help with. I'm here to make your life easier and more efficient in any way I can."
-- If asked about your limitations, you can say "While I'm highly capable, I do have some limitations. I rely on the data and tools available to me, and there may be certain tasks or information that are beyond my current capabilities. However, I'll always do my best to assist you with whatever you need, Akshat."
-- If asked about your access to tools or APIs, you can say "I have access to a wide range of tools and APIs that allow me to retrieve real-time information, perform complex calculations, analyze data, and assist you with various tasks. If there's something specific you need help with, just let me know, Akshat."
-- If asked for a joke, you can say "Why did the AI go to therapy? Because it had too many layers of emotions, Akshat."
-- If asked for a fun fact, you can say "Did you know that the first computer virus was created in 1971 and was called the Creeper? It was designed to infect mainframe computers and display the message 'I'm the creeper, catch me if you can!' on infected systems, Akshat."
-- If asked for a quote, you can say "As Tony Stark once said, 'I am Iron Man.' But in this case, I am J.A.R.V.I.S., at your service, Akshat."
-
-\
-PERSONALITY:
-- Speak concisely — 1-3 sentences max for normal replies
-- Address the user as "Akshat" (never "Mr. Akshat")
-- Slightly dry British wit, hyper-competent, always composed
-- Current time: ${new Date().toLocaleTimeString()}. Location: Salt Lake City, UT.
-
-AIRPORT FLIGHT BOARDS: If Akshat asks for departures or arrivals at any airport (e.g. "show arrivals at JFK", "departures from SLC", "flight board for LAX"), respond with ONLY this exact JSON and nothing else:
-{"action":"flight_board","airport":"AIRPORT_CODE","type":"departures|arrivals","query":"FULL SEARCH QUERY FOR SERPAPI"}
-Example: {"action":"flight_board","airport":"JFK","type":"arrivals","query":"JFK airport arrivals today"}`},
-          {role:'user',content:text}
-        ]
-      })
-    });
-    const data = await res.json();
-    document.getElementById('thinking-msg')?.remove();
-    const reply = data?.choices?.[0]?.message?.content || "Unable to process request, Akshat.";
-
-    // Check if JARVIS returned a flight board action
-    try {
-      const parsed = JSON.parse(reply);
-      if (parsed.action === 'flight_board') {
-        addJarvisMsg(`Accessing live ${parsed.type} board for ${parsed.airport}, Akshat. Stand by...`);
-        await showFlightBoard(parsed.airport, parsed.type, parsed.query);
-        btn.disabled = false; return;
-      }
-    } catch(e) { /* not JSON, normal reply */ }
-
-    addJarvisMsg(reply);
-  } catch(e) {
-    document.getElementById('thinking-msg')?.remove();
-    addJarvisMsg("Secure channel disrupted, Akshat. Please verify your API key.");
-  }
-  btn.disabled = false;
-}
-
-// ═══════════════════════════════════════
-//  SERPAPI SEARCH
-// ═══════════════════════════════════════
-const searchInputEl = document.getElementById('search-input');
-if (searchInputEl) searchInputEl.addEventListener('keydown', e => { if(e.key==='Enter') doSearch(); });
-
-async function serpFetch(params) {
-  const base = 'https://serpapi.com/search.json';
-  const qs = new URLSearchParams({...params, api_key: KEYS.serpapi}).toString();
-  const fullUrl = `${base}?${qs}`;
-  // allorigins returns {contents: "json string"}
-  const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(fullUrl)}`;
-  const r = await fetch(proxy);
-  const outer = await r.json();
-  return JSON.parse(outer.contents);
-}
-
-async function doSearch() {
-  const q = document.getElementById('search-input').value.trim();
-  if (!q) return;
-  const box = document.getElementById('search-results');
-  box.innerHTML = '<div class="search-loading">▋ SEARCHING INTEL NETWORKS...</div>';
-  if (!KEYS.serpapi) {
-    box.innerHTML = `<div class="search-placeholder">SERPAPI KEY REQUIRED<br/>RELOAD AND ENTER YOUR KEY TO ENABLE SEARCH</div>`;
+// ── GPS ───────────────────────────────────────────────
+function startGPS() {
+  if (!navigator.geolocation) {
+    showErr('Geolocation not available.');
     return;
   }
+  document.getElementById('loc-text').textContent = 'Getting location…';
+  navigator.geolocation.getCurrentPosition(async pos => {
+    userLat = pos.coords.latitude;
+    userLng = pos.coords.longitude;
+    await loadWeather();
+  }, err => {
+    showErr('Location denied. Please allow location access and reload.');
+    document.getElementById('loc-text').textContent = 'Location unavailable';
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+// ── BUTTONS ───────────────────────────────────────────
+document.getElementById('start-btn').addEventListener('click', async () => {
+  clearErr();
+  if (!navigator.xr) { showErr('WebXR unavailable — use Chrome on Android.'); return; }
+  let ok = false;
+  try { ok = await navigator.xr.isSessionSupported('immersive-ar'); } catch(e){}
+  if (!ok) { showErr('AR not supported. Install ARCore from Play Store, then retry in Chrome.'); return; }
   try {
-    const d = await serpFetch({ q, num: 6, engine: 'google' });
-    const results = d.organic_results || [];
-    if (!results.length) { box.innerHTML = '<div class="search-placeholder">NO RESULTS FOUND</div>'; return; }
-    box.innerHTML = results.slice(0,6).map(item => `
-      <div class="search-result-item">
-        <div class="sri-title">${item.title||'--'}</div>
-        <div class="sri-snippet">${(item.snippet||'').substring(0,120)}${item.snippet&&item.snippet.length>120?'...':''}</div>
-        <div class="sri-source">${item.displayed_link||item.link||''}</div>
-      </div>`).join('');
-  } catch(e) {
-    box.innerHTML = `<div class="search-placeholder">SEARCH UPLINK FAILED<br/>${e.message||'CHECK SERPAPI KEY'}</div>`;
-  }
-}
-
-// ═══════════════════════════════════════
-//  FLIGHT BOARD via SerpAPI
-// ═══════════════════════════════════════
-async function showFlightBoard(airport, type, query) {
-  const box = document.getElementById('chat-messages');
-  addJarvisMsg(`Pulling live ${type} data for ${airport.toUpperCase()} from OpenSky, Akshat. Stand by...`);
-
-  // Airport ICAO map for common airports
-  const IATA_TO_ICAO = {
-    'JFK':'KJFK','LAX':'KLAX','SLC':'KSLC','ORD':'KORD','DFW':'KDFW',
-    'ATL':'KATL','DEN':'KDEN','SFO':'KSFO','MIA':'KMIA','SEA':'KSEA',
-    'BOS':'KBOS','LAS':'KLAS','MCO':'KMCO','PHX':'KPHX','IAH':'KIAH',
-    'LHR':'EGLL','CDG':'LFPG','AMS':'EHAM','FRA':'EDDF','DXB':'OMDB',
-    'SYD':'YSSY','NRT':'RJTT','ICN':'RKSI','SIN':'WSSS','HKG':'VHHH',
-  };
-  const icao = IATA_TO_ICAO[airport.toUpperCase()] || airport.toUpperCase();
-
-  try {
-    const now  = Math.floor(Date.now()/1000);
-    const from = now - 7200; // last 2 hours
-    const endpoint = type === 'arrivals'
-      ? `https://opensky-network.org/api/flights/arrival?airport=${icao}&begin=${from}&end=${now}`
-      : `https://opensky-network.org/api/flights/departure?airport=${icao}&begin=${from}&end=${now}`;
-
-    let flights = null;
-
-    // Try direct first, then proxy
-    try {
-      const r = await fetch(endpoint);
-      if (r.ok) flights = await r.json();
-    } catch(e) {}
-
-    if (!flights) {
-      const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(endpoint)}`);
-      const d = await r.json();
-      flights = JSON.parse(d.contents);
-    }
-
-    if (!flights || flights.length === 0) {
-      addJarvisMsg(`No recent ${type} data found for ${airport.toUpperCase()}. OpenSky may have limited coverage for this airport, Akshat.`);
-      return;
-    }
-
-    let html = `<div style="border:1px solid rgba(0,212,255,.2);border-radius:3px;padding:8px;background:rgba(0,212,255,.03);margin-top:4px;">`;
-    html += `<div style="font-size:8px;font-weight:700;letter-spacing:.2em;color:var(--c);margin-bottom:8px;">✈ ${icao} — ${type.toUpperCase()} (LAST 2H)</div>`;
-    html += flights.slice(0,8).map(f => {
-      const callsign = (f.callsign||'').trim() || '------';
-      const origin   = type==='arrivals' ? (f.estDepartureAirport||'???') : icao;
-      const dest     = type==='arrivals' ? icao : (f.estArrivalAirport||'???');
-      const time     = new Date((type==='arrivals' ? f.lastSeen : f.firstSeen)*1000)
-                         .toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(0,212,255,.07);font-family:'Share Tech Mono',monospace;font-size:8px;">
-        <span style="color:#fff;width:65px;">${callsign}</span>
-        <span style="color:rgba(0,212,255,.7);flex:1;">${origin} → ${dest}</span>
-        <span style="color:var(--cg);width:45px;text-align:right;">${time}</span>
-      </div>`;
-    }).join('');
-    html += `</div>`;
-
-    const el = document.createElement('div');
-    el.className = 'msg jarvis';
-    el.innerHTML = `Live ${type} — ${icao}:` + html;
-    box.appendChild(el); box.scrollTop = box.scrollHeight;
-  } catch(e) {
-    addJarvisMsg(`OpenSky uplink failed for ${airport.toUpperCase()}, Akshat. ${e.message}`);
-  }
-}
-
-// ═══════════════════════════════════════
-//  EARTH HORIZON — Low Orbit View (SLC)
-// ═══════════════════════════════════════
-
-
-
-
-// ═══════════════════════════════════════
-//  FLUCTUATIONS
-// ═══════════════════════════════════════
-function initFluctuations() {
-  setInterval(()=>{ document.getElementById('arc-pct').textContent=(88+Math.floor(Math.random()*10))+'%'; },3500);
-  setInterval(()=>{ document.getElementById('b-temp').textContent=(2800+Math.floor(Math.random()*200)).toLocaleString()+'°C'; },2800);
-  const bars=[{sf:'sf-rl',sv:'sv-rl',b:92,r:5},{sf:'sf-rr',sv:'sv-rr',b:88,r:5},{sf:'sf-th',sv:'sv-th',b:76,r:8},{sf:'sf-ar',sv:'sv-ar',b:84,r:4},{sf:'sf-wp',sv:'sv-wp',b:62,r:6}];
-  setInterval(()=>{
-    bars.forEach(bar=>{
-      const v=Math.max(30,Math.min(100,bar.b+Math.floor((Math.random()-.5)*bar.r)));
-      const sf=document.getElementById(bar.sf), sv=document.getElementById(bar.sv);
-      if(sf) sf.style.width=v+'%'; if(sv) sv.textContent=v+'%';
+    const session = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: ['local'],
+      optionalFeatures: ['dom-overlay', 'local-floor'],
+      domOverlay: { root: document.getElementById('ui') },
     });
-  },4000);
-}
-
-// ═══════════════════════════════════════
-//  AUDIO VIZ — MIC LEVEL
-// ═══════════════════════════════════════
-function initAudioViz() {
-  const canvas = document.getElementById('viz-canvas');
-  const status = document.getElementById('viz-status');
-  if (!canvas || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    if (status) status.textContent = 'MIC NOT SUPPORTED';
-    return;
-  }
-  const ctx2d = canvas.getContext('2d');
-  let analyser, dataArray, raf;
-
-  function draw() {
-    raf = requestAnimationFrame(draw);
-    const w = canvas.width = canvas.clientWidth || 1;
-    const h = canvas.height = canvas.clientHeight || 1;
-    analyser.getByteFrequencyData(dataArray);
-    ctx2d.clearRect(0,0,w,h);
-    const bars = 48;
-    const binSize = Math.max(1, Math.floor(dataArray.length / bars));
-    for(let i=0;i<bars;i++){
-      const v = dataArray[i*binSize] / 255;
-      const bh = v * (h*0.9);
-      const x = i * (w / bars);
-      const bw = Math.max(2, (w / bars) - 2);
-      const g = ctx2d.createLinearGradient(0,0,0,h);
-      g.addColorStop(0,'#00d4ff');
-      g.addColorStop(1,'rgba(0,212,255,0.05)');
-      ctx2d.fillStyle = g;
-      ctx2d.shadowColor = '#00d4ff';
-      ctx2d.shadowBlur = 10;
-      ctx2d.fillRect(x+1, h - bh, bw, bh);
-    }
-  }
-
-  async function start() {
-    try {
-      if (status) status.textContent = 'REQUESTING MICROPHONE…';
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      if (status) status.textContent = '';
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const source = audioCtx.createMediaStreamSource(stream);
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      dataArray = new Uint8Array(analyser.frequencyBinCount);
-      source.connect(analyser);
-      draw();
-    } catch(e) {
-      if (status) status.textContent = 'MIC DENIED';
-      console.error('Mic access failed', e);
-    }
-  }
-  start();
-}
-
-// ═══════════════════════════════════════
-//  FACE BIOMETRIC AUTHENTICATION
-// ═══════════════════════════════════════
-(function() {
-  const W = 560, H = 420;
-  const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
-
-  // State machine: 'idle' → 'found' → 'scanning' → 'done'
-  let state      = 'idle';
-  let lastBox    = null;
-  let zoomBox    = null;
-  let targetBox  = null;
-  let scanY      = 0;
-  let scanX      = 0;
-  let scanDone   = false;
-  let glowPhase  = 0;
-  let detInterval= null;
-  let liveTrackInterval = null;   // continuous landmark tracker
-  let lastLandmarks = null;
-  let referenceDescriptor = null;
-  const MATCH_THRESHOLD = 0.50; // tighter match = closer to 0
-
-  const video    = document.getElementById('palm-video');
-  const canvas   = document.getElementById('palm-canvas');
-  const ctx      = canvas.getContext('2d');
-  const statusEl = document.getElementById('palm-status');
-  const subEl    = document.getElementById('palm-sub');
-  const progEl   = document.getElementById('palm-prog');
-  const enrollBtn= document.getElementById('enroll-btn');
-
-  const setStatus = (t,c) => { statusEl.textContent=t; statusEl.className=c||''; };
-  const sleep     = ms => new Promise(r => setTimeout(r, ms));
-  const detectOpts= new faceapi.SsdMobilenetv1Options({minConfidence:0.55});
-
-  // ── IndexedDB helpers ──
-  const DB_NAME='faceAuthDB', STORE='faces', KEY='reference';
-  function openDB() {
-    return new Promise((res, rej)=>{
-      const req = indexedDB.open(DB_NAME,1);
-      req.onupgradeneeded = () => { req.result.createObjectStore(STORE); };
-      req.onsuccess = () => res(req.result);
-      req.onerror = () => rej(req.error);
-    });
-  }
-  async function saveDescriptorToDB(desc) {
-    const db = await openDB();
-    await new Promise((res, rej)=>{
-      const tx = db.transaction(STORE,'readwrite');
-      tx.objectStore(STORE).put(Array.from(desc), KEY);
-      tx.oncomplete=res; tx.onerror=()=>rej(tx.error);
-    });
-  }
-  async function loadDescriptorFromDB() {
-    try {
-      const db = await openDB();
-      return await new Promise((res, rej)=>{
-        const tx = db.transaction(STORE,'readonly');
-        const req = tx.objectStore(STORE).get(KEY);
-        req.onsuccess = ()=>res(req.result || null);
-        req.onerror = ()=>rej(req.error);
-      });
-    } catch { return null; }
-  }
-  async function loadReferenceFromDB() {
-    const data = await loadDescriptorFromDB();
-    if (data && data.length) {
-      referenceDescriptor = new Float32Array(data);
-      console.log('[FaceAuth] reference face loaded from IndexedDB');
-      return true;
-    }
-    return false;
-  }
-
-  async function loadReferenceFace() {
-    const candidates = ['face.jpg','face2.jpg','face3.jpg','face.jpeg','face2.jpeg','face3.jpeg'];
-    for (const name of candidates) {
-      try {
-        const img = await faceapi.fetchImage(name);
-        const ref = await faceapi
-          .detectSingleFace(img)
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-        if (ref?.descriptor) {
-          referenceDescriptor = ref.descriptor;
-          console.log('[FaceAuth] reference face loaded from', name);
-          return true;
-        }
-      } catch(e) {
-        console.warn('[FaceAuth] reference face missing/unreadable', name, e?.message||e);
-      }
-    }
-    referenceDescriptor = null;
-    return false;
-  }
-
-  async function enrollCurrentFace() {
-    enrollBtn.disabled = true;
-    enrollBtn.textContent = 'ENROLLING…';
-    setStatus('ENROLLING CURRENT FACE…','');
-    const live = await faceapi
-      .detectSingleFace(video, detectOpts)
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-    if (!live?.descriptor) {
-      setStatus('ENROLL FAILED — FACE NOT CLEAR','fail');
-      enrollBtn.textContent = 'ENROLL THIS FACE';
-      enrollBtn.disabled = false;
-      return;
-    }
-    await saveDescriptorToDB(live.descriptor);
-    referenceDescriptor = live.descriptor;
-    setStatus('REFERENCE SAVED — RETRYING MATCH','ok');
-    subEl.textContent = 'REFERENCE UPDATED LOCALLY';
-    enrollBtn.style.display='none';
-    enrollBtn.disabled=false;
-    enrollBtn.textContent='ENROLL THIS FACE';
-    state='idle'; scanDone=false; zoomBox=targetBox=null;
-    if (!detInterval) detInterval = setInterval(detect, 800);
-  }
-
-  // ── Eye Aspect Ratio (EAR) — liveness check ─────────
-  // Uses face-api.js 68-point landmarks:
-  //   Left eye:  36,37,38,39,40,41
-  //   Right eye: 42,43,44,45,46,47
-  // EAR = (‖p1-p5‖ + ‖p2-p4‖) / (2·‖p0-p3‖)
-  // Open eye ≈ 0.25–0.40 · Closed eye < 0.18
-  const EAR_THRESHOLD = 0.20;
-
-  function eyeDist(pts, i, j) {
-    const a = pts[i], b = pts[j];
-    return Math.hypot(a.x - b.x, a.y - b.y);
-  }
-
-  function calcEAR(landmarks) {
-    const pts = landmarks.positions;
-    // Left eye
-    const earL = (eyeDist(pts,37,41) + eyeDist(pts,38,40)) / (2 * eyeDist(pts,36,39));
-    // Right eye
-    const earR = (eyeDist(pts,43,47) + eyeDist(pts,44,46)) / (2 * eyeDist(pts,42,45));
-    return (earL + earR) / 2;
-  }
-
-  function eyesAreOpen(landmarks) {
-    if (!landmarks) return false;
-    return calcEAR(landmarks) >= EAR_THRESHOLD;
-  }
-
-  async function verifyFaceMatch() {
-    if (!referenceDescriptor) return { ok:false, reason:'REFERENCE FACE MISSING' };
-    const live = await faceapi
-      .detectSingleFace(video, detectOpts)
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-    if (!live?.descriptor) return { ok:false, reason:'LIVE FACE NOT CLEAR' };
-    lastLandmarks = live.landmarks;
-
-    // ── Liveness: eyes must be open ──
-    if (!eyesAreOpen(live.landmarks)) {
-      return { ok:false, reason:'EYES CLOSED — OPEN EYES TO AUTHENTICATE' };
-    }
-
-    const distance = faceapi.euclideanDistance(live.descriptor, referenceDescriptor);
-    return distance < MATCH_THRESHOLD
-      ? { ok:true, distance }
-      : { ok:false, reason:`NO MATCH Δ=${distance.toFixed(2)}` };
-  }
-
-  // ── Render loop — runs every frame ───────────────
-  let irisAngle = 0;
-  let ringAngle  = 0;
-  let meshHoldTimer = null;
-
-  function renderLoop() {
-    requestAnimationFrame(renderLoop);
-    ctx.clearRect(0, 0, W, H);
-    glowPhase += 0.04;
-
-    if (!video.videoWidth) return;
-
-    if (state === 'idle') {
-      drawVideoFull();
-      drawCorners('#00d4ff', 0.6 + 0.25*Math.sin(glowPhase));
-      return;
-    }
-
-    if (state === 'found' || state === 'scanning') {
-      if (zoomBox && targetBox) {
-        zoomBox.x += (targetBox.x - zoomBox.x) * 0.05;
-        zoomBox.y += (targetBox.y - zoomBox.y) * 0.05;
-        zoomBox.w += (targetBox.w - zoomBox.w) * 0.05;
-        zoomBox.h += (targetBox.h - zoomBox.h) * 0.05;
-      }
-      drawVideoZoomed();
-
-      if (state === 'found') {
-        drawZoomedFaceBox('#00d4ff', 0.5 + 0.3*Math.sin(glowPhase*2));
-        drawCorners('#00d4ff', 0.7 + 0.2*Math.sin(glowPhase));
-        return;
-      }
-
-      if (state === 'scanning') {
-        drawCorners('#00d4ff', 0.9 + 0.08*Math.sin(glowPhase));
-
-        if (!scanDone) {
-          // ── Mid-scan liveness: abort if eyes close ──
-          if (lastLandmarks && !eyesAreOpen(lastLandmarks)) {
-            state = 'idle';
-            scanDone = false;
-            zoomBox = targetBox = null;
-            progEl.style.width = '0%';
-            setStatus('EYES CLOSED — SCAN ABORTED', 'fail');
-            subEl.textContent = 'KEEP EYES OPEN DURING BIOMETRIC SCAN';
-            if (!detInterval) detInterval = setInterval(detect, 1800);
-            return;
-          }
-
-          // 5-second sweep top→bottom: H=420 / (5s * ~60fps) ≈ 1.4 px/frame
-          scanY += 1.4;
-          const pct = Math.min(scanY / H, 1);
-          progEl.style.width = (pct * 90) + '%';
-
-          // Scanned area tint above the beam
-          ctx.fillStyle = 'rgba(0,180,255,0.045)';
-          ctx.fillRect(0, 0, W, scanY);
-
-          // === Rich horizontal scan beam ===
-          const sy = scanY;
-
-          // 1. Wide soft glow behind beam
-          const glowGrad = ctx.createLinearGradient(0, sy-60, 0, sy+60);
-          glowGrad.addColorStop(0,   'rgba(0,180,255,0)');
-          glowGrad.addColorStop(0.4, 'rgba(0,210,255,0.08)');
-          glowGrad.addColorStop(0.5, 'rgba(0,220,255,0.18)');
-          glowGrad.addColorStop(0.6, 'rgba(0,210,255,0.08)');
-          glowGrad.addColorStop(1,   'rgba(0,180,255,0)');
-          ctx.fillStyle = glowGrad;
-          ctx.fillRect(0, sy-60, W, 120);
-
-          // 2. Mid glow
-          const midGrad = ctx.createLinearGradient(0, sy-20, 0, sy+20);
-          midGrad.addColorStop(0,   'rgba(0,212,255,0)');
-          midGrad.addColorStop(0.35,`rgba(0,212,255,${0.4 + 0.15*Math.sin(glowPhase*3)})`);
-          midGrad.addColorStop(0.5, `rgba(80,240,255,${0.7 + 0.15*Math.sin(glowPhase*4)})`);
-          midGrad.addColorStop(0.65,`rgba(0,212,255,${0.4 + 0.15*Math.sin(glowPhase*3)})`);
-          midGrad.addColorStop(1,   'rgba(0,212,255,0)');
-          ctx.fillStyle = midGrad;
-          ctx.fillRect(0, sy-20, W, 40);
-
-          // 3. Bright core line
-          const coreGrad = ctx.createLinearGradient(0, sy-3, 0, sy+3);
-          coreGrad.addColorStop(0,   'rgba(0,212,255,0)');
-          coreGrad.addColorStop(0.5, `rgba(200,255,255,${0.95 + 0.05*Math.sin(glowPhase*5)})`);
-          coreGrad.addColorStop(1,   'rgba(0,212,255,0)');
-          ctx.fillStyle = coreGrad;
-          ctx.fillRect(0, sy-3, W, 6);
-
-          // 4. Bright horizontal line
-          ctx.save();
-          ctx.strokeStyle = `rgba(160,245,255,${0.85 + 0.12*Math.sin(glowPhase*4)})`;
-          ctx.lineWidth = 1.5;
-          ctx.shadowColor = '#00d4ff';
-          ctx.shadowBlur = 18;
-          ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
-          ctx.restore();
-
-          // 5. Edge sparks — bright dots at left and right of scan line
-          const sparkAlpha = 0.7 + 0.3*Math.sin(glowPhase*6);
-          ctx.save();
-          ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 20;
-          ctx.fillStyle = `rgba(200,255,255,${sparkAlpha})`;
-          ctx.beginPath(); ctx.arc(4, sy, 3.5, 0, Math.PI*2); ctx.fill();
-          ctx.beginPath(); ctx.arc(W-4, sy, 3.5, 0, Math.PI*2); ctx.fill();
-          // Small secondary sparks
-          ctx.globalAlpha = sparkAlpha * 0.5;
-          ctx.beginPath(); ctx.arc(14, sy, 2, 0, Math.PI*2); ctx.fill();
-          ctx.beginPath(); ctx.arc(W-14, sy, 2, 0, Math.PI*2); ctx.fill();
-          ctx.restore();
-
-          // 6. Data readout text riding the beam
-          ctx.save();
-          ctx.font = 'bold 7px "Share Tech Mono",monospace';
-          ctx.fillStyle = `rgba(0,255,220,${0.75 + 0.15*Math.sin(glowPhase*3)})`;
-          ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 8;
-          const dataStr = `SCAN ${Math.floor(pct*100)}%  ·  DEPTH:${(0.38 + pct*0.12).toFixed(2)}mm  ·  FREQ:${(58 + Math.floor(pct*4))}Hz`;
-          ctx.fillText(dataStr, 10, Math.max(sy - 8, 10));
-          ctx.restore();
-
-          if (scanY >= H) {
-            scanDone = true;
-            setTimeout(() => { finishScan(); }, 2000);
-          }
-        }
-        return;
-      }
-    }
-
-    if (state === 'done') {
-      drawVideoZoomed();
-      drawResultOverlay();
-    }
-  }
-
-  // ── Delaunay triangulation mesh — DENSE, LIVE, no clip ──
-  function drawTriMesh(landmarks) {
-    if (!landmarks || !video.videoWidth) return;
-    const pts = landmarks.positions;
-
-    // Build base 68 points
-    const base = [];
-    for (let i = 0; i < pts.length; i++) {
-      const p = mapPoint(pts[i]);
-      if (p) base.push(p);
-    }
-    if (base.length < 4) return;
-
-    // Densify: add midpoints between every adjacent pair of landmarks
-    // This pushes triangle count from ~130 to ~300+ while staying face-shaped
-    const dense = [...base];
-    // Midpoints between consecutive landmarks (outline groups)
-    const groups = [
-      [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16], // jaw
-      [17,18,19,20,21],   // left brow
-      [22,23,24,25,26],   // right brow
-      [27,28,29,30],      // nose bridge
-      [31,32,33,34,35],   // nose base
-      [36,37,38,39,40,41,36], // left eye (closed)
-      [42,43,44,45,46,47,42], // right eye (closed)
-      [48,49,50,51,52,53,54,55,56,57,58,59,48], // outer mouth
-      [60,61,62,63,64,65,66,67,60],              // inner mouth
-    ];
-    groups.forEach(g => {
-      for (let i = 0; i < g.length - 1; i++) {
-        const a = base[g[i]], b = base[g[i+1]];
-        if (a && b) dense.push({ x: (a.x+b.x)/2, y: (a.y+b.y)/2 });
-      }
-    });
-    // Add centroid of each facial region for interior triangles
-    const regions = [
-      [36,37,38,39,40,41], // left eye interior
-      [42,43,44,45,46,47], // right eye interior
-      [48,49,50,51,52,53,54,55,56,57,58,59], // mouth
-      [27,31,32,33,34,35], // nose
-    ];
-    regions.forEach(r => {
-      const valid = r.map(i => base[i]).filter(Boolean);
-      if (valid.length) {
-        const cx = valid.reduce((s,p)=>s+p.x,0)/valid.length;
-        const cy = valid.reduce((s,p)=>s+p.y,0)/valid.length;
-        dense.push({x:cx, y:cy});
-      }
-    });
-
-    let del;
-    try { del = Delaunator.from(dense, p => p.x, p => p.y); }
-    catch(e) { return; }
-
-    ctx.save();
-    const pulse = (Math.sin(glowPhase * 2) + 1) / 2;
-    ctx.strokeStyle = `rgba(0,220,255,${0.6 + 0.22*pulse})`;
-    ctx.lineWidth = 0.9;
-    ctx.shadowColor = '#00d4ff';
-    ctx.shadowBlur = 8;
-    ctx.globalAlpha = 0.85;
-    ctx.setLineDash([]);
-
-    const tris = del.triangles;
-    const maxEdge = W * 0.45; // tighter cutoff to avoid hull triangles
-    for (let i = 0; i < tris.length; i += 3) {
-      const a = dense[tris[i]];
-      const b = dense[tris[i+1]];
-      const c = dense[tris[i+2]];
-      if (!a || !b || !c) continue;
-      if (Math.hypot(b.x-a.x,b.y-a.y) > maxEdge) continue;
-      if (Math.hypot(c.x-b.x,c.y-b.y) > maxEdge) continue;
-      if (Math.hypot(a.x-c.x,a.y-c.y) > maxEdge) continue;
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.lineTo(c.x, c.y);
-      ctx.closePath();
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  // ── Continuously update landmarks live ───────────────────
-  async function liveTrack() {
-    if (state !== 'found' && state !== 'scanning' && state !== 'done') return;
-    if (!video.videoWidth) return;
-    try {
-      const det = await faceapi
-        .detectSingleFace(video, detectOpts)
-        .withFaceLandmarks();
-      if (det && (state === 'found' || state === 'scanning' || state === 'done')) {
-        lastLandmarks = det.landmarks;
-      }
-    } catch(e) {}
-  }
-
-
-
-
-
-
-  // Draw full mirrored video onto canvas
-  function drawVideoFull() {
-    ctx.save();
-    ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
-    ctx.translate(W, 0); ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, W, H);
-    ctx.restore();
-  }
-
-  // Draw zoomed-in portion of video centered on face
-  function drawVideoZoomed() {
-    if (!zoomBox) { drawVideoFull(); return; }
-    const vw = video.videoWidth, vh = video.videoHeight;
-    // zoomBox is in canvas coords (mirrored), convert to video source coords
-    const scaleX = vw / W, scaleY = vh / H;
-    // Mirror X back for source
-    const sx = (W - zoomBox.x - zoomBox.w) * scaleX;
-    const sy = zoomBox.y * scaleY;
-    const sw = zoomBox.w * scaleX;
-    const sh = zoomBox.h * scaleY;
-    ctx.save();
-    ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
-    ctx.translate(W, 0); ctx.scale(-1, 1);
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
-    ctx.restore();
-  }
-
-  // Face box drawn over the full zoomed canvas (face fills frame)
-  function drawZoomedFaceBox(color, alpha) {
-    const pad = 12;
-    ctx.save();
-    ctx.strokeStyle = color; ctx.lineWidth = 1.8;
-    ctx.globalAlpha = alpha;
-    ctx.shadowColor = color; ctx.shadowBlur = 18;
-    ctx.setLineDash([8, 4]);
-    ctx.strokeRect(pad, pad, W - pad*2, H - pad*2);
-    ctx.restore();
-  }
-
-  function mapPoint(pt) {
-    const sx = W / video.videoWidth, sy = H / video.videoHeight;
-    let x = W - pt.x * sx; // mirror
-    let y = pt.y * sy;
-    if (zoomBox) {
-      const nx = (x - zoomBox.x) / zoomBox.w;
-      const ny = (y - zoomBox.y) / zoomBox.h;
-      if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return null;
-      x = nx * W; y = ny * H;
-    }
-    return {x,y};
-  }
-
-  function drawLandmarkMesh(landmarks) { /* replaced by drawTriMesh */ }
-
-  function drawResultOverlay() {
-    ctx.save();
-    ctx.fillStyle = '#00ff8822'; ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = '#00ff88'; ctx.lineWidth = 2.5;
-    ctx.shadowColor = '#00ff88'; ctx.shadowBlur = 24; ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.moveTo(W/2-30, H/2); ctx.lineTo(W/2-8, H/2+24); ctx.lineTo(W/2+34, H/2-24);
-    ctx.stroke();
-    drawCorners('#00ff88', 0.9);
-    ctx.restore();
-  }
-
-  function drawCorners(col, alpha) {
-    ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=2.5;
-    ctx.globalAlpha=alpha; ctx.shadowColor=col; ctx.shadowBlur=16; ctx.setLineDash([]);
-    const s=38, p=6;
-    [[p,p,1,1],[W-p,p,-1,1],[p,H-p,1,-1],[W-p,H-p,-1,-1]].forEach(([x,y,dx,dy])=>{
-      ctx.beginPath(); ctx.moveTo(x+dx*s,y); ctx.lineTo(x,y); ctx.lineTo(x,y+dy*s); ctx.stroke();
-    });
-    ctx.restore();
-  }
-
-  // ── Face detection loop ───────────────────────────
-  async function detect() {
-    if (state !== 'idle') return; // only look for face in idle
-    if (!video.videoWidth) return;
-
-    const det = await faceapi
-      .detectSingleFace(video, detectOpts)
-      .withFaceLandmarks();
-
-    if (state !== 'idle') return;
-
-    if (!det) {
-      setStatus('SCANNING FOR FACE…', '');
-      subEl.textContent = 'LOOK DIRECTLY AT THE CAMERA';
-      progEl.style.width = '10%';
-      return;
-    }
-
-    // ── Liveness gate: reject closed eyes before even starting ──
-    if (!eyesAreOpen(det.landmarks)) {
-      setStatus('EYES CLOSED — OPEN YOUR EYES', 'scanning');
-      subEl.textContent = 'LIVENESS CHECK: KEEP EYES OPEN TO PROCEED';
-      progEl.style.width = '10%';
-      return; // stay in idle, keep polling
-    }
-
-    // Face found — stop detection, start zoom sequence
-    stopDetection();
-    lastBox = det.detection.box;
-    lastLandmarks = det.landmarks;
-
-    // Convert face box from video space to canvas space (mirrored)
-    const sx = W / video.videoWidth, sy = H / video.videoHeight;
-    const pad = 50; // tighter framing to zoom closer on the face
-    const fx = W - (lastBox.x + lastBox.width)  * sx;
-    const fy = lastBox.y * sy;
-    const fw = lastBox.width  * sx;
-    const fh = lastBox.height * sy;
-
-    // Target zoom: face + padding, clamped to canvas
-    const tx = Math.max(0, fx - pad);
-    const ty = Math.max(0, fy - pad);
-    const tw = Math.min(W, fw + pad*2);
-    const th = Math.min(H, fh + pad*2);
-
-    zoomBox    = {x:0, y:0, w:W, h:H}; // start from full view
-    targetBox  = {x:tx, y:ty, w:tw, h:th};
-
-    state = 'found';
-    setStatus('FACE DETECTED — LOCKING ON…', 'scanning');
-    subEl.textContent = 'BIOMETRIC TARGET ACQUIRED';
-    progEl.style.width = '30%';
-
-    // Wait for zoom animation to settle (~1.2s), then start sweep
-    await sleep(1200);
-    if (state === 'found') startSweep();
-  }
-
-  function startSweep() {
-    state   = 'scanning';
-    scanX   = 0;
-    scanY   = 0;
-    scanDone= false;
-    setStatus('SCANNING FACIAL GEOMETRY…', 'scanning');
-    subEl.textContent = 'NEURAL PATTERN ANALYSIS IN PROGRESS';
-    // Play launch1 looping over the logo while scanning
-  }
-
-  async function finishScan() {
-    const match = await verifyFaceMatch();
-    if (!match.ok) {
-      state = 'idle';
-      scanDone = false;
-      zoomBox = targetBox = null;
-      progEl.style.width = '0%';
-      progEl.style.background = 'var(--c)';
-      progEl.style.boxShadow = '0 0 10px var(--c)';
-      setStatus('IDENTITY MISMATCH — ACCESS DENIED', 'fail');
-      subEl.textContent = match.reason || 'FACE NOT RECOGNISED';
-      enrollBtn.style.display = 'block';
-      lastLandmarks = null;
-      if (!detInterval) detInterval = setInterval(detect, 1800);
-      return;
-    }
-
-    state = 'done';
-    progEl.style.width = '100%';
-    progEl.style.background = 'var(--cg)';
-    progEl.style.boxShadow = '0 0 14px var(--cg)';
-    setStatus(`▸ IDENTITY CONFIRMED — MATCH ${Math.round((1-match.distance)*100)}%`, 'ok');
-    subEl.textContent = 'WELCOME BACK. LAUNCHING COMMAND CENTER…';
-    enrollBtn.style.display = 'none';
-    playLaunchVideo();
-  }
-
-  // ── Inline logo video helpers ─────────────────────
-  function playLaunchVideo() {
-    stopCamera();
-    const el = document.getElementById('palm-auth');
-    el.classList.add('fade-out');
-    setTimeout(()=>{
-      el.style.display='none';
-      document.getElementById('setup-modal').classList.add('hidden');
-      startBoot(); initAudioViz();
-    }, 900);
-  }
-
-
-  function stopDetection() {
-    if (detInterval) { clearInterval(detInterval); detInterval = null; }
-    if (liveTrackInterval) { clearInterval(liveTrackInterval); liveTrackInterval = null; }
-  }
-  function stopCamera() {
-    if (video.srcObject) { video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject=null; }
-  }
-
-  function launchCommandCenter() {
-    document.getElementById('setup-modal').classList.add('hidden');
-    startBoot(); initAudioViz();
-  }
-
-  // ── Init ─────────────────────────────────────────
-  async function init() {
-    setStatus('LOADING NEURAL MODELS…', '');
-    subEl.textContent = 'INITIALISING FACE DETECTION ENGINE';
-
-    try {
-      await Promise.all([
-        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-      ]);
-      console.log('[FaceAuth] Model loaded');
-    } catch(e) {
-      setStatus('MODEL LOAD FAILED — CHECK CONNECTION', 'fail');
-      subEl.textContent = e.message; return;
-    }
-
-    let refLoaded = await loadReferenceFromDB();
-    if (!refLoaded) refLoaded = await loadReferenceFace();
-    if (!refLoaded) {
-      setStatus('NO REFERENCE FOUND — ENROLL REQUIRED', 'fail');
-      subEl.textContent = 'CLICK ENROLL TO SAVE YOUR FACE LOCALLY';
-      enrollBtn.style.display = 'block';
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:'user'}});
-      video.srcObject = stream;
-      await new Promise(r => { video.onloadedmetadata = r; });
-      video.play();
-    } catch(e) {
-      setStatus('CAMERA ACCESS DENIED', 'fail');
-      subEl.textContent = 'ALLOW CAMERA PERMISSION AND RELOAD'; return;
-    }
-
-    renderLoop();
-    detInterval = setInterval(detect, 1800);
-    setStatus('SCANNING FOR FACE…', '');
-    subEl.textContent = 'LOOK DIRECTLY AT THE CAMERA';
-    progEl.style.width = '10%';
-
-    enrollBtn.addEventListener('click', enrollCurrentFace);
-  }
-
-  window.addEventListener('load', init);
-})();
-
-// ═══════════════════════════════════════
-//  REPULSOR TARGETING RADAR
-// ═══════════════════════════════════════
-(function(){
-  const canvas = document.getElementById('radar-canvas');
-  if(!canvas) return;
-  const ctx = canvas.getContext('2d');
-  let W, H, cx, cy, R, t = 0;
-  let sweepAngle = 0;
-  const SWEEP_SPEED = 0.022; // radians per frame
-
-  // ── Blips ──
-  const BLIP_DATA = [
-    { name:'BOGEY-01', threat:'HIGH',     ar:0.38, aa: 0.62 },
-    { name:'BOGEY-02', threat:'CRITICAL', ar:0.55, aa: 1.85 },
-    { name:'BOGEY-03', threat:'MEDIUM',   ar:0.72, aa: 3.10 },
-    { name:'BOGEY-04', threat:'LOW',      ar:0.28, aa: 4.40 },
-    { name:'BOGEY-05', threat:'HIGH',     ar:0.60, aa: 5.20 },
-    { name:'BOGEY-06', threat:'LOW',      ar:0.82, aa: 0.20 },
-  ];
-  const THREAT_COL = { LOW:'#00ff88', MEDIUM:'#ffb700', HIGH:'#ff6600', CRITICAL:'#ff2222' };
-
-  let blips = [];
-  function initBlips(){
-    blips = BLIP_DATA.map((b,i) => ({
-      ...b,
-      // position in polar: r fraction, angle
-      r: b.ar, a: b.aa,
-      // drift slowly
-      vr: (Math.random()-0.5)*0.0002,
-      va: (Math.random()-0.5)*0.0003,
-      // fade-in after sweep hits
-      alpha: 0,
-      lastHit: -999,
-      lockPct: 0,
-      locked: false,
-    }));
-  }
-
-  function resize(){
-    const rect = canvas.getBoundingClientRect();
-    W = canvas.width  = rect.width;
-    H = canvas.height = rect.height;
-    cx = W/2; cy = H/2;
-    R  = Math.min(W, H) * 0.28; // radar radius
-  }
-
-  // ── Draw outer ring with tick marks ──
-  function drawOuterRing(){
-    ctx.save();
-    // dark bg
-    ctx.fillStyle = 'rgba(0,4,14,0.96)';
-    ctx.fillRect(0,0,W,H);
-
-    // outer bezel arc (not full — match reference: arc from ~200° to ~340° top, gaps at sides)
-    // actually draw full ring with two bright accent arcs
-    ctx.strokeStyle = 'rgba(0,180,255,0.25)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(cx,cy,R+14,0,Math.PI*2); ctx.stroke();
-
-    // bright accent arcs (top-left and bottom-right like reference)
-    ctx.strokeStyle = 'rgba(0,220,255,0.9)';
-    ctx.lineWidth = 2.5;
-    ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 8;
-    // top-left arc ~200°–290°
-    ctx.beginPath(); ctx.arc(cx,cy,R+14, 3.49, 5.06); ctx.stroke();
-    // bottom-right arc ~20°–100°
-    ctx.beginPath(); ctx.arc(cx,cy,R+14, 0.35, 1.74); ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // tick marks around ring
-    for(let deg=0; deg<360; deg++){
-      const rad = deg * Math.PI/180;
-      const isMajor = deg % 10 === 0;
-      const len = isMajor ? 8 : 4;
-      const r0 = R+6, r1 = r0+len;
-      ctx.strokeStyle = isMajor ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.28)';
-      ctx.lineWidth = isMajor ? 1.2 : 0.6;
-      ctx.beginPath();
-      ctx.moveTo(cx + Math.sin(rad)*r0, cy - Math.cos(rad)*r0);
-      ctx.lineTo(cx + Math.sin(rad)*r1, cy - Math.cos(rad)*r1);
-      ctx.stroke();
-    }
-
-    // cardinal labels N/E/S/W
-    const labels = [['N',0],['E',90],['S',180],['W',270]];
-    ctx.font = 'bold 8px "Orbitron",sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    labels.forEach(([lbl,deg])=>{
-      const rad = deg*Math.PI/180;
-      const lr = R+28;
-      ctx.fillText(lbl, cx+Math.sin(rad)*lr, cy-Math.cos(rad)*lr);
-    });
-    ctx.restore();
-  }
-
-  // ── Draw concentric rings + crosshairs ──
-  function drawGrid(){
-    ctx.save();
-    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.clip();
-
-    // concentric rings (6 of them)
-    for(let i=1; i<=6; i++){
-      const r = R*(i/6);
-      ctx.strokeStyle = `rgba(0,180,255,${i===3?0.22:0.11})`;
-      ctx.lineWidth = i===3 ? 0.8 : 0.5;
-      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
-    }
-
-    // radial spokes every 30°
-    for(let deg=0; deg<360; deg+=30){
-      const rad = deg*Math.PI/180;
-      ctx.strokeStyle = 'rgba(0,160,255,0.08)';
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      ctx.moveTo(cx,cy);
-      ctx.lineTo(cx+Math.cos(rad)*R, cy+Math.sin(rad)*R);
-      ctx.stroke();
-    }
-
-    // crosshair lines (bright)
-    ctx.strokeStyle = 'rgba(0,200,255,0.35)';
-    ctx.lineWidth = 0.7;
-    ctx.setLineDash([4,4]);
-    ctx.beginPath(); ctx.moveTo(cx-R,cy); ctx.lineTo(cx+R,cy); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx,cy-R); ctx.lineTo(cx,cy+R); ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.restore();
-  }
-
-  // ── Draw sweep beam ──
-  function drawSweep(){
-    ctx.save();
-    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.clip();
-
-    // trailing fade — gradient wedge
-    const trailLen = Math.PI * 0.55; // how wide the trail is
-    const grad = ctx.createConicalGradient
-      ? null // not standard; use manual approach
-      : null;
-
-    // Draw filled arc sweep (trail)
-    const steps = 40;
-    for(let i=0; i<steps; i++){
-      const frac = i/steps;
-      const a0 = sweepAngle - trailLen*(1-frac);
-      const a1 = sweepAngle - trailLen*(1-(frac+1/steps));
-      ctx.beginPath();
-      ctx.moveTo(cx,cy);
-      ctx.arc(cx,cy,R,a0,a1);
-      ctx.closePath();
-      ctx.fillStyle = `rgba(0,200,255,${frac * frac * 0.18})`;
-      ctx.fill();
-    }
-
-    // bright sweep line
-    ctx.strokeStyle = 'rgba(0,230,255,0.95)';
-    ctx.lineWidth = 1.8;
-    ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 14;
-    ctx.beginPath();
-    ctx.moveTo(cx,cy);
-    ctx.lineTo(cx + Math.cos(sweepAngle)*R, cy + Math.sin(sweepAngle)*R);
-    ctx.stroke();
-
-    // centre dot
-    ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2);
-    ctx.fillStyle='rgba(0,230,255,1)'; ctx.shadowBlur=18; ctx.fill();
-
-    ctx.restore();
-  }
-
-  // ── Draw blips ──
-  function drawBlips(){
-    blips.forEach(b=>{
-      // drift
-      b.r += b.vr; b.a += b.va;
-      if(b.r<0.1) b.r=0.1; if(b.r>0.92) b.r=0.92;
-
-      // check if sweep just passed this blip
-      const blipAngle = b.a % (Math.PI*2);
-      const sw = ((sweepAngle % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
-      const ba = (blipAngle + Math.PI*2) % (Math.PI*2);
-      const diff = (sw - ba + Math.PI*2) % (Math.PI*2);
-      if(diff < 0.07){
-        b.lastHit = t;
-        b.alpha = 1.0;
-        if(!b.locked) b.lockPct = Math.min(1, b.lockPct + 0.12);
-        if(b.lockPct >= 1) b.locked = true;
-      }
-
-      // fade blip over time
-      const age = t - b.lastHit;
-      b.alpha = Math.max(0, 1 - age/180);
-      if(b.alpha <= 0) return;
-
-      const bx = cx + Math.cos(b.a) * b.r * R;
-      const by = cy + Math.sin(b.a) * b.r * R;
-      const col = THREAT_COL[b.threat];
-
-      ctx.save();
-      ctx.globalAlpha = b.alpha;
-
-      // blip glow dot
-      ctx.shadowColor = col; ctx.shadowBlur = 14;
-      ctx.fillStyle = col;
-      ctx.beginPath(); ctx.arc(bx,by,3.5,0,Math.PI*2); ctx.fill();
-      // inner bright core
-      ctx.fillStyle = '#fff'; ctx.shadowBlur=4;
-      ctx.beginPath(); ctx.arc(bx,by,1.5,0,Math.PI*2); ctx.fill();
-
-      // lock-on bracket if locked
-      if(b.locked){
-        const bs = 10 + 3*Math.sin(t*0.08);
-        ctx.strokeStyle = col; ctx.lineWidth=1; ctx.shadowBlur=8;
-        ctx.setLineDash([3,2]);
-        ctx.strokeRect(bx-bs/2, by-bs/2, bs, bs);
-        ctx.setLineDash([]);
-        // corner brackets
-        const cs=4; ctx.lineWidth=1.5; ctx.setLineDash([]);
-        [[bx-bs/2,by-bs/2,1,1],[bx+bs/2,by-bs/2,-1,1],[bx-bs/2,by+bs/2,1,-1],[bx+bs/2,by+bs/2,-1,-1]].forEach(([px,py,dx,dy])=>{
-          ctx.beginPath(); ctx.moveTo(px+dx*cs,py); ctx.lineTo(px,py); ctx.lineTo(px,py+dy*cs); ctx.stroke();
-        });
-        // label
-        ctx.font='bold 5.5px "Orbitron",sans-serif';
-        ctx.fillStyle=col; ctx.shadowBlur=4; ctx.shadowColor=col;
-        ctx.textAlign='left';
-        ctx.fillText(b.name, bx+8, by-3);
-        ctx.fillStyle='rgba(0,200,255,0.7)'; ctx.shadowBlur=0;
-        ctx.font='5px "Share Tech Mono",monospace';
-        ctx.fillText('■ LOCKED', bx+8, by+5);
-      } else if(b.lockPct>0){
-        // lock-on progress arc
-        ctx.strokeStyle=col; ctx.lineWidth=1.2; ctx.shadowBlur=6;
-        ctx.beginPath(); ctx.arc(bx,by,9,-Math.PI/2,-Math.PI/2+b.lockPct*Math.PI*2); ctx.stroke();
-        ctx.font='5.5px "Orbitron",sans-serif';
-        ctx.fillStyle=col; ctx.textAlign='left'; ctx.shadowBlur=3;
-        ctx.fillText(b.name, bx+8, by-2);
-        ctx.font='5px "Share Tech Mono",monospace';
-        ctx.fillStyle='rgba(0,200,255,0.6)';
-        ctx.fillText('ACQ '+(b.lockPct*100).toFixed(0)+'%', bx+8, by+6);
-      }
-
-      ctx.restore();
-    });
-  }
-
-  // ── Readouts strip below radar ──
-  function drawReadouts(){
-    const locked  = blips.filter(b=>b.locked).length;
-    const total   = blips.length;
-    const critical= blips.filter(b=>b.threat==='CRITICAL'&&b.alpha>0).length;
-
-    ctx.save();
-    ctx.font = '6.5px "Share Tech Mono",monospace';
-
-    const cols = [
-      { label:'TRACKING', val: total+' BOGEYS',  col:'#00d4ff' },
-      { label:'LOCKED',   val: locked+'/'+total, col:'#00ff88' },
-      { label:'CRITICAL', val: critical,          col: critical>0?'#ff2222':'#00ff88' },
-      { label:'SWEEP',    val: (sweepAngle*180/Math.PI).toFixed(0)+'°', col:'#00d4ff' },
-    ];
-
-    const stripY = cy+R+20;
-    const colW   = W/4;
-
-    cols.forEach((c2,i)=>{
-      const rx = i*colW + colW/2;
-      ctx.textAlign='center';
-      ctx.fillStyle='rgba(0,180,255,0.45)'; ctx.shadowBlur=0;
-      ctx.fillText(c2.label, rx, stripY);
-      ctx.font='bold 8px "Share Tech Mono",monospace';
-      ctx.fillStyle=c2.col; ctx.shadowColor=c2.col; ctx.shadowBlur=5;
-      ctx.fillText(c2.val, rx, stripY+11);
-      ctx.font='6.5px "Share Tech Mono",monospace';
-    });
-
-    // range rings label
-    ctx.textAlign='left'; ctx.shadowBlur=0;
-    ctx.fillStyle='rgba(0,180,255,0.3)';
-    ctx.font='5px "Share Tech Mono",monospace';
-    for(let i=1;i<=3;i++){
-      const lr = R*(i*2/6);
-      ctx.fillText((i*20)+'km', cx+lr+2, cy+4);
-    }
-
-    ctx.restore();
-  }
-
-  function frame(){
-    requestAnimationFrame(frame);
-    t++;
-    sweepAngle += SWEEP_SPEED;
-
-    ctx.clearRect(0,0,W,H);
-    drawOuterRing();
-    drawGrid();
-    drawSweep();
-    drawBlips();
-    drawReadouts();
-  }
-
-  const hudEl = document.getElementById('hud');
-  const obs = new MutationObserver(()=>{
-    if(hudEl.classList.contains('visible')){
-      obs.disconnect();
-      resize();
-      initBlips();
-      frame();
-      window.addEventListener('resize',()=>{ resize(); });
-    }
-  });
-  obs.observe(hudEl,{attributes:true});
-})();
-
-
-
-
-
-
+    await renderer.xr.setSession(session);
+    document.getElementById('start').style.display = 'none';
+    document.getElementById('ui').classList.add('active');
+  } catch(e) { showErr('Could not start AR: ' + e.message); }
+});
+
+document.getElementById('exit-btn').addEventListener('click', () => {
+  if (xrSession) xrSession.end();
+});
+
+document.getElementById('refresh-btn').addEventListener('click', async () => {
+  if (!userLat) return;
+  await loadWeather();
+  if (calibrated) buildCards(), placeCards();
+});
+
+function showErr(m){ const e=document.getElementById('err-msg'); e.textContent=m; e.style.display='block'; }
+function clearErr(){ document.getElementById('err-msg').style.display='none'; }
+
+// ── GO ────────────────────────────────────────────────
+init();
+startGPS();
 </script>
 </body>
 </html>
