@@ -173,6 +173,47 @@
       display: none;
     }
 
+    #tracking-stage {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    #tracking-video {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+    }
+
+    #tracking-overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.92;
+    }
+
+    .tracker-pill {
+      position: fixed;
+      right: 16px;
+      top: calc(env(safe-area-inset-top, 0) + 16px);
+      z-index: 11;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(3, 12, 24, 0.8);
+      border: 1px solid rgba(136, 224, 255, 0.16);
+      color: var(--muted);
+      font-size: 12px;
+      backdrop-filter: blur(14px);
+      pointer-events: auto;
+    }
+
+    .tracker-pill strong {
+      color: var(--accent);
+    }
+
     @media (max-width: 640px) {
       .panel {
         margin-top: 10px;
@@ -183,12 +224,16 @@
 </head>
 <body>
   <div id="app"></div>
+  <div id="tracking-stage">
+    <video id="tracking-video" playsinline muted autoplay></video>
+    <canvas id="tracking-overlay"></canvas>
+  </div>
 
   <div id="overlay">
     <section class="panel" id="intro-panel">
       <div class="eyebrow">Surface AR</div>
       <h1>Palm Grab Cube</h1>
-      <p>Start AR, scan for a real surface, then tap the screen or press Place Cube. The cube idles with a float-spin animation until you grab it with your palm and non-index fingertips.</p>
+      <p>Start AR, scan for a real surface, then tap the screen or press Place Cube. The cube idles with a float-spin animation until a separate rear-camera hand tracker reports a palm grab.</p>
       <div class="controls">
         <button id="start-ar" type="button">Start WebXR</button>
         <button id="place-button" type="button" disabled>Place Cube</button>
@@ -200,20 +245,24 @@
     </section>
 
     <div class="footer">
-      <div class="hint" id="hint-text">Grab gesture: move your palm near the cube, then curl middle, ring, or pinky fingertips toward your palm center. Native WebXR hand joints are used when the browser/device exposes them.</div>
+      <div class="hint" id="hint-text">Grab gesture: move your palm near the cube, then curl middle, ring, or pinky fingertips toward your palm center. This page now expects a camera-based ONNX hand tracker instead of native XR hand joints.</div>
     </div>
   </div>
+
+  <div class="tracker-pill" id="tracker-pill"><strong>Hand Tracker:</strong> booting</div>
 
   <script type="importmap">
     {
       "imports": {
-        "three": "https://unpkg.com/three@0.160.1/build/three.module.js"
+        "three": "https://unpkg.com/three@0.160.1/build/three.module.js",
+        "ort": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/ort.min.mjs"
       }
     }
   </script>
 
   <script type="module">
     import * as THREE from "three";
+    import * as ort from "ort";
 
     const overlay = document.getElementById("overlay");
     const introPanel = document.getElementById("intro-panel");
@@ -222,6 +271,10 @@
     const placeButton = document.getElementById("place-button");
     const statusDot = document.getElementById("status-dot");
     const statusText = document.getElementById("status-text");
+    const trackingVideo = document.getElementById("tracking-video");
+    const trackingOverlay = document.getElementById("tracking-overlay");
+    const trackerPill = document.getElementById("tracker-pill");
+    const trackingCtx = trackingOverlay.getContext("2d");
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -315,32 +368,36 @@
       cubePlaced: false,
       cubeBasePosition: new THREE.Vector3(),
       cubeGrabbed: false,
-      grabHandedness: null,
       lastPlacementTime: 0,
-      handTrackingAvailable: false,
-      handDataByHandedness: new Map()
+      cameraStream: null,
+      trackerBooted: false,
+      trackerReady: false,
+      trackerActive: false,
+      trackerRunning: false,
+      lastTrackerFrameTime: 0,
+      handObservation: {
+        seen: false,
+        palmScreen: new THREE.Vector2(0.5, 0.5),
+        palmWorld: new THREE.Vector3(),
+        grabStrength: 0,
+        fingertips: []
+      },
+      trackerSession: null
     };
 
-    const palmForward = new THREE.Vector3();
-    const palmSide = new THREE.Vector3();
-    const palmUp = new THREE.Vector3();
     const cubeTarget = new THREE.Vector3();
     const cubeScaleTarget = new THREE.Vector3(1, 1, 1);
     const tempVectorA = new THREE.Vector3();
+    const tempVectorB = new THREE.Vector3();
+    const tempVectorC = new THREE.Vector3();
     const tempQuaternion = new THREE.Quaternion();
     const tempMatrix = new THREE.Matrix4();
     const worldUp = new THREE.Vector3(0, 1, 0);
-
-    const JOINTS = {
-      wrist: "wrist",
-      indexBase: "index-finger-metacarpal",
-      middleBase: "middle-finger-metacarpal",
-      ringBase: "ring-finger-metacarpal",
-      pinkyBase: "pinky-finger-metacarpal",
-      middleTip: "middle-finger-tip",
-      ringTip: "ring-finger-tip",
-      pinkyTip: "pinky-finger-tip"
-    };
+    const tempVector2 = new THREE.Vector2();
+    const trackerInputCanvas = document.createElement("canvas");
+    const trackerInputCtx = trackerInputCanvas.getContext("2d", { willReadFrequently: true });
+    const TRACKER_MODEL_URL = "./models/hand_landmarks.onnx";
+    const TRACKER_INPUT_SIZE = 256;
 
     function setStatus(text, ready = false) {
       statusText.textContent = text;
@@ -357,6 +414,223 @@
 
     function updatePlaceAvailability() {
       placeButton.disabled = !(state.session && state.surfaceFound);
+    }
+
+    function setTrackerStatus(text, active = false) {
+      trackerPill.innerHTML = `<strong>Hand Tracker:</strong> ${text}`;
+      trackerPill.style.borderColor = active ? "rgba(125, 244, 165, 0.28)" : "rgba(136, 224, 255, 0.16)";
+      trackerPill.style.color = active ? "#dfffea" : "";
+    }
+
+    function fitTrackingOverlay() {
+      trackingOverlay.width = window.innerWidth;
+      trackingOverlay.height = window.innerHeight;
+    }
+
+    async function startTrackingCamera() {
+      if (state.cameraStream) return;
+
+      state.cameraStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+
+      trackingVideo.srcObject = state.cameraStream;
+      await trackingVideo.play();
+      fitTrackingOverlay();
+      state.trackerBooted = true;
+      setTrackerStatus("camera ready", true);
+    }
+
+    async function initOnnxTracker() {
+      if (state.trackerSession) return true;
+
+      try {
+        ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/";
+        state.trackerSession = await ort.InferenceSession.create(TRACKER_MODEL_URL, {
+          executionProviders: ["wasm"]
+        });
+        state.trackerReady = true;
+        setTrackerStatus("onnx model loaded", true);
+        return true;
+      } catch (error) {
+        state.trackerReady = false;
+        setTrackerStatus("model missing - add ./models/hand_landmarks.onnx");
+        console.warn("ONNX hand tracker load failed:", error);
+        return false;
+      }
+    }
+
+    function normalizeLandmarks(rawTensor) {
+      if (!rawTensor || !rawTensor.data) return null;
+      const values = rawTensor.data;
+      if (values.length < 63) return null;
+
+      const points = [];
+      const stride = Math.floor(values.length / 21);
+      let maxXY = 0;
+
+      for (let i = 0; i < 21; i += 1) {
+        const x = values[i * stride];
+        const y = values[i * stride + 1];
+        const z = stride > 2 ? values[i * stride + 2] : 0;
+        maxXY = Math.max(maxXY, Math.abs(x), Math.abs(y));
+        points.push({ x, y, z });
+      }
+
+      if (maxXY > 2) {
+        for (const point of points) {
+          point.x /= TRACKER_INPUT_SIZE;
+          point.y /= TRACKER_INPUT_SIZE;
+        }
+      }
+
+      return points;
+    }
+
+    function extractLandmarks(outputMap) {
+      const tensors = Object.values(outputMap || {});
+      let candidate = null;
+
+      for (const tensor of tensors) {
+        if (!tensor?.data) continue;
+        if (tensor.data.length >= 63) {
+          candidate = tensor;
+          break;
+        }
+      }
+
+      return normalizeLandmarks(candidate);
+    }
+
+    function samplePalmObservationFromLandmarks(landmarks) {
+      if (!landmarks || landmarks.length < 21) {
+        state.handObservation.seen = false;
+        state.handObservation.grabStrength = 0;
+        return;
+      }
+
+      const wrist = landmarks[0];
+      const indexBase = landmarks[5];
+      const middleBase = landmarks[9];
+      const ringBase = landmarks[13];
+      const pinkyBase = landmarks[17];
+      const middleTip = landmarks[12];
+      const ringTip = landmarks[16];
+      const pinkyTip = landmarks[20];
+
+      const palmX = (wrist.x + indexBase.x + middleBase.x + ringBase.x + pinkyBase.x) / 5;
+      const palmY = (wrist.y + indexBase.y + middleBase.y + ringBase.y + pinkyBase.y) / 5;
+
+      const palm = tempVector2.set(palmX, palmY);
+      const tipDistances = [
+        Math.hypot(middleTip.x - palm.x, middleTip.y - palm.y),
+        Math.hypot(ringTip.x - palm.x, ringTip.y - palm.y),
+        Math.hypot(pinkyTip.x - palm.x, pinkyTip.y - palm.y)
+      ];
+
+      let curledCount = 0;
+      for (const distance of tipDistances) {
+        if (distance < 0.16) curledCount += 1;
+      }
+
+      state.handObservation.seen = true;
+      state.handObservation.palmScreen.set(
+        THREE.MathUtils.clamp(palmX, 0, 1),
+        THREE.MathUtils.clamp(palmY, 0, 1)
+      );
+      state.handObservation.grabStrength = curledCount / 3;
+      state.handObservation.fingertips = [middleTip, ringTip, pinkyTip];
+    }
+
+    function drawTrackingDebug() {
+      trackingCtx.clearRect(0, 0, trackingOverlay.width, trackingOverlay.height);
+
+      if (!state.handObservation.seen) return;
+
+      const palmX = state.handObservation.palmScreen.x * trackingOverlay.width;
+      const palmY = state.handObservation.palmScreen.y * trackingOverlay.height;
+
+      trackingCtx.strokeStyle = "rgba(136, 224, 255, 0.95)";
+      trackingCtx.fillStyle = "rgba(136, 224, 255, 0.2)";
+      trackingCtx.lineWidth = 3;
+      trackingCtx.beginPath();
+      trackingCtx.arc(palmX, palmY, 28, 0, Math.PI * 2);
+      trackingCtx.fill();
+      trackingCtx.stroke();
+
+      trackingCtx.fillStyle = "#e6f6ff";
+      trackingCtx.font = "12px Segoe UI";
+      trackingCtx.fillText(`grab ${state.handObservation.grabStrength.toFixed(2)}`, palmX + 18, palmY - 18);
+
+      for (const tip of state.handObservation.fingertips) {
+        const x = tip.x * trackingOverlay.width;
+        const y = tip.y * trackingOverlay.height;
+        trackingCtx.beginPath();
+        trackingCtx.arc(x, y, 10, 0, Math.PI * 2);
+        trackingCtx.fill();
+      }
+    }
+
+    function projectPalmToWorld() {
+      if (!state.handObservation.seen || !state.session || !state.cubePlaced) return false;
+
+      const xrCamera = renderer.xr.getCamera(camera);
+      const cameraWorld = xrCamera.getWorldPosition(tempVectorA);
+      const cubeDepth = cameraWorld.distanceTo(cubeGroup.position);
+      const ndcX = state.handObservation.palmScreen.x * 2 - 1;
+      const ndcY = 1 - state.handObservation.palmScreen.y * 2;
+
+      tempVectorB.set(ndcX, ndcY, 0.5).unproject(xrCamera);
+      tempVectorC.copy(tempVectorB).sub(cameraWorld).normalize();
+      state.handObservation.palmWorld.copy(cameraWorld).addScaledVector(tempVectorC, cubeDepth);
+      return true;
+    }
+
+    async function runTrackingFrame(now) {
+      if (!state.trackerBooted || !state.trackerSession || trackingVideo.readyState < 2) return;
+      if (now - state.lastTrackerFrameTime < 66) return;
+      if (state.trackerRunning) return;
+      state.lastTrackerFrameTime = now;
+      state.trackerRunning = true;
+
+      trackerInputCanvas.width = TRACKER_INPUT_SIZE;
+      trackerInputCanvas.height = TRACKER_INPUT_SIZE;
+      trackerInputCtx.drawImage(trackingVideo, 0, 0, TRACKER_INPUT_SIZE, TRACKER_INPUT_SIZE);
+
+      const imageData = trackerInputCtx.getImageData(0, 0, TRACKER_INPUT_SIZE, TRACKER_INPUT_SIZE);
+      const floatData = new Float32Array(TRACKER_INPUT_SIZE * TRACKER_INPUT_SIZE * 3);
+
+      for (let i = 0, p = 0; i < imageData.data.length; i += 4, p += 1) {
+        floatData[p] = imageData.data[i] / 255;
+        floatData[p + TRACKER_INPUT_SIZE * TRACKER_INPUT_SIZE] = imageData.data[i + 1] / 255;
+        floatData[p + TRACKER_INPUT_SIZE * TRACKER_INPUT_SIZE * 2] = imageData.data[i + 2] / 255;
+      }
+
+      try {
+        const inputName = state.trackerSession.inputNames[0];
+        const feeds = {};
+        feeds[inputName] = new ort.Tensor("float32", floatData, [1, 3, TRACKER_INPUT_SIZE, TRACKER_INPUT_SIZE]);
+        const outputs = await state.trackerSession.run(feeds);
+        const landmarks = extractLandmarks(outputs);
+        samplePalmObservationFromLandmarks(landmarks);
+        state.trackerActive = state.handObservation.seen;
+        setTrackerStatus(state.handObservation.seen ? "hand seen" : "camera active", true);
+      } catch (error) {
+        state.handObservation.seen = false;
+        state.handObservation.grabStrength = 0;
+        state.trackerActive = false;
+        setTrackerStatus("model output mismatch");
+        console.warn("ONNX tracking frame failed:", error);
+      } finally {
+        state.trackerRunning = false;
+      }
+
+      drawTrackingDebug();
     }
 
     async function checkSupport() {
@@ -402,127 +676,41 @@
       floorShadow.position.set(tempVectorA.x, tempVectorA.y + 0.002, tempVectorA.z);
       state.cubePlaced = true;
       state.cubeGrabbed = false;
-      state.grabHandedness = null;
       setStatus("Cube placed. Move your palm near it to grab.", true);
       setHint("Tap again to reposition the cube on another detected surface.");
     }
 
-    function readJoint(frame, inputSource, jointName, referenceSpace, target) {
-      const joint = inputSource.hand.get(jointName);
-      if (!joint) return false;
-      const pose = frame.getJointPose(joint, referenceSpace);
-      if (!pose) return false;
-      target.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
-      return true;
-    }
-
-    function updateHandData(frame, referenceSpace) {
-      state.handDataByHandedness.clear();
-
-      if (!state.session) return;
-
-      for (const inputSource of state.session.inputSources) {
-        if (!inputSource.hand || !inputSource.handedness) continue;
-
-        const wrist = new THREE.Vector3();
-        const indexBase = new THREE.Vector3();
-        const middleBase = new THREE.Vector3();
-        const ringBase = new THREE.Vector3();
-        const pinkyBase = new THREE.Vector3();
-        const middleTip = new THREE.Vector3();
-        const ringTip = new THREE.Vector3();
-        const pinkyTip = new THREE.Vector3();
-
-        const hasAllCore =
-          readJoint(frame, inputSource, JOINTS.wrist, referenceSpace, wrist) &&
-          readJoint(frame, inputSource, JOINTS.indexBase, referenceSpace, indexBase) &&
-          readJoint(frame, inputSource, JOINTS.middleBase, referenceSpace, middleBase) &&
-          readJoint(frame, inputSource, JOINTS.ringBase, referenceSpace, ringBase) &&
-          readJoint(frame, inputSource, JOINTS.pinkyBase, referenceSpace, pinkyBase);
-
-        if (!hasAllCore) continue;
-
-        readJoint(frame, inputSource, JOINTS.middleTip, referenceSpace, middleTip);
-        readJoint(frame, inputSource, JOINTS.ringTip, referenceSpace, ringTip);
-        readJoint(frame, inputSource, JOINTS.pinkyTip, referenceSpace, pinkyTip);
-
-        const palmCenter = new THREE.Vector3()
-          .add(wrist)
-          .add(indexBase)
-          .add(middleBase)
-          .add(ringBase)
-          .add(pinkyBase)
-          .multiplyScalar(1 / 5);
-
-        palmSide.copy(pinkyBase).sub(indexBase);
-        palmForward.copy(middleBase).sub(wrist);
-        palmUp.crossVectors(palmSide, palmForward).normalize();
-        if (inputSource.handedness === "left") {
-          palmUp.multiplyScalar(-1);
-        }
-        if (!Number.isFinite(palmUp.x)) {
-          palmUp.copy(worldUp);
-        }
-
-        let curledCount = 0;
-        const curlDistances = [
-          middleTip.distanceTo(palmCenter),
-          ringTip.distanceTo(palmCenter),
-          pinkyTip.distanceTo(palmCenter)
-        ];
-
-        for (const distance of curlDistances) {
-          if (distance > 0 && distance < 0.09) curledCount += 1;
-        }
-
-        const cubeDistance = state.cubePlaced ? cubeGroup.position.distanceTo(palmCenter) : Infinity;
-        const isGrabPose = curledCount >= 2 && cubeDistance < 0.18;
-
-        state.handDataByHandedness.set(inputSource.handedness, {
-          palmCenter,
-          palmUp: palmUp.clone(),
-          curledCount,
-          cubeDistance,
-          isGrabPose
-        });
-      }
-    }
-
     function updateGrabState() {
       if (!state.cubePlaced) return;
+      if (!projectPalmToWorld()) return;
+
+      const cubeDistance = cubeGroup.position.distanceTo(state.handObservation.palmWorld);
+      const grabPose = state.handObservation.seen && state.handObservation.grabStrength >= 0.66 && cubeDistance < 0.22;
 
       if (!state.cubeGrabbed) {
-        for (const [handedness, handData] of state.handDataByHandedness) {
-          if (!handData.isGrabPose) continue;
+        if (grabPose) {
           state.cubeGrabbed = true;
-          state.grabHandedness = handedness;
-          setStatus(`Cube grabbed by ${handedness} hand.`, true);
+          setStatus("Cube grabbed by camera hand tracker.", true);
           setHint("Relax your fingers to release the cube back into float mode.");
-          break;
         }
       }
 
       if (state.cubeGrabbed) {
-        const handData = state.handDataByHandedness.get(state.grabHandedness);
-        if (!handData || !handData.isGrabPose) {
+        if (!grabPose) {
           state.cubeGrabbed = false;
-          state.grabHandedness = null;
           state.cubeBasePosition.copy(cubeGroup.position);
           setStatus("Cube released. It is floating in place again.", true);
           setHint("Move your palm near the cube and curl middle, ring, or pinky fingers to grab it.");
           return;
         }
 
-        cubeTarget.copy(handData.palmCenter).addScaledVector(handData.palmUp, 0.06);
+        cubeTarget.copy(state.handObservation.palmWorld).addScaledVector(worldUp, 0.04);
         cubeGroup.position.lerp(cubeTarget, 0.45);
 
-        tempMatrix.lookAt(handData.palmCenter, cubeTarget, worldUp);
+        tempMatrix.lookAt(cubeTarget, renderer.xr.getCamera(camera).getWorldPosition(tempVectorA), worldUp);
         tempQuaternion.setFromRotationMatrix(tempMatrix);
         cubeGroup.quaternion.slerp(tempQuaternion, 0.22);
         cubeGroup.scale.lerp(cubeScaleTarget.setScalar(1.08), 0.18);
-
-        floorShadow.visible = true;
-        floorShadow.position.set(cubeGroup.position.x, Math.max(0, cubeGroup.position.y - 0.07), cubeGroup.position.z);
       }
     }
 
@@ -567,14 +755,20 @@
       if (!navigator.xr) return;
 
       try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("Rear camera API is unavailable in this browser.");
+        }
+
+        await startTrackingCamera();
+        await initOnnxTracker();
+
         const session = await navigator.xr.requestSession("immersive-ar", {
           requiredFeatures: ["hit-test"],
-          optionalFeatures: ["dom-overlay", "hand-tracking", "local-floor"],
+          optionalFeatures: ["dom-overlay", "local-floor"],
           domOverlay: { root: overlay }
         });
 
         state.session = session;
-        state.handTrackingAvailable = session.inputSources.some((source) => Boolean(source.hand));
 
         renderer.xr.setReferenceSpaceType("local");
         await renderer.xr.setSession(session);
@@ -582,30 +776,21 @@
         await requestHitTestSource();
 
         setStatus("AR session started. Scan until the reticle locks onto a surface.", true);
-        setHint("Tap the screen once the reticle appears to place the cube.");
+        setHint("Tap the screen once the reticle appears to place the cube. The rear camera ONNX tracker will drive grab detection.");
         introPanel.classList.add("hidden");
 
         session.addEventListener("end", () => {
           clearHitTestState();
           state.session = null;
           state.cubeGrabbed = false;
-          state.grabHandedness = null;
-          state.handDataByHandedness.clear();
           placeButton.disabled = true;
           introPanel.classList.remove("hidden");
           setStatus("AR session ended.", true);
           setHint("Start WebXR again to scan a surface and place the cube.");
         });
-
-        session.addEventListener("inputsourceschange", () => {
-          state.handTrackingAvailable = session.inputSources.some((source) => Boolean(source.hand));
-          if (state.handTrackingAvailable) {
-            setHint("Hand joints detected. Curl middle, ring, or pinky fingertips toward your palm to grab.");
-          }
-        });
       } catch (error) {
         setStatus(`Unable to start AR: ${error.message}`, false);
-        setHint("Surface hit testing needs a secure context and a WebXR AR-capable browser/device.");
+        setHint("This needs secure-context WebXR plus rear-camera access. If the ONNX model is missing, add ./models/hand_landmarks.onnx.");
       }
     }
 
@@ -613,6 +798,7 @@
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+      fitTrackingOverlay();
     }
 
     function updateHitTest(frame) {
@@ -651,13 +837,10 @@
         }
 
         updateHitTest(frame);
-
-        if (state.handTrackingAvailable) {
-          updateHandData(frame, state.referenceSpace);
-          updateGrabState();
-        }
+        updateGrabState();
       }
 
+      runTrackingFrame(timestamp);
       updateIdleAnimation(timeSeconds);
       halo.rotation.z += state.cubeGrabbed ? 0.05 : 0.02;
       glow.scale.setScalar(1 + Math.sin(timeSeconds * 3.2) * 0.08);
