@@ -6,17 +6,15 @@
     name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
   />
-  <title>WebXR Hand Grab Cube</title>
+  <title>Mobile AR Hand Cube</title>
   <style>
     :root {
-      --bg: #020812;
-      --panel: rgba(4, 14, 24, 0.74);
-      --border: rgba(103, 205, 255, 0.3);
-      --text: #e8f7ff;
-      --muted: #8eb7cf;
-      --accent: #70d3ff;
-      --good: #7dffbe;
-      --warn: #ffd479;
+      --bg: #08111d;
+      --panel: rgba(7, 17, 30, 0.74);
+      --border: rgba(120, 202, 255, 0.28);
+      --text: #e8f6ff;
+      --muted: #9bc7e7;
+      --accent: #53beff;
     }
 
     * {
@@ -30,425 +28,470 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background:
-        radial-gradient(circle at top, rgba(35, 141, 255, 0.18), transparent 35%),
-        linear-gradient(180deg, #06111c 0%, #02060c 100%);
+      background: var(--bg);
       color: var(--text);
       font-family: "Segoe UI", system-ui, sans-serif;
       touch-action: none;
     }
 
-    canvas {
-      display: block;
+    #cameraFeed,
+    #sceneCanvas {
+      position: fixed;
+      inset: 0;
       width: 100%;
       height: 100%;
+      object-fit: cover;
     }
 
-    #handVideo {
-      position: fixed;
-      width: 2px;
-      height: 2px;
-      opacity: 0;
+    #cameraFeed {
+      z-index: 0;
+      background: #000;
+    }
+
+    #sceneCanvas {
+      z-index: 1;
       pointer-events: none;
     }
 
-    #overlay {
+    #ui {
       position: fixed;
       inset: 0;
-      z-index: 10;
+      z-index: 2;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 18px);
       pointer-events: none;
+      padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
     }
 
     .panel {
-      width: min(92vw, 360px);
-      padding: 16px 18px;
+      max-width: 320px;
+      padding: 14px 16px;
       border: 1px solid var(--border);
-      border-radius: 20px;
+      border-radius: 18px;
       background: var(--panel);
-      backdrop-filter: blur(18px);
-      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 0 32px rgba(22, 89, 170, 0.22);
       pointer-events: auto;
     }
 
     h1 {
       margin: 0 0 8px;
-      font-size: 24px;
-      letter-spacing: -0.04em;
-      line-height: 0.95;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
     }
 
     p {
       margin: 0;
+      color: var(--muted);
       font-size: 13px;
       line-height: 1.45;
-      color: var(--muted);
     }
 
-    .status {
-      margin-top: 12px;
-      min-height: 36px;
-      font-size: 12px;
-      line-height: 1.4;
+    #status {
+      margin-top: 10px;
       color: var(--accent);
+      font-size: 12px;
+      min-height: 16px;
     }
 
-    .legend {
+    #hint {
       margin-top: 10px;
-      font-size: 11px;
-      line-height: 1.45;
+      font-size: 12px;
       color: var(--muted);
     }
 
-    .controls {
-      display: flex;
-      justify-content: flex-start;
-      align-items: flex-end;
-      gap: 10px;
-      pointer-events: auto;
-    }
-
-    button {
-      border: 0;
-      border-radius: 999px;
-      padding: 14px 18px;
-      background: linear-gradient(135deg, #d7f7ff, #63d3ff 55%, #2a8cff);
-      color: #04121c;
-      font-size: 15px;
-      font-weight: 700;
-      box-shadow: 0 14px 34px rgba(42, 140, 255, 0.28);
-      cursor: pointer;
-    }
-
-    .chipRow {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 10px;
-      font-size: 11px;
-    }
-
-    .chip {
-      padding: 6px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--text);
-    }
-
-    #reticle {
-      position: fixed;
-      left: 50%;
-      top: 50%;
-      width: 44px;
-      height: 44px;
-      margin-left: -22px;
-      margin-top: -22px;
-      border-radius: 999px;
-      border: 1px solid rgba(112, 211, 255, 0.38);
-      box-shadow: 0 0 0 1px rgba(4, 18, 28, 0.4) inset;
-      pointer-events: none;
-    }
-
-    #reticle::before,
-    #reticle::after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      background: rgba(112, 211, 255, 0.9);
-      transform: translate(-50%, -50%);
-    }
-
-    #reticle::before {
-      width: 14px;
-      height: 1px;
-    }
-
-    #reticle::after {
-      width: 1px;
-      height: 14px;
-    }
   </style>
-
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.161.0/build/three.module.js"
-      }
-    }
-  </script>
 </head>
 <body>
-  <video id="handVideo" playsinline autoplay muted></video>
+  <video id="cameraFeed" playsinline muted autoplay></video>
+  <canvas id="sceneCanvas"></canvas>
 
-  <div id="overlay">
+  <div id="ui">
     <div class="panel">
-      <h1>XR Hand Cube</h1>
+      <h1>AR Hologram Cube</h1>
       <p>
-        Start AR, scan the room until a horizontal surface is found, then move your hand near the cube.
-        Close your hand to grab and open it to release or throw.
+        Point your phone around the room. Make a fist near the cube to grab it,
+        then open your hand to release or throw it.
       </p>
-      <div id="status" class="status">Checking WebXR support.</div>
-      <div class="chipRow">
-        <div id="surfaceChip" class="chip">Surface: searching</div>
-        <div id="handChip" class="chip">Hand: idle</div>
-        <div id="grabChip" class="chip">Cube: free</div>
-      </div>
-      <div class="legend">
-        Uses WebXR camera passthrough, center-screen hit testing, optional anchors, MediaPipe Hands, and simple real-world gravity.
-      </div>
-    </div>
-
-    <div class="controls">
-      <button id="startButton" type="button">Start AR</button>
+      <div id="status">Starting AR...</div>
+      <div id="hint">Open on HTTPS or localhost. If motion tracking stays off, tap anywhere once.</div>
     </div>
   </div>
 
-  <div id="reticle" aria-hidden="true"></div>
-
+  <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
-  <script type="module">
-    import * as THREE from "three";
-
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+  <script>
+    const video = document.getElementById("cameraFeed");
+    const canvas = document.getElementById("sceneCanvas");
     const statusEl = document.getElementById("status");
-    const startButton = document.getElementById("startButton");
-    const handVideo = document.getElementById("handVideo");
-    const surfaceChip = document.getElementById("surfaceChip");
-    const handChip = document.getElementById("handChip");
-    const grabChip = document.getElementById("grabChip");
 
     const renderer = new THREE.WebGLRenderer({
+      canvas,
       antialias: true,
       alpha: true,
       powerPreference: "high-performance",
     });
-    renderer.xr.enabled = true;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 30);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 50);
+    camera.position.set(0, 0, 0);
 
-    const hemi = new THREE.HemisphereLight(0x91d8ff, 0x03111d, 1.3);
+    const clock = new THREE.Clock();
+    const gravity = new THREE.Vector3(0, -2.8, 0);
+    const tempVec = new THREE.Vector3();
+    const tempVec2 = new THREE.Vector3();
+    const targetCameraQuat = new THREE.Quaternion();
+    const handTargetWorld = new THREE.Vector3();
+    const grabOffset = new THREE.Vector3();
+    const handMarkerTarget = new THREE.Vector3();
+    const deviceEuler = new THREE.Euler();
+    const zee = new THREE.Vector3(0, 0, 1);
+    const q0 = new THREE.Quaternion();
+    const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+
+    let hands;
+    let mediapipeCamera;
+    let screenOrientation = 0;
+    let sensorReady = false;
+    let started = false;
+    let motionTapRetryNeeded = false;
+    let handVisible = false;
+    let handClosed = false;
+    let grabbing = false;
+    let lastGrabState = false;
+    let interactionPlaneDistance = 2;
+    let lastHandTime = 0;
+    let handVelocityWorld = new THREE.Vector3();
+    const handVelocityHistory = [];
+    const floorY = -1.25;
+
+    const cubeState = {
+      velocity: new THREE.Vector3(0, 0, 0),
+      held: false,
+    };
+
+    const hemi = new THREE.HemisphereLight(0x8ed7ff, 0x08111d, 1.5);
     scene.add(hemi);
 
-    const dir = new THREE.DirectionalLight(0x89d9ff, 1.8);
-    dir.position.set(1.4, 2.5, 1.1);
+    const dir = new THREE.DirectionalLight(0x80d8ff, 1.8);
+    dir.position.set(2, 3, 1.5);
     scene.add(dir);
 
-    const reticle = new THREE.Mesh(
-      new THREE.RingGeometry(0.06, 0.075, 32).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({
-        color: 0x79d7ff,
-        transparent: true,
-        opacity: 0.9,
-      })
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(20, 20),
+      new THREE.ShadowMaterial({ opacity: 0.1 })
     );
-    reticle.matrixAutoUpdate = false;
-    reticle.visible = false;
-    scene.add(reticle);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = floorY;
+    scene.add(floor);
 
-    const anchorRoot = new THREE.Group();
-    scene.add(anchorRoot);
-
-    const floorMarker = new THREE.Mesh(
-      new THREE.CircleGeometry(0.18, 40).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({
-        color: 0x62cfff,
-        transparent: true,
-        opacity: 0.14,
-        depthWrite: false,
-      })
-    );
-    floorMarker.visible = false;
-    anchorRoot.add(floorMarker);
-
-    const floorGrid = new THREE.GridHelper(0.6, 8, 0x6bd5ff, 0x245271);
-    const floorGridMaterials = Array.isArray(floorGrid.material) ? floorGrid.material : [floorGrid.material];
-    for (const material of floorGridMaterials) {
-      material.transparent = true;
-      material.opacity = 0.3;
-    }
-    floorGrid.visible = false;
-    anchorRoot.add(floorGrid);
-
-    const cubeSize = 0.18;
-    const cubeHalf = cubeSize * 0.5;
+    const floorGrid = new THREE.GridHelper(20, 20, 0x2d74aa, 0x12304e);
+    floorGrid.position.y = floorY + 0.001;
+    floorGrid.material.transparent = true;
+    floorGrid.material.opacity = 0.22;
+    scene.add(floorGrid);
 
     const cubeGroup = new THREE.Group();
-    cubeGroup.visible = false;
     scene.add(cubeGroup);
 
     const cube = new THREE.Mesh(
-      new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
+      new THREE.BoxGeometry(0.34, 0.34, 0.34),
       new THREE.MeshPhysicalMaterial({
-        color: 0x2a90ff,
+        color: 0x2a8cff,
         transparent: true,
-        opacity: 0.38,
-        roughness: 0.1,
-        metalness: 0.08,
-        transmission: 0.25,
-        clearcoat: 0.8,
-        emissive: 0x2f9dff,
-        emissiveIntensity: 1.45,
+        opacity: 0.4,
+        transmission: 0.35,
+        roughness: 0.12,
+        metalness: 0.05,
+        emissive: 0x2b9fff,
+        emissiveIntensity: 1.3,
       })
     );
     cubeGroup.add(cube);
 
-    const glow = new THREE.Mesh(
-      new THREE.BoxGeometry(cubeSize * 1.18, cubeSize * 1.18, cubeSize * 1.18),
+    const cubeGlow = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.42, 0.42),
       new THREE.MeshBasicMaterial({
-        color: 0x73d5ff,
+        color: 0x59c8ff,
         transparent: true,
         opacity: 0.12,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       })
     );
-    cubeGroup.add(glow);
+    cubeGroup.add(cubeGlow);
 
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(cubeSize * 1.03, cubeSize * 1.03, cubeSize * 1.03)),
+    const cubeEdges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(0.36, 0.36, 0.36)),
       new THREE.LineBasicMaterial({
-        color: 0xb7f3ff,
+        color: 0xa7edff,
         transparent: true,
-        opacity: 0.72,
+        opacity: 0.8,
       })
     );
-    cubeGroup.add(edges);
+    cubeGroup.add(cubeEdges);
+
+    cubeGroup.position.set(0, 0.05, -2);
 
     const handMarker = new THREE.Mesh(
-      new THREE.SphereGeometry(0.035, 20, 20),
+      new THREE.SphereGeometry(0.05, 18, 18),
       new THREE.MeshBasicMaterial({
-        color: 0x9be8ff,
+        color: 0x89ddff,
         transparent: true,
-        opacity: 0.7,
+        opacity: 0.75,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
       })
     );
     handMarker.visible = false;
     scene.add(handMarker);
 
-    const state = {
-      session: null,
-      refSpace: null,
-      viewerSpace: null,
-      hitTestSource: null,
-      floorAnchor: null,
-      floorPoseMatrix: new THREE.Matrix4(),
-      floorDetected: false,
-      floorY: 0,
-      floorPoint: new THREE.Vector3(),
-      anchorSupported: false,
-      cubePlaced: false,
-      grabbing: false,
-      handClosed: false,
-      handVisible: false,
-      handLandmarks: null,
-      handCenterWorld: new THREE.Vector3(),
-      handVelocityWorld: new THREE.Vector3(),
-      lastHandWorld: new THREE.Vector3(),
-      lastHandTime: 0,
-      handSamples: [],
-      cubeVelocity: new THREE.Vector3(),
-      cubeAngularPhase: 0,
-      grabOffset: new THREE.Vector3(),
-      handStream: null,
-      mediapipeReady: false,
-      handLoopRunning: false,
-    };
-
-    const tmpVec = new THREE.Vector3();
-    const tmpVec2 = new THREE.Vector3();
-    const tmpVec3 = new THREE.Vector3();
-    const tmpQuat = new THREE.Quaternion();
-    const tmpScale = new THREE.Vector3();
-    const cameraWorldPos = new THREE.Vector3();
-    const cameraForward = new THREE.Vector3();
-    const cameraRight = new THREE.Vector3();
-    const cameraUp = new THREE.Vector3();
-    const interactionPlanePoint = new THREE.Vector3();
-
-    const physics = {
-      gravity: -3.8,
-      restitution: 0.22,
-      friction: 0.82,
-      linearDampingAir: 0.995,
-      linearDampingGround: 0.88,
-    };
-
-    let hands = null;
-
     function setStatus(text) {
       statusEl.textContent = text;
     }
 
-    function setChip(el, label, value) {
-      el.textContent = `${label}: ${value}`;
+    function resize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     }
 
-    function averageLandmarks(landmarks, indices) {
-      const point = { x: 0, y: 0, z: 0 };
+    function setObjectQuaternion(quaternion, alpha, beta, gamma, orient) {
+      deviceEuler.set(beta, alpha, -gamma, "YXZ");
+      quaternion.setFromEuler(deviceEuler);
+      quaternion.multiply(q1);
+      quaternion.multiply(q0.setFromAxisAngle(zee, -orient));
+    }
+
+    function updateCameraOrientation() {
+      if (!sensorReady) return;
+      camera.quaternion.slerp(targetCameraQuat, 0.22);
+    }
+
+    function handleDeviceOrientation(event) {
+      if (event.alpha == null || event.beta == null || event.gamma == null) {
+        return;
+      }
+
+      const alpha = THREE.MathUtils.degToRad(event.alpha);
+      const beta = THREE.MathUtils.degToRad(event.beta);
+      const gamma = THREE.MathUtils.degToRad(event.gamma);
+      const orient = THREE.MathUtils.degToRad(screenOrientation || 0);
+      setObjectQuaternion(targetCameraQuat, alpha, beta, gamma, orient);
+      sensorReady = true;
+    }
+
+    function updateScreenOrientation() {
+      if (window.screen.orientation && typeof window.screen.orientation.angle === "number") {
+        screenOrientation = window.screen.orientation.angle;
+      } else {
+        screenOrientation = window.orientation || 0;
+      }
+    }
+
+    function averageHandPoint(landmarks, indices) {
+      let x = 0;
+      let y = 0;
+      let z = 0;
       for (const index of indices) {
-        point.x += landmarks[index].x;
-        point.y += landmarks[index].y;
-        point.z += landmarks[index].z;
+        x += landmarks[index].x;
+        y += landmarks[index].y;
+        z += landmarks[index].z;
       }
-      const scale = 1 / indices.length;
-      point.x *= scale;
-      point.y *= scale;
-      point.z *= scale;
-      return point;
+      const count = indices.length;
+      return {
+        x: x / count,
+        y: y / count,
+        z: z / count,
+      };
     }
 
-    function distance2D(a, b) {
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      return Math.hypot(dx, dy);
-    }
+    function handIsClosed(landmarks) {
+      const palm = averageHandPoint(landmarks, [0, 5, 9, 17]);
+      const tips = [8, 12, 16, 20];
+      let totalDistance = 0;
 
-    function detectHandClosed(landmarks) {
-      const palmCenter = averageLandmarks(landmarks, [0, 5, 9, 17]);
-      const palmWidth = Math.max(distance2D(landmarks[5], landmarks[17]), 0.04);
-      const fingertipIndices = [8, 12, 16, 20];
-      const avgTipDistance =
-        fingertipIndices.reduce((sum, index) => sum + distance2D(landmarks[index], palmCenter), 0) /
-        fingertipIndices.length;
-      return avgTipDistance < palmWidth * 0.9;
-    }
-
-    function updateHandState(landmarks) {
-      state.handVisible = Boolean(landmarks);
-      state.handLandmarks = landmarks;
-      state.handClosed = landmarks ? detectHandClosed(landmarks) : false;
-      setChip(handChip, "Hand", landmarks ? (state.handClosed ? "closed" : "open") : "idle");
-    }
-
-    async function setupHandTracking() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("getUserMedia is not available on this browser.");
+      for (const index of tips) {
+        const dx = landmarks[index].x - palm.x;
+        const dy = landmarks[index].y - palm.y;
+        totalDistance += Math.hypot(dx, dy);
       }
 
-      if (state.handStream) {
-        state.handStream.getTracks().forEach((track) => track.stop());
+      const averageDistance = totalDistance / tips.length;
+      return averageDistance < 0.16;
+    }
+
+    function planeWorldPointFromNormalized(nx, ny, distance) {
+      const fov = THREE.MathUtils.degToRad(camera.fov);
+      const halfHeight = Math.tan(fov * 0.5) * distance;
+      const halfWidth = halfHeight * camera.aspect;
+      const x = (nx * 2 - 1) * halfWidth;
+      const y = (0.5 - ny) * 2 * halfHeight;
+
+      tempVec.set(x, y, -distance);
+      tempVec.applyQuaternion(camera.quaternion);
+      tempVec.add(camera.position);
+      return tempVec;
+    }
+
+    function pushHandVelocitySample(position, timestamp) {
+      handVelocityHistory.push({
+        time: timestamp,
+        position: position.clone(),
+      });
+
+      while (handVelocityHistory.length > 6) {
+        handVelocityHistory.shift();
       }
 
-      state.handStream = await navigator.mediaDevices.getUserMedia({
+      if (handVelocityHistory.length < 2) return;
+
+      const first = handVelocityHistory[0];
+      const last = handVelocityHistory[handVelocityHistory.length - 1];
+      const dt = Math.max((last.time - first.time) / 1000, 0.001);
+      handVelocityWorld.copy(last.position).sub(first.position).divideScalar(dt);
+    }
+
+    function clearHandVelocity() {
+      handVelocityHistory.length = 0;
+      handVelocityWorld.set(0, 0, 0);
+    }
+
+    function beginGrab() {
+      grabbing = true;
+      cubeState.held = true;
+      cubeState.velocity.set(0, 0, 0);
+      grabOffset.copy(cubeGroup.position).sub(handTargetWorld);
+      setStatus("Grabbed cube.");
+    }
+
+    function releaseGrab() {
+      grabbing = false;
+      cubeState.held = false;
+      cubeState.velocity.copy(handVelocityWorld).multiplyScalar(0.26);
+      setStatus("Released cube.");
+    }
+
+    function updateCubePhysics(dt) {
+      if (cubeState.held) {
+        tempVec2.copy(handTargetWorld).add(grabOffset);
+        cubeGroup.position.lerp(tempVec2, 0.28);
+
+        const latest = handVelocityHistory[handVelocityHistory.length - 1];
+        if (latest) {
+          cubeState.velocity.copy(handVelocityWorld);
+        }
+        return;
+      }
+
+      cubeState.velocity.addScaledVector(gravity, dt);
+      cubeState.velocity.multiplyScalar(0.995);
+      cubeGroup.position.addScaledVector(cubeState.velocity, dt);
+
+      const halfSize = 0.17;
+      if (cubeGroup.position.y - halfSize < floorY) {
+        cubeGroup.position.y = floorY + halfSize;
+        if (cubeState.velocity.y < 0) {
+          cubeState.velocity.y *= -0.32;
+          cubeState.velocity.x *= 0.8;
+          cubeState.velocity.z *= 0.8;
+        }
+      }
+
+      if (cubeGroup.position.y <= floorY + halfSize + 0.002) {
+        cubeState.velocity.x *= 0.985;
+        cubeState.velocity.z *= 0.985;
+        if (Math.abs(cubeState.velocity.y) < 0.03) {
+          cubeState.velocity.y = 0;
+        }
+      }
+    }
+
+    function onHandsResults(results) {
+      handVisible = false;
+      handMarker.visible = false;
+
+      if (!results.multiHandLandmarks || !results.multiHandLandmarks.length) {
+        if (grabbing) {
+          releaseGrab();
+        }
+        clearHandVelocity();
+        return;
+      }
+
+      const landmarks = results.multiHandLandmarks[0];
+      const palmCenter = averageHandPoint(landmarks, [0, 5, 9, 17]);
+      const palmWidth = Math.hypot(
+        landmarks[5].x - landmarks[17].x,
+        landmarks[5].y - landmarks[17].y
+      );
+
+      interactionPlaneDistance = THREE.MathUtils.clamp(1.25 + (0.22 / Math.max(palmWidth, 0.08)), 1.4, 2.6);
+      planeWorldPointFromNormalized(palmCenter.x, palmCenter.y, interactionPlaneDistance);
+      handTargetWorld.copy(tempVec);
+      handMarkerTarget.copy(handTargetWorld);
+      handVisible = true;
+      handClosed = handIsClosed(landmarks);
+      lastHandTime = performance.now();
+      pushHandVelocitySample(handTargetWorld, lastHandTime);
+
+      const distanceToCube = handTargetWorld.distanceTo(cubeGroup.position);
+      const nearCube = distanceToCube < 0.45;
+
+      if (handClosed && !lastGrabState && nearCube && !grabbing) {
+        beginGrab();
+      }
+
+      if (!handClosed && lastGrabState && grabbing) {
+        releaseGrab();
+      }
+
+      lastGrabState = handClosed;
+    }
+
+    async function requestMotionPermission() {
+      if (
+        typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function"
+      ) {
+        const response = await DeviceOrientationEvent.requestPermission();
+        if (response !== "granted") {
+          throw new Error("Motion permission denied.");
+        }
+      }
+    }
+
+    function enableOrientationListener() {
+      window.addEventListener("deviceorientation", handleDeviceOrientation, true);
+      window.addEventListener("orientationchange", updateScreenOrientation);
+      if (window.screen.orientation) {
+        window.screen.orientation.addEventListener("change", updateScreenOrientation);
+      }
+    }
+
+    async function startCameraAndTracking() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera API unavailable. Open this page in a mobile browser over HTTPS.");
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
         video: {
           facingMode: { ideal: "environment" },
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
-        audio: false,
       });
 
-      handVideo.srcObject = state.handStream;
-      await handVideo.play();
+      video.srcObject = stream;
+      await video.play();
 
       hands = new Hands({
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
@@ -457,374 +500,98 @@
       hands.setOptions({
         maxNumHands: 1,
         modelComplexity: 0,
-        minDetectionConfidence: 0.55,
-        minTrackingConfidence: 0.55,
+        minDetectionConfidence: 0.65,
+        minTrackingConfidence: 0.6,
+      });
+      hands.onResults(onHandsResults);
+
+      mediapipeCamera = new Camera(video, {
+        width: 640,
+        height: 360,
+        onFrame: async () => {
+          await hands.send({ image: video });
+        },
       });
 
-      hands.onResults((results) => {
-        const landmarks = results.multiHandLandmarks?.[0] || null;
-        updateHandState(landmarks);
-      });
-
-      state.mediapipeReady = true;
-      runHandLoop();
+      mediapipeCamera.start();
     }
 
-    async function runHandLoop() {
-      if (state.handLoopRunning || !state.mediapipeReady) {
+    async function startExperience() {
+      if (started) {
         return;
       }
 
-      state.handLoopRunning = true;
+      started = true;
+      setStatus("Requesting camera access...");
 
-      const loop = async () => {
-        while (state.handLoopRunning) {
-          if (handVideo.readyState >= 2 && hands) {
-            try {
-              await hands.send({ image: handVideo });
-            } catch (error) {
-              console.warn("MediaPipe frame failed:", error);
-            }
-          }
-          await new Promise((resolve) => window.setTimeout(resolve, 45));
-        }
-      };
+      try {
+        updateScreenOrientation();
+        enableOrientationListener();
 
-      loop();
-    }
-
-    function stopHandTracking() {
-      state.handLoopRunning = false;
-      state.mediapipeReady = false;
-      state.handVisible = false;
-      state.handLandmarks = null;
-      state.handClosed = false;
-      handMarker.visible = false;
-      if (state.handStream) {
-        state.handStream.getTracks().forEach((track) => track.stop());
-        state.handStream = null;
-      }
-    }
-
-    function getMainXrCamera() {
-      const xrCamera = renderer.xr.getCamera(camera);
-      return xrCamera.isArrayCamera && xrCamera.cameras.length ? xrCamera.cameras[0] : xrCamera;
-    }
-
-    function updateHandWorldFromCamera(frameTimeMs) {
-      if (!state.handVisible || !state.handLandmarks) {
-        handMarker.visible = false;
-        return;
-      }
-
-      const handCenter = averageLandmarks(state.handLandmarks, [0, 5, 9, 17]);
-      const mainCamera = getMainXrCamera();
-
-      mainCamera.getWorldPosition(cameraWorldPos);
-      mainCamera.getWorldQuaternion(tmpQuat);
-
-      cameraForward.set(0, 0, -1).applyQuaternion(tmpQuat).normalize();
-      cameraRight.set(1, 0, 0).applyQuaternion(tmpQuat).normalize();
-      cameraUp.set(0, 1, 0).applyQuaternion(tmpQuat).normalize();
-
-      const planeDistance = 0.55;
-      const frustumHeight = 2 * planeDistance * Math.tan(THREE.MathUtils.degToRad((camera.fov || 60) * 0.5));
-      const frustumWidth = frustumHeight * (window.innerWidth / window.innerHeight);
-
-      const x = (handCenter.x - 0.5) * frustumWidth;
-      const y = (0.5 - handCenter.y) * frustumHeight;
-
-      interactionPlanePoint.copy(cameraWorldPos).addScaledVector(cameraForward, planeDistance);
-      state.handCenterWorld
-        .copy(interactionPlanePoint)
-        .addScaledVector(cameraRight, x)
-        .addScaledVector(cameraUp, y);
-
-      handMarker.visible = true;
-      handMarker.position.lerp(state.handCenterWorld, 0.45);
-
-      if (state.lastHandTime > 0) {
-        const dt = Math.max((frameTimeMs - state.lastHandTime) / 1000, 1 / 120);
-        tmpVec.copy(state.handCenterWorld).sub(state.lastHandWorld).divideScalar(dt);
-        state.handSamples.push({ t: frameTimeMs, velocity: tmpVec.clone() });
-        while (state.handSamples.length && frameTimeMs - state.handSamples[0].t > 120) {
-          state.handSamples.shift();
-        }
-        state.handVelocityWorld.set(0, 0, 0);
-        for (const sample of state.handSamples) {
-          state.handVelocityWorld.add(sample.velocity);
-        }
-        state.handVelocityWorld.multiplyScalar(1 / Math.max(state.handSamples.length, 1));
-      }
-
-      state.lastHandWorld.copy(state.handCenterWorld);
-      state.lastHandTime = frameTimeMs;
-    }
-
-    function updateFloorFromAnchor(frame) {
-      if (!state.floorAnchor || !state.refSpace) {
-        return false;
-      }
-
-      const anchorPose = frame.getPose(state.floorAnchor.anchorSpace, state.refSpace);
-      if (!anchorPose) {
-        return false;
-      }
-
-      state.floorPoseMatrix.fromArray(anchorPose.transform.matrix);
-      state.floorPoseMatrix.decompose(anchorRoot.position, anchorRoot.quaternion, tmpScale);
-      state.floorPoint.copy(anchorRoot.position);
-      state.floorY = anchorRoot.position.y;
-      floorMarker.visible = true;
-      floorGrid.visible = true;
-      state.floorDetected = true;
-      return true;
-    }
-
-    async function setFloorFromHit(hit, pose) {
-      state.floorPoseMatrix.fromArray(pose.transform.matrix);
-      state.floorPoseMatrix.decompose(anchorRoot.position, anchorRoot.quaternion, tmpScale);
-      state.floorPoint.copy(anchorRoot.position);
-      state.floorY = anchorRoot.position.y;
-      state.floorDetected = true;
-      floorMarker.visible = true;
-      floorGrid.visible = true;
-      setChip(surfaceChip, "Surface", "locked");
-
-      if (!state.floorAnchor && state.anchorSupported && typeof hit.createAnchor === "function") {
         try {
-          state.floorAnchor = await hit.createAnchor();
-        } catch (error) {
-          console.warn("Anchor creation failed:", error);
+          await requestMotionPermission();
+          motionTapRetryNeeded = false;
+        } catch (motionError) {
+          motionTapRetryNeeded = true;
+          setStatus("Camera starting. Tap anywhere once if motion tracking is blocked.");
         }
-      }
 
-      if (!state.cubePlaced) {
-        cubeGroup.position.copy(anchorRoot.position).add(new THREE.Vector3(0, cubeHalf + 0.18, 0));
-        cubeGroup.visible = true;
-        state.cubePlaced = true;
-        state.cubeVelocity.set(0, 0, 0);
-        setStatus("Surface found. Cube placed above the real floor. Close your hand near the cube to grab it.");
-      }
-    }
-
-    function tryStartGrab() {
-      if (!state.handVisible || !state.handClosed || state.grabbing || !state.cubePlaced) {
-        return;
-      }
-
-      const distance = state.handCenterWorld.distanceTo(cubeGroup.position);
-      if (distance > 0.22) {
-        return;
-      }
-
-      state.grabbing = true;
-      state.grabOffset.copy(cubeGroup.position).sub(state.handCenterWorld);
-      state.cubeVelocity.set(0, 0, 0);
-      setChip(grabChip, "Cube", "grabbed");
-      setStatus("Cube attached to your hand. Open your hand to release it.");
-    }
-
-    function releaseGrab() {
-      if (!state.grabbing) {
-        return;
-      }
-
-      state.grabbing = false;
-      state.cubeVelocity.copy(state.handVelocityWorld).multiplyScalar(0.75);
-      setChip(grabChip, "Cube", "free");
-      setStatus("Cube released with hand velocity applied.");
-    }
-
-    function updateCubePhysics(dt) {
-      if (!state.cubePlaced) {
-        return;
-      }
-
-      if (state.grabbing && state.handVisible) {
-        tmpVec.copy(state.handCenterWorld).add(state.grabOffset);
-        cubeGroup.position.lerp(tmpVec, 0.36);
-        cubeGroup.rotation.y += dt * 0.9;
-        cubeGroup.rotation.x += dt * 0.45;
-        return;
-      }
-
-      state.cubeVelocity.y += physics.gravity * dt;
-      cubeGroup.position.addScaledVector(state.cubeVelocity, dt);
-
-      if (state.floorDetected && cubeGroup.position.y - cubeHalf <= state.floorY) {
-        cubeGroup.position.y = state.floorY + cubeHalf;
-
-        if (Math.abs(state.cubeVelocity.y) > 0.02) {
-          state.cubeVelocity.y = -state.cubeVelocity.y * physics.restitution;
-          state.cubeVelocity.x *= physics.friction;
-          state.cubeVelocity.z *= physics.friction;
+        await startCameraAndTracking();
+        if (sensorReady) {
+          setStatus("Move the phone and bring one hand into view.");
         } else {
-          state.cubeVelocity.y = 0;
-          state.cubeVelocity.x *= physics.linearDampingGround;
-          state.cubeVelocity.z *= physics.linearDampingGround;
+          setStatus("Camera is live. Tap anywhere once to enable motion tracking if needed.");
         }
-      } else {
-        state.cubeVelocity.multiplyScalar(physics.linearDampingAir);
+      } catch (error) {
+        started = false;
+        setStatus(error.message || "Unable to start AR.");
       }
-
-      state.cubeAngularPhase += dt * Math.min(state.cubeVelocity.length() * 2.2, 2.5);
-      cubeGroup.rotation.y = state.cubeAngularPhase;
-      cubeGroup.rotation.x = state.cubeAngularPhase * 0.55;
     }
 
-    function onResize() {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-    }
-
-    async function startAr() {
-      if (!navigator.xr) {
-        throw new Error("WebXR is not available.");
-      }
-
-      const supported = await navigator.xr.isSessionSupported("immersive-ar");
-      if (!supported) {
-        throw new Error("immersive-ar is not supported on this device.");
-      }
-
-      setStatus("Starting hand tracking camera.");
-      await setupHandTracking();
-
-      setStatus("Starting WebXR immersive AR session.");
-      const session = await navigator.xr.requestSession("immersive-ar", {
-        requiredFeatures: ["hit-test", "local-floor"],
-        optionalFeatures: ["anchors", "dom-overlay", "bounded-floor"],
-        domOverlay: { root: document.getElementById("overlay") },
-      });
-
-      state.session = session;
-      state.anchorSupported = session.enabledFeatures?.includes("anchors") ?? true;
-
-      session.addEventListener("end", () => {
-        renderer.setAnimationLoop(null);
-        state.hitTestSource?.cancel?.();
-        state.floorAnchor?.delete?.();
-        state.session = null;
-        state.refSpace = null;
-        state.viewerSpace = null;
-        state.hitTestSource = null;
-        state.floorAnchor = null;
-        state.floorDetected = false;
-        state.cubePlaced = false;
-        state.grabbing = false;
-        cubeGroup.visible = false;
-        reticle.visible = false;
-        floorMarker.visible = false;
-        floorGrid.visible = false;
-        stopHandTracking();
-        setChip(surfaceChip, "Surface", "searching");
-        setChip(handChip, "Hand", "idle");
-        setChip(grabChip, "Cube", "free");
-        setStatus("Session ended.");
-        startButton.disabled = false;
-      });
-
-      renderer.xr.setReferenceSpaceType("local-floor");
-      await renderer.xr.setSession(session);
-
-      state.refSpace = await session.requestReferenceSpace("local-floor");
-      state.viewerSpace = await session.requestReferenceSpace("viewer");
-      state.hitTestSource = await session.requestHitTestSource({ space: state.viewerSpace });
-
-      setChip(surfaceChip, "Surface", "searching");
-      setChip(grabChip, "Cube", "free");
-      setStatus("Move the phone slowly until the center reticle locks onto a horizontal surface.");
-      startButton.disabled = true;
-
-      const clock = new THREE.Clock();
-
-      // WebXR render loop keeps rendering and hit testing tied to the device frame.
-      renderer.setAnimationLoop((time, frame) => {
-        const dt = Math.min(clock.getDelta(), 0.033);
-
-        if (frame && state.refSpace) {
-          if (!updateFloorFromAnchor(frame) && state.hitTestSource) {
-            // Continuous hit testing from the center of the screen via viewer space.
-            const hitResults = frame.getHitTestResults(state.hitTestSource);
-            if (hitResults.length > 0) {
-              const hit = hitResults[0];
-              const pose = hit.getPose(state.refSpace);
-              if (pose) {
-                reticle.visible = true;
-                reticle.matrix.fromArray(pose.transform.matrix);
-                setChip(surfaceChip, "Surface", "candidate");
-                if (!state.floorDetected) {
-                  setFloorFromHit(hit, pose);
-                }
-              }
-            } else {
-              reticle.visible = false;
-              if (!state.floorDetected) {
-                setChip(surfaceChip, "Surface", "searching");
-              }
-            }
-          }
-
-          // MediaPipe hand landmarks are mapped into a world-space plane in front of the XR camera.
-          updateHandWorldFromCamera(time);
-
-          if (state.handVisible) {
-            if (state.handClosed) {
-              tryStartGrab();
-            } else {
-              releaseGrab();
-            }
-          } else if (state.grabbing) {
-            releaseGrab();
-          }
-
-          // Cube physics run in world coordinates and collide against the detected real floor height.
-          updateCubePhysics(dt);
-        }
-
-        renderer.render(scene, camera);
-      });
-    }
-
-    window.addEventListener("resize", onResize);
-
-    async function init() {
-      if (!navigator.xr) {
-        setStatus("WebXR unavailable. Use Android Chrome on HTTPS with ARCore/WebXR support.");
-        startButton.disabled = true;
+    async function tryEnableMotionFromGesture() {
+      if (sensorReady || !started || !motionTapRetryNeeded) {
         return;
       }
 
       try {
-        const supported = await navigator.xr.isSessionSupported("immersive-ar");
-        if (!supported) {
-          setStatus("immersive-ar not supported on this device/browser.");
-          startButton.disabled = true;
-          return;
-        }
-
-        setStatus("WebXR AR is available. Tap Start AR and allow camera access.");
+        await requestMotionPermission();
+        motionTapRetryNeeded = false;
+        setStatus("Motion tracking enabled.");
       } catch (error) {
-        setStatus(`WebXR check failed: ${error.message}`);
-        startButton.disabled = true;
+        setStatus(error.message || "Motion permission blocked.");
       }
     }
 
-    startButton.addEventListener("click", async () => {
-      startButton.disabled = true;
-      try {
-        await startAr();
-      } catch (error) {
-        console.error(error);
-        stopHandTracking();
-        setStatus(`Startup failed: ${error.message}`);
-        startButton.disabled = false;
-      }
-    });
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.033);
 
-    init();
+      updateCameraOrientation();
+      updateCubePhysics(dt);
+
+      cube.rotation.x += dt * 0.45;
+      cube.rotation.y += dt * 0.7;
+      cubeGlow.rotation.x = cube.rotation.x * 0.8;
+      cubeGlow.rotation.y = cube.rotation.y * 0.8;
+      cubeEdges.rotation.copy(cube.rotation);
+
+      if (handVisible) {
+        handMarker.visible = true;
+        handMarker.position.lerp(handMarkerTarget, 0.35);
+        handMarker.scale.setScalar(handClosed ? 0.8 : 1.0);
+      } else {
+        handMarker.visible = false;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener("resize", resize);
+    window.addEventListener("load", startExperience);
+    document.body.addEventListener("click", tryEnableMotionFromGesture, { passive: true });
+    document.body.addEventListener("touchend", tryEnableMotionFromGesture, { passive: true });
+    resize();
+    animate();
   </script>
 </body>
 </html>
