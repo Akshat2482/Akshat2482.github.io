@@ -100,6 +100,7 @@
       display: flex;
       justify-content: flex-start;
       align-items: flex-end;
+      pointer-events: auto;
     }
 
     button {
@@ -112,6 +113,8 @@
       font-weight: 700;
       box-shadow: 0 12px 28px rgba(25, 146, 255, 0.35);
       cursor: pointer;
+      pointer-events: auto;
+      touch-action: manipulation;
     }
 
     #hint {
@@ -490,6 +493,10 @@
     }
 
     async function startCameraAndTracking() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera API unavailable. Open this page in a mobile browser over HTTPS.");
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
@@ -573,6 +580,12 @@
 
     window.addEventListener("resize", resize);
     startButton.addEventListener("click", startExperience);
+    startButton.addEventListener("touchend", (event) => {
+      event.preventDefault();
+      if (!startButton.disabled) {
+        startExperience();
+      }
+    }, { passive: false });
     resize();
     animate();
   </script>
