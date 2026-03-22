@@ -2,18 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-  <title>WebXR Palm Grab Cube</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <title>Mobile AR Hand Cube</title>
   <style>
     :root {
-      --bg: #04111f;
-      --panel: rgba(5, 18, 33, 0.78);
-      --panel-border: rgba(135, 196, 255, 0.22);
-      --accent: #88e0ff;
-      --accent-strong: #33b8ff;
-      --text: #e6f6ff;
-      --muted: #9abed4;
-      --warn: #ffd166;
+      --bg: #08111d;
+      --panel: rgba(7, 17, 30, 0.74);
+      --border: rgba(120, 202, 255, 0.28);
+      --text: #e8f6ff;
+      --muted: #9bc7e7;
+      --accent: #53beff;
     }
 
     * {
@@ -21,844 +22,559 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    html, body {
+    html,
+    body {
       margin: 0;
       width: 100%;
       height: 100%;
       overflow: hidden;
-      font-family: "Segoe UI", system-ui, sans-serif;
-      background:
-        radial-gradient(circle at 20% 20%, rgba(51, 184, 255, 0.18), transparent 30%),
-        radial-gradient(circle at 80% 15%, rgba(136, 224, 255, 0.12), transparent 24%),
-        linear-gradient(180deg, #071a2d 0%, #030b15 100%);
+      background: var(--bg);
       color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      touch-action: none;
     }
 
-    #app {
+    #cameraFeed,
+    #sceneCanvas {
       position: fixed;
       inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
 
-    #overlay {
+    #cameraFeed {
+      z-index: 0;
+      background: #000;
+    }
+
+    #sceneCanvas {
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    #ui {
       position: fixed;
       inset: 0;
+      z-index: 2;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: env(safe-area-inset-top, 0) 16px env(safe-area-inset-bottom, 0);
       pointer-events: none;
-      z-index: 10;
+      padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
     }
 
     .panel {
-      margin-top: 16px;
-      align-self: flex-start;
-      max-width: min(92vw, 430px);
-      padding: 16px 18px;
-      border-radius: 20px;
+      max-width: 320px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
       background: var(--panel);
-      border: 1px solid var(--panel-border);
       backdrop-filter: blur(16px);
-      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+      box-shadow: 0 0 32px rgba(22, 89, 170, 0.22);
       pointer-events: auto;
     }
 
-    .eyebrow {
-      font-size: 12px;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: var(--accent);
-      opacity: 0.9;
-    }
-
     h1 {
-      margin: 8px 0 10px;
-      font-size: clamp(28px, 5vw, 42px);
-      line-height: 0.95;
-      letter-spacing: -0.04em;
+      margin: 0 0 8px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
     }
 
     p {
       margin: 0;
-      font-size: 14px;
-      line-height: 1.5;
       color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
     }
 
-    .controls {
+    #status {
+      margin-top: 10px;
+      color: var(--accent);
+      font-size: 12px;
+      min-height: 16px;
+    }
+
+    #controls {
       display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 16px;
-      pointer-events: auto;
+      justify-content: flex-start;
+      align-items: flex-end;
     }
 
     button {
-      appearance: none;
       border: 0;
       border-radius: 999px;
-      padding: 13px 18px;
-      font: inherit;
+      padding: 14px 18px;
+      background: linear-gradient(135deg, #32a4ff, #1dd8ff);
+      color: #05131f;
+      font-size: 15px;
       font-weight: 700;
+      box-shadow: 0 12px 28px rgba(25, 146, 255, 0.35);
       cursor: pointer;
-      transition: transform 120ms ease, opacity 120ms ease, box-shadow 120ms ease;
     }
 
-    button:active {
-      transform: translateY(1px) scale(0.99);
-    }
-
-    #start-ar {
-      color: #03253a;
-      background: linear-gradient(135deg, #d9f6ff 0%, #88e0ff 45%, #33b8ff 100%);
-      box-shadow: 0 12px 35px rgba(51, 184, 255, 0.32);
-    }
-
-    #place-button {
-      color: var(--text);
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-    }
-
-    #place-button[disabled] {
-      opacity: 0.45;
-      cursor: default;
-    }
-
-    .status-row {
-      margin-top: 14px;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--warn);
-      box-shadow: 0 0 16px rgba(255, 209, 102, 0.6);
-      flex: 0 0 auto;
-    }
-
-    .dot.ready {
-      background: #7df4a5;
-      box-shadow: 0 0 16px rgba(125, 244, 165, 0.66);
-    }
-
-    .footer {
-      margin-bottom: 16px;
-      align-self: stretch;
-      display: flex;
-      justify-content: center;
-      pointer-events: none;
-    }
-
-    .hint {
-      width: min(92vw, 560px);
-      padding: 13px 16px;
-      border-radius: 16px;
-      background: rgba(3, 12, 24, 0.74);
-      border: 1px solid rgba(136, 224, 255, 0.16);
-      color: var(--muted);
-      font-size: 13px;
-      text-align: center;
-      backdrop-filter: blur(14px);
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    #tracking-stage {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 4;
-    }
-
-    #tracking-video {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
-    }
-
-    #tracking-overlay {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      opacity: 0.92;
-    }
-
-    .tracker-pill {
-      position: fixed;
-      right: 16px;
-      top: calc(env(safe-area-inset-top, 0) + 16px);
-      z-index: 11;
-      padding: 10px 14px;
-      border-radius: 999px;
-      background: rgba(3, 12, 24, 0.8);
-      border: 1px solid rgba(136, 224, 255, 0.16);
-      color: var(--muted);
+    #hint {
+      margin-top: 10px;
       font-size: 12px;
-      backdrop-filter: blur(14px);
-      pointer-events: auto;
+      color: var(--muted);
     }
 
-    .tracker-pill strong {
-      color: var(--accent);
-    }
-
-    @media (max-width: 640px) {
-      .panel {
-        margin-top: 10px;
-        padding: 14px;
-      }
-    }
   </style>
 </head>
 <body>
-  <div id="app"></div>
-  <div id="tracking-stage">
-    <video id="tracking-video" playsinline muted autoplay></video>
-    <canvas id="tracking-overlay"></canvas>
-  </div>
+  <video id="cameraFeed" playsinline muted autoplay></video>
+  <canvas id="sceneCanvas"></canvas>
 
-  <div id="overlay">
-    <section class="panel" id="intro-panel">
-      <div class="eyebrow">Surface AR</div>
-      <h1>Palm Grab Cube</h1>
-      <p>Start AR, scan for a real surface, then tap the screen or press Place Cube. The cube idles with a float-spin animation until a separate rear-camera hand tracker reports a palm grab.</p>
-      <div class="controls">
-        <button id="start-ar" type="button">Start WebXR</button>
-        <button id="place-button" type="button" disabled>Place Cube</button>
-      </div>
-      <div class="status-row">
-        <span class="dot" id="status-dot"></span>
-        <span id="status-text">Checking WebXR support.</span>
-      </div>
-    </section>
+  <div id="ui">
+    <div class="panel">
+      <h1>AR Hologram Cube</h1>
+      <p>
+        Point your phone around the room. Make a fist near the cube to grab it,
+        then open your hand to release or throw it.
+      </p>
+      <div id="status">Waiting to start.</div>
+      <div id="hint">Best on HTTPS or localhost with motion permissions enabled.</div>
+    </div>
 
-    <div class="footer">
-      <div class="hint" id="hint-text">Grab gesture: move your palm near the cube, then curl middle, ring, or pinky fingertips toward your palm center. This page now expects a camera-based ONNX hand tracker instead of native XR hand joints.</div>
+    <div id="controls">
+      <button id="startButton">Start AR</button>
     </div>
   </div>
 
-  <div class="tracker-pill" id="tracker-pill"><strong>Hand Tracker:</strong> booting</div>
-
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.160.1/build/three.module.js",
-        "ort": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/ort.min.mjs"
-      }
-    }
-  </script>
-
-  <script type="module">
-    import * as THREE from "three";
-    import * as ort from "ort";
-
-    const overlay = document.getElementById("overlay");
-    const introPanel = document.getElementById("intro-panel");
-    const hintText = document.getElementById("hint-text");
-    const startButton = document.getElementById("start-ar");
-    const placeButton = document.getElementById("place-button");
-    const statusDot = document.getElementById("status-dot");
-    const statusText = document.getElementById("status-text");
-    const trackingVideo = document.getElementById("tracking-video");
-    const trackingOverlay = document.getElementById("tracking-overlay");
-    const trackerPill = document.getElementById("tracker-pill");
-    const trackingCtx = trackingOverlay.getContext("2d");
+  <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+  <script>
+    const video = document.getElementById("cameraFeed");
+    const canvas = document.getElementById("sceneCanvas");
+    const startButton = document.getElementById("startButton");
+    const statusEl = document.getElementById("status");
 
     const renderer = new THREE.WebGLRenderer({
+      canvas,
       antialias: true,
       alpha: true,
-      powerPreference: "high-performance"
+      powerPreference: "high-performance",
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true;
-    document.getElementById("app").appendChild(renderer.domElement);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 50);
+    camera.position.set(0, 0, 0);
 
-    const hemiLight = new THREE.HemisphereLight(0xc8ecff, 0x102030, 1.6);
-    scene.add(hemiLight);
+    const clock = new THREE.Clock();
+    const gravity = new THREE.Vector3(0, -2.8, 0);
+    const tempVec = new THREE.Vector3();
+    const tempVec2 = new THREE.Vector3();
+    const targetCameraQuat = new THREE.Quaternion();
+    const handTargetWorld = new THREE.Vector3();
+    const grabOffset = new THREE.Vector3();
+    const handMarkerTarget = new THREE.Vector3();
+    const deviceEuler = new THREE.Euler();
+    const zee = new THREE.Vector3(0, 0, 1);
+    const q0 = new THREE.Quaternion();
+    const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    keyLight.position.set(1.4, 3, 2.4);
-    scene.add(keyLight);
+    let hands;
+    let mediapipeCamera;
+    let screenOrientation = 0;
+    let sensorReady = false;
+    let handVisible = false;
+    let handClosed = false;
+    let grabbing = false;
+    let lastGrabState = false;
+    let interactionPlaneDistance = 2;
+    let lastHandTime = 0;
+    let handVelocityWorld = new THREE.Vector3();
+    const handVelocityHistory = [];
+    const floorY = -1.25;
 
-    const fillLight = new THREE.DirectionalLight(0x5cc7ff, 0.9);
-    fillLight.position.set(-2, 1.8, -1.5);
-    scene.add(fillLight);
+    const cubeState = {
+      velocity: new THREE.Vector3(0, 0, 0),
+      held: false,
+    };
 
-    const floorShadow = new THREE.Mesh(
-      new THREE.CircleGeometry(0.18, 48),
-      new THREE.MeshBasicMaterial({ color: 0x08121f, transparent: true, opacity: 0.22 })
+    const hemi = new THREE.HemisphereLight(0x8ed7ff, 0x08111d, 1.5);
+    scene.add(hemi);
+
+    const dir = new THREE.DirectionalLight(0x80d8ff, 1.8);
+    dir.position.set(2, 3, 1.5);
+    scene.add(dir);
+
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(20, 20),
+      new THREE.ShadowMaterial({ opacity: 0.1 })
     );
-    floorShadow.rotation.x = -Math.PI / 2;
-    floorShadow.visible = false;
-    scene.add(floorShadow);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = floorY;
+    scene.add(floor);
 
-    const reticle = new THREE.Mesh(
-      new THREE.RingGeometry(0.06, 0.085, 40),
-      new THREE.MeshBasicMaterial({ color: 0x88e0ff, transparent: true, opacity: 0.9, side: THREE.DoubleSide })
-    );
-    reticle.rotation.x = -Math.PI / 2;
-    reticle.matrixAutoUpdate = false;
-    reticle.visible = false;
-    scene.add(reticle);
-
-    const reticleCore = new THREE.Mesh(
-      new THREE.CircleGeometry(0.013, 24),
-      new THREE.MeshBasicMaterial({ color: 0x33b8ff, transparent: true, opacity: 0.85 })
-    );
-    reticleCore.rotation.x = -Math.PI / 2;
-    reticle.add(reticleCore);
+    const floorGrid = new THREE.GridHelper(20, 20, 0x2d74aa, 0x12304e);
+    floorGrid.position.y = floorY + 0.001;
+    floorGrid.material.transparent = true;
+    floorGrid.material.opacity = 0.22;
+    scene.add(floorGrid);
 
     const cubeGroup = new THREE.Group();
-    cubeGroup.visible = false;
     scene.add(cubeGroup);
 
     const cube = new THREE.Mesh(
-      new THREE.BoxGeometry(0.12, 0.12, 0.12),
+      new THREE.BoxGeometry(0.34, 0.34, 0.34),
       new THREE.MeshPhysicalMaterial({
-        color: 0x6fe2ff,
-        metalness: 0.1,
-        roughness: 0.18,
-        transmission: 0.08,
-        thickness: 0.32,
+        color: 0x2a8cff,
         transparent: true,
-        opacity: 0.98,
-        emissive: 0x11435e,
-        emissiveIntensity: 0.9,
-        clearcoat: 0.6
+        opacity: 0.4,
+        transmission: 0.35,
+        roughness: 0.12,
+        metalness: 0.05,
+        emissive: 0x2b9fff,
+        emissiveIntensity: 1.3,
       })
     );
     cubeGroup.add(cube);
 
-    const halo = new THREE.Mesh(
-      new THREE.TorusGeometry(0.11, 0.007, 18, 70),
-      new THREE.MeshBasicMaterial({ color: 0xaaf1ff, transparent: true, opacity: 0.6 })
+    const cubeGlow = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.42, 0.42),
+      new THREE.MeshBasicMaterial({
+        color: 0x59c8ff,
+        transparent: true,
+        opacity: 0.12,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
     );
-    halo.rotation.x = Math.PI / 2;
-    cubeGroup.add(halo);
+    cubeGroup.add(cubeGlow);
 
-    const glow = new THREE.Mesh(
-      new THREE.SphereGeometry(0.1, 24, 24),
-      new THREE.MeshBasicMaterial({ color: 0x2db9ff, transparent: true, opacity: 0.08 })
+    const cubeEdges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(0.36, 0.36, 0.36)),
+      new THREE.LineBasicMaterial({
+        color: 0xa7edff,
+        transparent: true,
+        opacity: 0.8,
+      })
     );
-    cubeGroup.add(glow);
+    cubeGroup.add(cubeEdges);
 
-    const state = {
-      session: null,
-      referenceSpace: null,
-      viewerSpace: null,
-      hitTestSource: null,
-      hitTestRequested: false,
-      surfaceFound: false,
-      cubePlaced: false,
-      cubeBasePosition: new THREE.Vector3(),
-      cubeGrabbed: false,
-      lastPlacementTime: 0,
-      cameraStream: null,
-      trackerBooted: false,
-      trackerReady: false,
-      trackerActive: false,
-      trackerRunning: false,
-      lastTrackerFrameTime: 0,
-      handObservation: {
-        seen: false,
-        palmScreen: new THREE.Vector2(0.5, 0.5),
-        palmWorld: new THREE.Vector3(),
-        grabStrength: 0,
-        fingertips: []
-      },
-      trackerSession: null
-    };
+    cubeGroup.position.set(0, 0.05, -2);
 
-    const cubeTarget = new THREE.Vector3();
-    const cubeScaleTarget = new THREE.Vector3(1, 1, 1);
-    const tempVectorA = new THREE.Vector3();
-    const tempVectorB = new THREE.Vector3();
-    const tempVectorC = new THREE.Vector3();
-    const tempQuaternion = new THREE.Quaternion();
-    const tempMatrix = new THREE.Matrix4();
-    const worldUp = new THREE.Vector3(0, 1, 0);
-    const tempVector2 = new THREE.Vector2();
-    const trackerInputCanvas = document.createElement("canvas");
-    const trackerInputCtx = trackerInputCanvas.getContext("2d", { willReadFrequently: true });
-    const TRACKER_MODEL_URL = "./models/hand_landmarks.onnx";
-    const TRACKER_INPUT_SIZE = 256;
+    const handMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.05, 18, 18),
+      new THREE.MeshBasicMaterial({
+        color: 0x89ddff,
+        transparent: true,
+        opacity: 0.75,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    handMarker.visible = false;
+    scene.add(handMarker);
 
-    function setStatus(text, ready = false) {
-      statusText.textContent = text;
-      statusDot.classList.toggle("ready", ready);
+    function setStatus(text) {
+      statusEl.textContent = text;
     }
 
-    function setHint(text) {
-      hintText.textContent = text;
+    function resize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     }
 
-    function isPrimaryPointerTarget(target) {
-      return !target.closest("button");
+    function setObjectQuaternion(quaternion, alpha, beta, gamma, orient) {
+      deviceEuler.set(beta, alpha, -gamma, "YXZ");
+      quaternion.setFromEuler(deviceEuler);
+      quaternion.multiply(q1);
+      quaternion.multiply(q0.setFromAxisAngle(zee, -orient));
     }
 
-    function updatePlaceAvailability() {
-      placeButton.disabled = !(state.session && state.surfaceFound);
+    function updateCameraOrientation() {
+      if (!sensorReady) return;
+      camera.quaternion.slerp(targetCameraQuat, 0.22);
     }
 
-    function setTrackerStatus(text, active = false) {
-      trackerPill.innerHTML = `<strong>Hand Tracker:</strong> ${text}`;
-      trackerPill.style.borderColor = active ? "rgba(125, 244, 165, 0.28)" : "rgba(136, 224, 255, 0.16)";
-      trackerPill.style.color = active ? "#dfffea" : "";
+    function handleDeviceOrientation(event) {
+      if (event.alpha == null || event.beta == null || event.gamma == null) {
+        return;
+      }
+
+      const alpha = THREE.MathUtils.degToRad(event.alpha);
+      const beta = THREE.MathUtils.degToRad(event.beta);
+      const gamma = THREE.MathUtils.degToRad(event.gamma);
+      const orient = THREE.MathUtils.degToRad(screenOrientation || 0);
+      setObjectQuaternion(targetCameraQuat, alpha, beta, gamma, orient);
+      sensorReady = true;
     }
 
-    function fitTrackingOverlay() {
-      trackingOverlay.width = window.innerWidth;
-      trackingOverlay.height = window.innerHeight;
+    function updateScreenOrientation() {
+      if (window.screen.orientation && typeof window.screen.orientation.angle === "number") {
+        screenOrientation = window.screen.orientation.angle;
+      } else {
+        screenOrientation = window.orientation || 0;
+      }
     }
 
-    async function startTrackingCamera() {
-      if (state.cameraStream) return;
+    function averageHandPoint(landmarks, indices) {
+      let x = 0;
+      let y = 0;
+      let z = 0;
+      for (const index of indices) {
+        x += landmarks[index].x;
+        y += landmarks[index].y;
+        z += landmarks[index].z;
+      }
+      const count = indices.length;
+      return {
+        x: x / count,
+        y: y / count,
+        z: z / count,
+      };
+    }
 
-      state.cameraStream = await navigator.mediaDevices.getUserMedia({
+    function handIsClosed(landmarks) {
+      const palm = averageHandPoint(landmarks, [0, 5, 9, 17]);
+      const tips = [8, 12, 16, 20];
+      let totalDistance = 0;
+
+      for (const index of tips) {
+        const dx = landmarks[index].x - palm.x;
+        const dy = landmarks[index].y - palm.y;
+        totalDistance += Math.hypot(dx, dy);
+      }
+
+      const averageDistance = totalDistance / tips.length;
+      return averageDistance < 0.16;
+    }
+
+    function planeWorldPointFromNormalized(nx, ny, distance) {
+      const fov = THREE.MathUtils.degToRad(camera.fov);
+      const halfHeight = Math.tan(fov * 0.5) * distance;
+      const halfWidth = halfHeight * camera.aspect;
+      const x = (nx * 2 - 1) * halfWidth;
+      const y = (0.5 - ny) * 2 * halfHeight;
+
+      tempVec.set(x, y, -distance);
+      tempVec.applyQuaternion(camera.quaternion);
+      tempVec.add(camera.position);
+      return tempVec;
+    }
+
+    function pushHandVelocitySample(position, timestamp) {
+      handVelocityHistory.push({
+        time: timestamp,
+        position: position.clone(),
+      });
+
+      while (handVelocityHistory.length > 6) {
+        handVelocityHistory.shift();
+      }
+
+      if (handVelocityHistory.length < 2) return;
+
+      const first = handVelocityHistory[0];
+      const last = handVelocityHistory[handVelocityHistory.length - 1];
+      const dt = Math.max((last.time - first.time) / 1000, 0.001);
+      handVelocityWorld.copy(last.position).sub(first.position).divideScalar(dt);
+    }
+
+    function clearHandVelocity() {
+      handVelocityHistory.length = 0;
+      handVelocityWorld.set(0, 0, 0);
+    }
+
+    function beginGrab() {
+      grabbing = true;
+      cubeState.held = true;
+      cubeState.velocity.set(0, 0, 0);
+      grabOffset.copy(cubeGroup.position).sub(handTargetWorld);
+      setStatus("Grabbed cube.");
+    }
+
+    function releaseGrab() {
+      grabbing = false;
+      cubeState.held = false;
+      cubeState.velocity.copy(handVelocityWorld).multiplyScalar(0.26);
+      setStatus("Released cube.");
+    }
+
+    function updateCubePhysics(dt) {
+      if (cubeState.held) {
+        tempVec2.copy(handTargetWorld).add(grabOffset);
+        cubeGroup.position.lerp(tempVec2, 0.28);
+
+        const latest = handVelocityHistory[handVelocityHistory.length - 1];
+        if (latest) {
+          cubeState.velocity.copy(handVelocityWorld);
+        }
+        return;
+      }
+
+      cubeState.velocity.addScaledVector(gravity, dt);
+      cubeState.velocity.multiplyScalar(0.995);
+      cubeGroup.position.addScaledVector(cubeState.velocity, dt);
+
+      const halfSize = 0.17;
+      if (cubeGroup.position.y - halfSize < floorY) {
+        cubeGroup.position.y = floorY + halfSize;
+        if (cubeState.velocity.y < 0) {
+          cubeState.velocity.y *= -0.32;
+          cubeState.velocity.x *= 0.8;
+          cubeState.velocity.z *= 0.8;
+        }
+      }
+
+      if (cubeGroup.position.y <= floorY + halfSize + 0.002) {
+        cubeState.velocity.x *= 0.985;
+        cubeState.velocity.z *= 0.985;
+        if (Math.abs(cubeState.velocity.y) < 0.03) {
+          cubeState.velocity.y = 0;
+        }
+      }
+    }
+
+    function onHandsResults(results) {
+      handVisible = false;
+      handMarker.visible = false;
+
+      if (!results.multiHandLandmarks || !results.multiHandLandmarks.length) {
+        if (grabbing) {
+          releaseGrab();
+        }
+        clearHandVelocity();
+        return;
+      }
+
+      const landmarks = results.multiHandLandmarks[0];
+      const palmCenter = averageHandPoint(landmarks, [0, 5, 9, 17]);
+      const palmWidth = Math.hypot(
+        landmarks[5].x - landmarks[17].x,
+        landmarks[5].y - landmarks[17].y
+      );
+
+      interactionPlaneDistance = THREE.MathUtils.clamp(1.25 + (0.22 / Math.max(palmWidth, 0.08)), 1.4, 2.6);
+      planeWorldPointFromNormalized(palmCenter.x, palmCenter.y, interactionPlaneDistance);
+      handTargetWorld.copy(tempVec);
+      handMarkerTarget.copy(handTargetWorld);
+      handVisible = true;
+      handClosed = handIsClosed(landmarks);
+      lastHandTime = performance.now();
+      pushHandVelocitySample(handTargetWorld, lastHandTime);
+
+      const distanceToCube = handTargetWorld.distanceTo(cubeGroup.position);
+      const nearCube = distanceToCube < 0.45;
+
+      if (handClosed && !lastGrabState && nearCube && !grabbing) {
+        beginGrab();
+      }
+
+      if (!handClosed && lastGrabState && grabbing) {
+        releaseGrab();
+      }
+
+      lastGrabState = handClosed;
+    }
+
+    async function requestMotionPermission() {
+      if (
+        typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function"
+      ) {
+        const response = await DeviceOrientationEvent.requestPermission();
+        if (response !== "granted") {
+          throw new Error("Motion permission denied.");
+        }
+      }
+    }
+
+    async function startCameraAndTracking() {
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
           facingMode: { ideal: "environment" },
           width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
+          height: { ideal: 720 },
+        },
       });
 
-      trackingVideo.srcObject = state.cameraStream;
-      await trackingVideo.play();
-      fitTrackingOverlay();
-      state.trackerBooted = true;
-      setTrackerStatus("camera ready", true);
+      video.srcObject = stream;
+      await video.play();
+
+      hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+      });
+
+      hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 0,
+        minDetectionConfidence: 0.65,
+        minTrackingConfidence: 0.6,
+      });
+      hands.onResults(onHandsResults);
+
+      mediapipeCamera = new Camera(video, {
+        width: 640,
+        height: 360,
+        onFrame: async () => {
+          await hands.send({ image: video });
+        },
+      });
+
+      mediapipeCamera.start();
     }
 
-    async function initOnnxTracker() {
-      if (state.trackerSession) return true;
+    async function startExperience() {
+      startButton.disabled = true;
+      setStatus("Requesting permissions...");
 
       try {
-        ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/";
-        state.trackerSession = await ort.InferenceSession.create(TRACKER_MODEL_URL, {
-          executionProviders: ["wasm"]
-        });
-        state.trackerReady = true;
-        setTrackerStatus("onnx model loaded", true);
-        return true;
+        updateScreenOrientation();
+        await requestMotionPermission();
+        window.addEventListener("deviceorientation", handleDeviceOrientation, true);
+        window.addEventListener("orientationchange", updateScreenOrientation);
+        if (window.screen.orientation) {
+          window.screen.orientation.addEventListener("change", updateScreenOrientation);
+        }
+
+        await startCameraAndTracking();
+        startButton.style.display = "none";
+        setStatus("Move the phone and bring one hand into view.");
       } catch (error) {
-        state.trackerReady = false;
-        setTrackerStatus("model missing - add ./models/hand_landmarks.onnx");
-        console.warn("ONNX hand tracker load failed:", error);
-        return false;
+        startButton.disabled = false;
+        setStatus(error.message || "Unable to start AR.");
       }
     }
 
-    function normalizeLandmarks(rawTensor) {
-      if (!rawTensor || !rawTensor.data) return null;
-      const values = rawTensor.data;
-      if (values.length < 63) return null;
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.033);
 
-      const points = [];
-      const stride = Math.floor(values.length / 21);
-      let maxXY = 0;
+      updateCameraOrientation();
+      updateCubePhysics(dt);
 
-      for (let i = 0; i < 21; i += 1) {
-        const x = values[i * stride];
-        const y = values[i * stride + 1];
-        const z = stride > 2 ? values[i * stride + 2] : 0;
-        maxXY = Math.max(maxXY, Math.abs(x), Math.abs(y));
-        points.push({ x, y, z });
-      }
+      cube.rotation.x += dt * 0.45;
+      cube.rotation.y += dt * 0.7;
+      cubeGlow.rotation.x = cube.rotation.x * 0.8;
+      cubeGlow.rotation.y = cube.rotation.y * 0.8;
+      cubeEdges.rotation.copy(cube.rotation);
 
-      if (maxXY > 2) {
-        for (const point of points) {
-          point.x /= TRACKER_INPUT_SIZE;
-          point.y /= TRACKER_INPUT_SIZE;
-        }
-      }
-
-      return points;
-    }
-
-    function extractLandmarks(outputMap) {
-      const tensors = Object.values(outputMap || {});
-      let candidate = null;
-
-      for (const tensor of tensors) {
-        if (!tensor?.data) continue;
-        if (tensor.data.length >= 63) {
-          candidate = tensor;
-          break;
-        }
-      }
-
-      return normalizeLandmarks(candidate);
-    }
-
-    function samplePalmObservationFromLandmarks(landmarks) {
-      if (!landmarks || landmarks.length < 21) {
-        state.handObservation.seen = false;
-        state.handObservation.grabStrength = 0;
-        return;
-      }
-
-      const wrist = landmarks[0];
-      const indexBase = landmarks[5];
-      const middleBase = landmarks[9];
-      const ringBase = landmarks[13];
-      const pinkyBase = landmarks[17];
-      const middleTip = landmarks[12];
-      const ringTip = landmarks[16];
-      const pinkyTip = landmarks[20];
-
-      const palmX = (wrist.x + indexBase.x + middleBase.x + ringBase.x + pinkyBase.x) / 5;
-      const palmY = (wrist.y + indexBase.y + middleBase.y + ringBase.y + pinkyBase.y) / 5;
-
-      const palm = tempVector2.set(palmX, palmY);
-      const tipDistances = [
-        Math.hypot(middleTip.x - palm.x, middleTip.y - palm.y),
-        Math.hypot(ringTip.x - palm.x, ringTip.y - palm.y),
-        Math.hypot(pinkyTip.x - palm.x, pinkyTip.y - palm.y)
-      ];
-
-      let curledCount = 0;
-      for (const distance of tipDistances) {
-        if (distance < 0.16) curledCount += 1;
-      }
-
-      state.handObservation.seen = true;
-      state.handObservation.palmScreen.set(
-        THREE.MathUtils.clamp(palmX, 0, 1),
-        THREE.MathUtils.clamp(palmY, 0, 1)
-      );
-      state.handObservation.grabStrength = curledCount / 3;
-      state.handObservation.fingertips = [middleTip, ringTip, pinkyTip];
-    }
-
-    function drawTrackingDebug() {
-      trackingCtx.clearRect(0, 0, trackingOverlay.width, trackingOverlay.height);
-
-      if (!state.handObservation.seen) return;
-
-      const palmX = state.handObservation.palmScreen.x * trackingOverlay.width;
-      const palmY = state.handObservation.palmScreen.y * trackingOverlay.height;
-
-      trackingCtx.strokeStyle = "rgba(136, 224, 255, 0.95)";
-      trackingCtx.fillStyle = "rgba(136, 224, 255, 0.2)";
-      trackingCtx.lineWidth = 3;
-      trackingCtx.beginPath();
-      trackingCtx.arc(palmX, palmY, 28, 0, Math.PI * 2);
-      trackingCtx.fill();
-      trackingCtx.stroke();
-
-      trackingCtx.fillStyle = "#e6f6ff";
-      trackingCtx.font = "12px Segoe UI";
-      trackingCtx.fillText(`grab ${state.handObservation.grabStrength.toFixed(2)}`, palmX + 18, palmY - 18);
-
-      for (const tip of state.handObservation.fingertips) {
-        const x = tip.x * trackingOverlay.width;
-        const y = tip.y * trackingOverlay.height;
-        trackingCtx.beginPath();
-        trackingCtx.arc(x, y, 10, 0, Math.PI * 2);
-        trackingCtx.fill();
-      }
-    }
-
-    function projectPalmToWorld() {
-      if (!state.handObservation.seen || !state.session || !state.cubePlaced) return false;
-
-      const xrCamera = renderer.xr.getCamera(camera);
-      const cameraWorld = xrCamera.getWorldPosition(tempVectorA);
-      const cubeDepth = cameraWorld.distanceTo(cubeGroup.position);
-      const ndcX = state.handObservation.palmScreen.x * 2 - 1;
-      const ndcY = 1 - state.handObservation.palmScreen.y * 2;
-
-      tempVectorB.set(ndcX, ndcY, 0.5).unproject(xrCamera);
-      tempVectorC.copy(tempVectorB).sub(cameraWorld).normalize();
-      state.handObservation.palmWorld.copy(cameraWorld).addScaledVector(tempVectorC, cubeDepth);
-      return true;
-    }
-
-    async function runTrackingFrame(now) {
-      if (!state.trackerBooted || !state.trackerSession || trackingVideo.readyState < 2) return;
-      if (now - state.lastTrackerFrameTime < 66) return;
-      if (state.trackerRunning) return;
-      state.lastTrackerFrameTime = now;
-      state.trackerRunning = true;
-
-      trackerInputCanvas.width = TRACKER_INPUT_SIZE;
-      trackerInputCanvas.height = TRACKER_INPUT_SIZE;
-      trackerInputCtx.drawImage(trackingVideo, 0, 0, TRACKER_INPUT_SIZE, TRACKER_INPUT_SIZE);
-
-      const imageData = trackerInputCtx.getImageData(0, 0, TRACKER_INPUT_SIZE, TRACKER_INPUT_SIZE);
-      const floatData = new Float32Array(TRACKER_INPUT_SIZE * TRACKER_INPUT_SIZE * 3);
-
-      for (let i = 0, p = 0; i < imageData.data.length; i += 4, p += 1) {
-        floatData[p] = imageData.data[i] / 255;
-        floatData[p + TRACKER_INPUT_SIZE * TRACKER_INPUT_SIZE] = imageData.data[i + 1] / 255;
-        floatData[p + TRACKER_INPUT_SIZE * TRACKER_INPUT_SIZE * 2] = imageData.data[i + 2] / 255;
-      }
-
-      try {
-        const inputName = state.trackerSession.inputNames[0];
-        const feeds = {};
-        feeds[inputName] = new ort.Tensor("float32", floatData, [1, 3, TRACKER_INPUT_SIZE, TRACKER_INPUT_SIZE]);
-        const outputs = await state.trackerSession.run(feeds);
-        const landmarks = extractLandmarks(outputs);
-        samplePalmObservationFromLandmarks(landmarks);
-        state.trackerActive = state.handObservation.seen;
-        setTrackerStatus(state.handObservation.seen ? "hand seen" : "camera active", true);
-      } catch (error) {
-        state.handObservation.seen = false;
-        state.handObservation.grabStrength = 0;
-        state.trackerActive = false;
-        setTrackerStatus("model output mismatch");
-        console.warn("ONNX tracking frame failed:", error);
-      } finally {
-        state.trackerRunning = false;
-      }
-
-      drawTrackingDebug();
-    }
-
-    async function checkSupport() {
-      if (!navigator.xr) {
-        setStatus("This browser does not expose WebXR.", false);
-        setHint("Use an ARCore-capable Android browser with WebXR immersive-ar support.");
-        startButton.disabled = true;
-        return;
-      }
-
-      try {
-        const supported = await navigator.xr.isSessionSupported("immersive-ar");
-        if (!supported) {
-          setStatus("immersive-ar is not supported on this device.", false);
-          setHint("Chrome on Android with ARCore is the most common setup for WebXR surface hit testing.");
-          startButton.disabled = true;
-          return;
-        }
-      } catch (error) {
-        setStatus(`WebXR support check failed: ${error.message}`, false);
-        startButton.disabled = true;
-        return;
-      }
-
-      setStatus("WebXR AR is available. Start scanning for a surface.", true);
-    }
-
-    function placeCubeFromReticle() {
-      if (!state.surfaceFound || !reticle.visible) return;
-
-      const now = performance.now();
-      if (now - state.lastPlacementTime < 120) return;
-      state.lastPlacementTime = now;
-
-      tempVectorA.setFromMatrixPosition(reticle.matrix);
-      state.cubeBasePosition.copy(tempVectorA);
-      state.cubeBasePosition.y += 0.085;
-      cubeGroup.position.copy(state.cubeBasePosition);
-      cubeGroup.rotation.set(0, 0, 0);
-      cubeGroup.scale.setScalar(1);
-      cubeGroup.visible = true;
-      floorShadow.visible = true;
-      floorShadow.position.set(tempVectorA.x, tempVectorA.y + 0.002, tempVectorA.z);
-      state.cubePlaced = true;
-      state.cubeGrabbed = false;
-      setStatus("Cube placed. Move your palm near it to grab.", true);
-      setHint("Tap again to reposition the cube on another detected surface.");
-    }
-
-    function updateGrabState() {
-      if (!state.cubePlaced) return;
-      if (!projectPalmToWorld()) return;
-
-      const cubeDistance = cubeGroup.position.distanceTo(state.handObservation.palmWorld);
-      const grabPose = state.handObservation.seen && state.handObservation.grabStrength >= 0.66 && cubeDistance < 0.22;
-
-      if (!state.cubeGrabbed) {
-        if (grabPose) {
-          state.cubeGrabbed = true;
-          setStatus("Cube grabbed by camera hand tracker.", true);
-          setHint("Relax your fingers to release the cube back into float mode.");
-        }
-      }
-
-      if (state.cubeGrabbed) {
-        if (!grabPose) {
-          state.cubeGrabbed = false;
-          state.cubeBasePosition.copy(cubeGroup.position);
-          setStatus("Cube released. It is floating in place again.", true);
-          setHint("Move your palm near the cube and curl middle, ring, or pinky fingers to grab it.");
-          return;
-        }
-
-        cubeTarget.copy(state.handObservation.palmWorld).addScaledVector(worldUp, 0.04);
-        cubeGroup.position.lerp(cubeTarget, 0.45);
-
-        tempMatrix.lookAt(cubeTarget, renderer.xr.getCamera(camera).getWorldPosition(tempVectorA), worldUp);
-        tempQuaternion.setFromRotationMatrix(tempMatrix);
-        cubeGroup.quaternion.slerp(tempQuaternion, 0.22);
-        cubeGroup.scale.lerp(cubeScaleTarget.setScalar(1.08), 0.18);
-      }
-    }
-
-    function updateIdleAnimation(timeSeconds) {
-      if (!state.cubePlaced || state.cubeGrabbed) return;
-
-      cubeTarget.copy(state.cubeBasePosition);
-      cubeTarget.y += Math.sin(timeSeconds * 2.3) * 0.028;
-      cubeGroup.position.lerp(cubeTarget, 0.18);
-      cubeGroup.rotation.x += 0.01;
-      cubeGroup.rotation.y += 0.018;
-      cubeGroup.rotation.z += 0.006;
-      cubeGroup.scale.lerp(cubeScaleTarget.setScalar(1), 0.12);
-
-      floorShadow.visible = true;
-      floorShadow.position.set(state.cubeBasePosition.x, state.cubeBasePosition.y - 0.082, state.cubeBasePosition.z);
-      floorShadow.scale.setScalar(1 + Math.sin(timeSeconds * 2.3) * 0.06);
-    }
-
-    async function requestHitTestSource() {
-      if (!state.session || state.hitTestRequested) return;
-      state.hitTestRequested = true;
-      state.viewerSpace = await state.session.requestReferenceSpace("viewer");
-      state.hitTestSource = await state.session.requestHitTestSource({ space: state.viewerSpace });
-    }
-
-    function clearHitTestState() {
-      if (state.hitTestSource) {
-        state.hitTestSource.cancel();
-      }
-
-      state.referenceSpace = null;
-      state.viewerSpace = null;
-      state.hitTestSource = null;
-      state.hitTestRequested = false;
-      state.surfaceFound = false;
-      reticle.visible = false;
-      updatePlaceAvailability();
-    }
-
-    async function startAR() {
-      if (!navigator.xr) return;
-
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) {
-          throw new Error("Rear camera API is unavailable in this browser.");
-        }
-
-        await startTrackingCamera();
-        await initOnnxTracker();
-
-        const session = await navigator.xr.requestSession("immersive-ar", {
-          requiredFeatures: ["hit-test"],
-          optionalFeatures: ["dom-overlay", "local-floor"],
-          domOverlay: { root: overlay }
-        });
-
-        state.session = session;
-
-        renderer.xr.setReferenceSpaceType("local");
-        await renderer.xr.setSession(session);
-        state.referenceSpace = renderer.xr.getReferenceSpace();
-        await requestHitTestSource();
-
-        setStatus("AR session started. Scan until the reticle locks onto a surface.", true);
-        setHint("Tap the screen once the reticle appears to place the cube. The rear camera ONNX tracker will drive grab detection.");
-        introPanel.classList.add("hidden");
-
-        session.addEventListener("end", () => {
-          clearHitTestState();
-          state.session = null;
-          state.cubeGrabbed = false;
-          placeButton.disabled = true;
-          introPanel.classList.remove("hidden");
-          setStatus("AR session ended.", true);
-          setHint("Start WebXR again to scan a surface and place the cube.");
-        });
-      } catch (error) {
-        setStatus(`Unable to start AR: ${error.message}`, false);
-        setHint("This needs secure-context WebXR plus rear-camera access. If the ONNX model is missing, add ./models/hand_landmarks.onnx.");
-      }
-    }
-
-    function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      fitTrackingOverlay();
-    }
-
-    function updateHitTest(frame) {
-      if (!state.hitTestSource || !state.referenceSpace) return;
-
-      const hits = frame.getHitTestResults(state.hitTestSource);
-      if (hits.length > 0) {
-        const hit = hits[0];
-        const pose = hit.getPose(state.referenceSpace);
-        if (pose) {
-          reticle.visible = true;
-          reticle.matrix.fromArray(pose.transform.matrix);
-
-          if (!state.surfaceFound) {
-            state.surfaceFound = true;
-            updatePlaceAvailability();
-            setStatus("Surface found. Tap to place the cube.", true);
-          }
-        }
+      if (handVisible) {
+        handMarker.visible = true;
+        handMarker.position.lerp(handMarkerTarget, 0.35);
+        handMarker.scale.setScalar(handClosed ? 0.8 : 1.0);
       } else {
-        reticle.visible = false;
-        if (state.surfaceFound) {
-          state.surfaceFound = false;
-          updatePlaceAvailability();
-          setStatus("Scanning for a surface.", true);
-        }
-      }
-    }
-
-    function render(timestamp, frame) {
-      const timeSeconds = timestamp * 0.001;
-
-      if (frame && state.session) {
-        if (!state.referenceSpace) {
-          state.referenceSpace = renderer.xr.getReferenceSpace();
-        }
-
-        updateHitTest(frame);
-        updateGrabState();
+        handMarker.visible = false;
       }
 
-      runTrackingFrame(timestamp);
-      updateIdleAnimation(timeSeconds);
-      halo.rotation.z += state.cubeGrabbed ? 0.05 : 0.02;
-      glow.scale.setScalar(1 + Math.sin(timeSeconds * 3.2) * 0.08);
       renderer.render(scene, camera);
     }
 
-    startButton.addEventListener("click", startAR);
-    placeButton.addEventListener("click", placeCubeFromReticle);
-
-    overlay.addEventListener("pointerdown", (event) => {
-      if (!state.session || !state.surfaceFound) return;
-      if (!isPrimaryPointerTarget(event.target)) return;
-      placeCubeFromReticle();
-    });
-
-    window.addEventListener("resize", onWindowResize);
-    renderer.setAnimationLoop(render);
-    checkSupport();
+    window.addEventListener("resize", resize);
+    startButton.addEventListener("click", startExperience);
+    resize();
+    animate();
   </script>
 </body>
 </html>
