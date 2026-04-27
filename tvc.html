@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TVC Telemetry</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --glass-bg:     rgba(255,255,255,0.08);
+  --glass-border: rgba(255,255,255,0.18);
+  --glass-shine:  rgba(255,255,255,0.22);
+  --blur:         30px;
+  --text:         rgba(255,255,255,0.92);
+  --text-dim:     rgba(255,255,255,0.40);
+  --text-faint:   rgba(255,255,255,0.22);
+  --blue:         #6ed0ff;
+  --green:        #5ffa8f;
+  --red:          #ff6a5d;
+  --orange:       #ffb660;
+  --purple:       #c57cff;
+  --r:            26px;
+}
+
+html, body { min-height: 100%; }
+body {
+  min-height: 100svh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 42px 18px 56px;
+  overflow-x: hidden;
+  background:
+    radial-gradient(ellipse 100% 70% at 15% 5%,  #1a4d80 0%, transparent 55%),
+    radial-gradient(ellipse 80% 60% at 85% 20%,   #0b2245 0%, transparent 45%),
+    radial-gradient(ellipse 80% 80% at 50% 100%,  #071123 0%, transparent 55%),
+    #040710;
+}
+
+.orb { position:fixed; border-radius:50%; pointer-events:none; z-index:0; filter:blur(72px); }
+.orb-1 { width:520px;height:520px; background:radial-gradient(circle,rgba(110,208,255,.18) 0%,transparent 72%); top:-140px;left:-120px; animation:float1 20s ease-in-out infinite alternate; }
+.orb-2 { width:420px;height:420px; background:radial-gradient(circle,rgba(95,250,143,.10) 0%,transparent 70%); bottom:-100px;right:-100px; animation:float2 18s ease-in-out infinite alternate; }
+.orb-3 { width:620px;height:620px; background:radial-gradient(circle,rgba(255,106,93,.14) 0%,transparent 70%); top:30%;left:55%; transform:translate(-50%,-50%); }
+
+@keyframes float1 { from{transform:translate(0,0) scale(1)} to{transform:translate(60px,40px) scale(1.15)} }
+@keyframes float2 { from{transform:translate(0,0)} to{transform:translate(-52px,-45px) scale(1.18)} }
+
+.wrap { position:relative; z-index:1; width:100%; max-width:420px; display:flex; flex-direction:column; gap:14px; }
+.card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r);
+  backdrop-filter: blur(var(--blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+  box-shadow: 0 1.5px 0 0 var(--glass-shine) inset, 0 -1px 0 0 rgba(255,255,255,0.05) inset, 0 24px 60px rgba(0,0,0,.36), 0 1px 4px rgba(0,0,0,.25);
+  overflow: hidden;
+}
+header { text-align:center; margin-bottom:6px; }
+.eyebrow { font-size:11px; letter-spacing:4px; text-transform:uppercase; color:var(--text-faint); font-weight:300; margin-bottom:10px; }
+.title { font-size:44px; font-weight:200; letter-spacing:-1.6px; line-height:1; }
+.title b { font-weight:700; background:linear-gradient(135deg,#ffffff 20%,var(--blue) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+
+.status-row { display:flex; align-items:center; gap:12px; padding:18px 20px; }
+.dot { width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,0.16);flex-shrink:0;transition:background .4s,box-shadow .4s,transform .3s; }
+.dot.conn { background:var(--green);box-shadow:0 0 12px var(--green); }
+.dot.warn { background:var(--orange);box-shadow:0 0 10px var(--orange); }
+.status-label { font-size:13px;font-weight:400;color:var(--text-dim);font-family:'SF Mono',ui-monospace,'Courier New',monospace; }
+
+hr { border:none;height:1px;background:linear-gradient(90deg,transparent 0%,var(--glass-border) 30%,var(--glass-border) 70%,transparent 100%);margin:0 18px; }
+
+.btn {
+  all: unset;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: auto; min-width: 170px;
+  margin: 10px auto;
+  padding: 12px 24px;
+  border-radius: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 13px; font-weight: 600; letter-spacing: .2px;
+  cursor: pointer;
+  border: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  transition: transform .2s ease, box-shadow .2s, background .2s, border-color .2s, opacity .2s;
+  box-shadow: 0 1px 0 var(--glass-shine) inset, 0 10px 26px rgba(0,0,0,.22);
+}
+.btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 1px 0 var(--glass-shine) inset,0 18px 36px rgba(0,0,0,.28); border-color:rgba(255,255,255,.26); }
+.btn:disabled { opacity:.28; cursor:default; }
+.btn-connect { color:var(--blue); border-color:rgba(110,208,255,.22); }
+
+.metric-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:20px; }
+.metric-card { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:18px; min-height:104px; display:flex; flex-direction:column; justify-content:space-between; }
+.metric-label { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--text-faint); margin-bottom:8px; }
+.metric-value { font-size:32px; line-height:1.05; font-weight:500; color:var(--text); }
+.metric-small { font-size:12px; color:var(--text-dim); margin-top:6px; }
+
+/* Rocket visual — centered, flame attached */
+.rocket-visual {
+  padding: 28px 20px 32px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Single wrapper that rotates together */
+.rocket-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 120px;
+  /* total height = SVG 200px + flame 72px sticking below */
+  height: 272px;
+  transition: transform 0.3s ease;
+}
+
+.rocket-svg {
+  width: 120px;
+  height: 200px;
+  fill: #ffffff;
+  stroke: none;
+  display: block;
+}
+
+/* Flame sits at the exhaust: fins bottom = y=80 in 100-unit viewBox → 160px from top of SVG */
+.flame-wrapper {
+  position: absolute;
+  top: 160px;          /* aligned to exhaust port */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 72px;
+  pointer-events: none;
+}
+
+.flame {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 18px;
+  height: 60px;
+  transform: translateX(-50%);
+  transform-origin: center top;
+  background: radial-gradient(circle at 50% 20%, rgba(255,255,255,0.95) 0%, rgba(255,211,90,0.95) 24%, rgba(255,102,36,0.75) 48%, rgba(255,62,20,0.35) 70%, transparent 100%);
+  filter: blur(1px);
+  border-radius: 50% 50% 45% 45%;
+  transition: transform 0.2s ease;
+}
+.flame::before,
+.flame::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  width: 14px;
+  height: 40px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 20%, rgba(255,255,255,0.95) 0%, rgba(255,163,43,0.9) 30%, rgba(255,72,25,0.5) 60%, transparent 100%);
+}
+.flame::before { left: 40%; width: 10px; height: 32px; }
+.flame::after  { left: 60%; width: 10px; height: 36px; }
+
+.hero { padding:24px 20px 18px; }
+.hero-title { font-size:20px; font-weight:600; color:var(--text); margin-bottom:8px; }
+.hero-copy { font-size:13px; line-height:1.85; color:var(--text-faint); }
+
+.note { font-size:10px; color:var(--text-faint); text-align:center; line-height:1.8; padding:0 6px 8px; }
+</style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Telemetry Dashboard</div>
+    <div class="title"><b>TVC</b> Telemetry</div>
+  </header>
+
+  <div class="card" id="connectCard">
+    <div class="status-row">
+      <div class="dot" id="dot"></div>
+      <div class="status-label" id="statusLabel">Not connected</div>
+    </div>
+    <hr>
+    <button class="btn btn-connect" id="btnConnect" onclick="toggleConnect()">Connect to Rocket</button>
+  </div>
+
+  <div class="card metric-grid">
+    <div class="metric-card">
+      <div class="metric-label">Roll Angle</div>
+      <div class="metric-value" id="rollValue">—°</div>
+      <div class="metric-small" id="rollHint">0 = vertical</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Servo Angle</div>
+      <div class="metric-value" id="servoValue">—°</div>
+      <div class="metric-small">Safe range: 45° – 135°</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Flight Error</div>
+      <div class="metric-value" id="errorValue">—°</div>
+      <div class="metric-small">Deviation from target vertical</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Rocket Pose</div>
+      <div class="metric-value" id="poseValue">unknown</div>
+      <div class="metric-small">Tilt direction based on roll</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="rocket-visual">
+      <!-- Single wrapper: rotate this to move rocket + flame together -->
+      <div class="rocket-wrapper" id="rocketWrapper">
+        <svg class="rocket-svg" id="rocketSvg" viewBox="0 0 60 100" xmlns="http://www.w3.org/2000/svg">
+          <!-- Rocket body -->
+          <rect x="20" y="20" width="20" height="60" rx="2"/>
+          <!-- Nose cone -->
+          <polygon points="30,10 20,20 40,20"/>
+          <!-- Fins -->
+          <polygon points="15,70 20,70 20,80"/>
+          <polygon points="40,70 45,70 40,80"/>
+        </svg>
+        <!-- Flame now lives inside the wrapper, anchored at the exhaust -->
+        <div class="flame-wrapper">
+          <div class="flame" id="flame"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">Open this page in Chrome or Edge on Android / Desktop. Web Bluetooth requires a secure browser context.</div>
+</div>
+
+<script>
+  const SVC = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+  const TX  = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+
+  let bleDevice = null;
+  let txChar = null;
+  let connected = false;
+
+  const $dot = document.getElementById('dot');
+  const $statusLabel = document.getElementById('statusLabel');
+  const $btnConnect = document.getElementById('btnConnect');
+  const $rollValue = document.getElementById('rollValue');
+  const $servoValue = document.getElementById('servoValue');
+  const $errorValue = document.getElementById('errorValue');
+  const $poseValue = document.getElementById('poseValue');
+  const $connectCard = document.getElementById('connectCard');
+
+  function addLog(message, type) {
+    console.log(`[${type.toUpperCase()}] ${message}`);
+  }
+
+  function toggleConnect() {
+    if (connected) {
+      bleDevice?.gatt.disconnect();
+      return;
+    }
+    if (!navigator.bluetooth) {
+      addLog('Web Bluetooth not supported in this browser.', 'warn');
+      return;
+    }
+    requestConnection();
+  }
+
+  async function requestConnection() {
+    addLog('Scanning for ROCKET_TVC service devices…', 'info');
+    try {
+      bleDevice = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [SVC] }],
+        optionalServices: [SVC]
+      });
+      bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+      const server = await bleDevice.gatt.connect();
+      const service = await server.getPrimaryService(SVC);
+      txChar = await service.getCharacteristic(TX);
+      await txChar.startNotifications();
+      txChar.addEventListener('characteristicvaluechanged', onNotify);
+      onConnected();
+    } catch (err) {
+      addLog(err.message || 'Connection cancelled.', 'warn');
+    }
+  }
+
+  function onConnected() {
+    connected = true;
+    $dot.className = 'dot conn';
+    $statusLabel.textContent = 'Connected to ROCKET_TVC';
+    $btnConnect.textContent = 'Disconnect';
+    addLog('Connected — receiving telemetry.', 'state');
+  }
+
+  function onDisconnected() {
+    connected = false;
+    txChar = null;
+    $dot.className = 'dot';
+    $statusLabel.textContent = 'Not connected';
+    $btnConnect.textContent = 'Connect to Rocket';
+    addLog('Disconnected.', 'warn');
+  }
+
+  function onNotify(event) {
+    const text = new TextDecoder().decode(event.target.value);
+    text.split(/\r?\n/).filter(Boolean).forEach(line => {
+      parseTelemetry(line);
+    });
+  }
+
+  function parseTelemetry(line) {
+    const m = line.match(/roll=([\-\d.]+).*err=([\-\d.]+).*servo=([\d.]+).*pose=([a-zA-Z\s-]+)/);
+    if (!m) return;
+    const roll = parseFloat(m[1]);
+    const err = parseFloat(m[2]);
+    const servo = parseFloat(m[3]);
+    const pose = m[4];
+
+    $rollValue.textContent = roll.toFixed(1) + '°';
+    $servoValue.textContent = servo.toFixed(1) + '°';
+    $errorValue.textContent = (err >= 0 ? '+' : '') + err.toFixed(1) + '°';
+    $poseValue.textContent = pose;
+
+    // Rotate the whole wrapper so flame stays glued to the rocket body
+    document.getElementById('rocketWrapper').style.transform = `rotate(${roll}deg)`;
+
+    // Scale flame height slightly with tilt (thrust effect) — no counter-rotation needed
+    const flame = document.getElementById('flame');
+    flame.style.transform = `translateX(-50%) scaleY(${1 + Math.abs(roll) / 150})`;
+  }
+</script>
+</body>
+</html>
