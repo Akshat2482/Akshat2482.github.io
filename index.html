@@ -1,260 +1,365 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Garage Control</title>
-
-<!-- iOS "Add to Home Screen" support -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=412, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Garage">
-<meta name="theme-color" content="#000000">
-<link rel="manifest" href="manifest.json">
-
+<title>JARVIS Remote</title>
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body {
-    margin: 0; padding: 0; height: 100%;
-    background: #000000;
-    font-family: -apple-system, "SF Mono", ui-monospace, monospace;
-    overscroll-behavior: none;
-    touch-action: manipulation;
-    -webkit-user-select: none;
-    user-select: none;
+    height:100%; width:100%; overflow:hidden;
+    background:#0a0a0c; color:#ebebf0;
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    touch-action:manipulation; user-select:none; -webkit-user-select:none;
   }
-  .app {
-    min-height: 100vh;
-    min-height: 100dvh;
-    max-width: 480px;
-    margin: 0 auto;
-    padding: calc(env(safe-area-inset-top, 20px) + 8px) 20px calc(env(safe-area-inset-bottom, 20px) + 8px);
-    display: flex;
-    flex-direction: column;
+  #app {
+    display:flex; flex-direction:column; align-items:center; justify-content:space-between;
+    height:100dvh; width:100vw; padding:16px 12px 24px;
   }
-  .topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-bottom: 14px;
-    border-bottom: 1px solid #17232f;
-    margin-bottom: 8px;
+  .camera-wrap {
+    position:relative; width:100%; max-width:380px;
+    aspect-ratio:4/3; border-radius:14px; overflow:hidden;
+    background:#141416; border:1.5px solid #1e1e22;
   }
-  .brand { display: flex; align-items: center; gap: 8px; }
-  .brand-dot {
-    width: 8px; height: 8px; background: #33e0ff;
-    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  .camera-wrap.expanded { position:fixed; inset:0; max-width:none; aspect-ratio:auto; border-radius:0; border:none; z-index:100; }
+  .camera-wrap video, .camera-wrap canvas { width:100%; height:100%; object-fit:cover; display:block; }
+  .camera-wrap .overlay-label {
+    position:absolute; top:10px; left:10px; right:10px;
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:11px; color:rgba(235,165,60,0.9); font-weight:600; letter-spacing:0.5px;
   }
-  .brand-text { color: #d8ecf5; font-size: 12px; font-weight: 700; letter-spacing: 2px; }
-  .status-pill {
-    display: flex; align-items: center; gap: 5px;
-    padding: 4px 10px; border: 1px solid #64808f; border-radius: 4px;
+  .camera-wrap .close-btn {
+    display:none; width:32px; height:32px; border-radius:50%;
+    background:rgba(235,165,60,0.15); color:#eba53c; border:1px solid rgba(235,165,60,0.4);
+    font-size:16px; line-height:32px; text-align:center; cursor:pointer;
   }
-  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #64808f; }
-  .status-text { font-size: 10px; font-weight: 700; color: #64808f; }
-  .status-pill.online { border-color: #35e08a; }
-  .status-pill.online .status-dot { background: #35e08a; }
-  .status-pill.online .status-text { color: #35e08a; }
-  .status-pill.offline { border-color: #ff4b4b; }
-  .status-pill.offline .status-dot { background: #ff4b4b; }
-  .status-pill.offline .status-text { color: #ff4b4b; }
-
-  .center-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+  .camera-wrap.expanded .close-btn { display:block; }
+  .controls {
+    display:flex; gap:10px; width:100%; max-width:380px;
+    justify-content:space-between; align-items:stretch;
   }
-  .dial-wrap {
-    position: relative;
-    width: 204px; height: 204px;
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 20px;
+  .btn {
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:6px; padding:14px 6px; border-radius:14px;
+    background:linear-gradient(180deg,#1a1a1e,#141416);
+    border:1.5px solid #2a2a30; color:#ebebf0;
+    font-size:11px; font-weight:600; letter-spacing:0.3px;
+    cursor:pointer; transition:all .15s ease;
   }
-  .ring {
-    position: absolute;
-    width: 204px; height: 204px;
-    border-radius: 102px;
-    border: 4px solid transparent;
-    opacity: 0;
-    pointer-events: none;
+  .btn:active { transform:scale(0.96); border-color:#eba53c; }
+  .btn .icon { font-size:22px; line-height:1; }
+  .mic-area {
+    width:100%; max-width:380px; display:flex; flex-direction:column; align-items:center; gap:10px;
   }
-  .ring.spinning {
-    animation: spin 0.9s linear infinite;
-    opacity: 1;
-    border-top-color: #33e0ff;
-    border-right-color: #33e0ff;
+  .mic-btn {
+    width:72px; height:72px; border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, #eba53c, #c7852a);
+    border:2px solid #ffb84d; color:#0a0a0c;
+    font-size:28px; line-height:72px; text-align:center;
+    box-shadow:0 0 24px rgba(235,165,60,0.35);
+    cursor:pointer; transition:all .12s ease;
   }
-  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-  .dial {
-    border: none; padding: 0; cursor: pointer;
-    width: 180px; height: 180px; border-radius: 90px;
-    background: #64808f;
-    display: flex; align-items: center; justify-content: center;
-    transition: background 0.3s, opacity 0.2s, transform 0.1s;
-    -webkit-touch-callout: none;
+  .mic-btn:active { transform:scale(0.92); box-shadow:0 0 40px rgba(235,165,60,0.6); }
+  .mic-btn.recording { animation:pulse 1.2s infinite; }
+  @keyframes pulse {
+    0%,100% { box-shadow:0 0 20px rgba(235,165,60,0.4); }
+    50% { box-shadow:0 0 40px rgba(235,165,60,0.7); }
   }
-  .dial:active:not(:disabled) { transform: scale(0.96); }
-  .dial:disabled { opacity: 0.4; cursor: default; }
-  .dial.open { background: #33e0ff; }
-
-  .sub-label { color: #64808f; font-size: 11px; letter-spacing: 2px; margin-bottom: 4px; }
-  .center-label { color: #d8ecf5; font-size: 20px; font-weight: 700; letter-spacing: 2px; }
-  .center-label.sending { color: #64808f; }
-
-  .footer { text-align: center; color: #64808f; font-size: 10px; letter-spacing: 1px; padding-top: 12px; }
+  .visualizer {
+    width:100%; height:56px; border-radius:10px;
+    background:#0e0e10; border:1px solid #1e1e22; overflow:hidden;
+    display:none;
+  }
+  .visualizer.active { display:block; }
+  .visualizer canvas { width:100%; height:100%; display:block; }
+  .face-section {
+    width:100%; max-width:380px; display:flex; flex-direction:column; align-items:center; gap:8px;
+  }
+  .face-box {
+    width:100%; aspect-ratio:1/1; max-height:120px; border-radius:12px;
+    background:#0e0e10; border:1.5px dashed #2a2a30;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:#6b6b76; text-align:center; padding:8px;
+    overflow:hidden; position:relative;
+  }
+  .face-box video, .face-box canvas { width:100%; height:100%; object-fit:cover; position:absolute; inset:0; }
+  .face-btn {
+    padding:10px 18px; border-radius:20px; font-size:12px; font-weight:600;
+    background:linear-gradient(180deg,#eba53c,#c7852a); color:#0a0a0c; border:none;
+    cursor:pointer;
+  }
+  .status {
+    font-size:10px; color:#6b6b76; text-align:center; letter-spacing:0.3px;
+    min-height:14px;
+  }
 </style>
 </head>
 <body>
-
-<div class="app">
-  <div class="topbar">
-    <div class="brand">
-      <div class="brand-dot"></div>
-      <span class="brand-text">GARAGE CONTROL</span>
-    </div>
-    <div id="statusPill" class="status-pill offline">
-      <div class="status-dot"></div>
-      <span id="statusText" class="status-text">CONNECTING</span>
+<div id="app">
+  <!-- Camera -->
+  <div class="camera-wrap" id="cameraWrap" style="display:block">
+    <img id="laptopCam" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:block" />
+    <canvas id="laptopCamCanvas" style="display:none"></canvas>
+    <div class="overlay-label">
+      <span>LAPTOP CAM</span>
+      <button class="close-btn" id="closeCamBtn">&times;</button>
     </div>
   </div>
 
-  <div class="center-area">
-    <div class="dial-wrap">
-      <div id="ring" class="ring"></div>
-      <button id="dial" class="dial" onclick="pressButton()" disabled>
-        <svg width="64" height="56" viewBox="0 0 64 56">
-          <path d="M2 20 L32 2 L62 20 Z" fill="#000000"/>
-          <rect x="6" y="18" width="52" height="34" rx="4" fill="#000000"/>
-          <rect x="14" y="26" width="36" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
-          <rect x="14" y="34" width="36" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
-          <rect x="14" y="42" width="36" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
-        </svg>
-      </button>
-    </div>
-    <div class="sub-label">GARAGE DOOR</div>
-    <div id="label" class="center-label">CONNECTING</div>
+  <!-- 3 Buttons -->
+  <div class="controls">
+    <button class="btn" id="cameraBtn"><span class="icon">📷</span>Camera</button>
+    <button class="btn" id="remoteBtn"><span class="icon">🖥️</span>Remote</button>
+    <button class="btn" id="chatBtn"><span class="icon">💬</span>JARVIS</button>
   </div>
 
-  <div id="footer" class="footer">Auto-refreshing every 3s</div>
+  <!-- Mic + Visualizer -->
+  <div class="mic-area">
+    <button class="mic-btn" id="micBtn">🎤</button>
+    <div class="visualizer" id="visualizer"><canvas id="vizCanvas"></canvas></div>
+  </div>
+
+  <!-- Face Recognition -->
+  <div class="face-section">
+    <div class="face-box" id="faceBox">
+      <span id="faceLabel">Face not enrolled</span>
+      <video id="faceVideo" autoplay playsinline muted style="display:none"></video>
+      <canvas id="faceCanvas" style="display:none"></canvas>
+    </div>
+    <button class="face-btn" id="enrollFaceBtn">Enroll Face</button>
+    <div class="status" id="faceStatus"></div>
+  </div>
 </div>
 
 <script>
-// ---- Fill these in with your own Firebase details ----
-const FIREBASE_URL = "https://garagecontroller-593f2-default-rtdb.firebaseio.com";
-const FIREBASE_SECRET = "N4nIXKzkrCW4QuwWXu6BnKcxOHJlqiTvIVCocdr4";
-// --------------------------------------------------------
+/* ===================== CONFIG ===================== */
+const WS_URL = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host;
+const A17_WIDTH = 412;
+const CAM_MJPEG_URL = '/cam.mjpg';
 
-const POLL_INTERVAL_MS = 3000;
-const MIN_SPIN_MS = 1400;
-
-let online = null;      // null = unknown, true/false = known
-let doorState = "closed"; // assumed only -- no real door sensor
-let sending = false;
-
-const dial = document.getElementById("dial");
-const ring = document.getElementById("ring");
-const label = document.getElementById("label");
-const statusPill = document.getElementById("statusPill");
-const statusText = document.getElementById("statusText");
-const footer = document.getElementById("footer");
-
-function baseUrl() {
-  return `${FIREBASE_URL}/.json?auth=${FIREBASE_SECRET}`;
+/* ===================== FULLSCREEN ===================== */
+function requestFullscreen() {
+  const el = document.documentElement;
+  if (el.requestFullscreen) el.requestFullscreen();
+  else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  else if (el.msRequestFullscreen) el.msRequestFullscreen();
 }
+window.addEventListener('load', () => {
+  setTimeout(requestFullscreen, 300);
+  document.addEventListener('touchstart', requestFullscreen, { once: true });
+  document.addEventListener('click', requestFullscreen, { once: true });
+});
 
-async function fetchGarageOnline() {
-  const res = await fetch(baseUrl());
-  if (!res.ok) throw new Error("GET failed: " + res.status);
-  const data = await res.json();
-  return Boolean(data && data.garageOnline);
+/* ===================== CAMERA ===================== */
+const cameraWrap = document.getElementById('cameraWrap');
+const laptopCam = document.getElementById('laptopCam');
+let camActive = false;
+
+function startCamera() {
+  laptopCam.src = CAM_MJPEG_URL + '?t=' + Date.now();
+  laptopCam.style.display = 'block';
+  cameraWrap.style.display = 'block';
+  camActive = true;
 }
-
-async function patchGarage(patch) {
-  const res = await fetch(baseUrl(), {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) throw new Error("PATCH failed: " + res.status);
+function stopCamera() {
+  laptopCam.src = '';
+  laptopCam.style.display = 'none';
+  cameraWrap.style.display = 'none';
+  camActive = false;
 }
+document.getElementById('cameraBtn').addEventListener('click', () => {
+  if (!camActive) startCamera();
+  else { stopCamera(); }
+});
+document.getElementById('closeCamBtn').addEventListener('click', () => {
+  cameraWrap.classList.remove('expanded');
+});
+cameraWrap.addEventListener('click', (e) => {
+  if (e.target.id === 'closeCamBtn') return;
+  cameraWrap.classList.add('expanded');
+});
 
-function renderStatus() {
-  statusPill.classList.remove("online", "offline");
-  if (online === true) {
-    statusPill.classList.add("online");
-    statusText.textContent = "ONLINE";
-  } else if (online === false) {
-    statusPill.classList.add("offline");
-    statusText.textContent = "OFFLINE";
-  } else {
-    statusText.textContent = "CONNECTING";
-  }
+/* ===================== MIC + VISUALIZER ===================== */
+const micBtn = document.getElementById('micBtn');
+const visualizer = document.getElementById('visualizer');
+const vizCanvas = document.getElementById('vizCanvas');
+const vizCtx = vizCanvas.getContext('2d');
+let micStream = null, audioCtx, analyser, micSource, vizRAF;
 
-  dial.disabled = online !== true || sending;
-  footer.textContent = online === false
-    ? "Garage unit unreachable \u2014 controls disabled"
-    : "Tap to toggle";
-
-  if (!sending) {
-    dial.classList.toggle("open", doorState === "open");
-    label.classList.remove("sending");
-    label.textContent = online === null
-      ? "CONNECTING"
-      : (doorState === "open" ? "OPEN" : "CLOSED");
-  }
+function startMic() {
+  navigator.mediaDevices.getUserMedia({ audio:true, video:false }).then(stream => {
+    micStream = stream;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    micSource = audioCtx.createMediaStreamSource(stream);
+    micSource.connect(analyser);
+    visualizer.classList.add('active');
+    micBtn.classList.add('recording');
+    drawVisualizer();
+    // TODO: stream audio chunks to laptop via WebSocket
+  }).catch(e => alert('Mic access denied: ' + e.message));
 }
-
-async function poll() {
-  try {
-    online = await fetchGarageOnline();
-  } catch (err) {
-    console.warn("Status poll failed:", err);
-    online = null;
-  }
-  renderStatus();
+function stopMic() {
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  if (audioCtx) audioCtx.close();
+  cancelAnimationFrame(vizRAF);
+  visualizer.classList.remove('active');
+  micBtn.classList.remove('recording');
+  vizCtx.clearRect(0, 0, vizCanvas.width, vizCanvas.height);
 }
-
-async function pressButton() {
-  if (sending || online !== true) return;
-  sending = true;
-
-  if ('vibrate' in navigator) navigator.vibrate(40); // no-op on iOS Safari, works on Android Chrome
-
-  const goingTo = doorState === "closed" ? "open" : "closed";
-  label.textContent = goingTo === "open" ? "Opening" : "Closing";
-  label.classList.add("sending");
-  ring.classList.add("spinning");
-  renderStatus();
-
-  const started = Date.now();
-  try {
-    if (goingTo === "open") {
-      await patchGarage({ openGarage: true });
-    } else {
-      await patchGarage({ closeGarage: true });
+function drawVisualizer() {
+  vizCanvas.width = vizCanvas.clientWidth * (window.devicePixelRatio || 1);
+  vizCanvas.height = vizCanvas.clientHeight * (window.devicePixelRatio || 1);
+  const buf = new Uint8Array(analyser.frequencyBinCount);
+  const w = vizCanvas.width, h = vizCanvas.height;
+  function frame() {
+    analyser.getByteFrequencyData(buf);
+    vizCtx.clearRect(0, 0, w, h);
+    const barW = w / buf.length;
+    for (let i = 0; i < buf.length; i++) {
+      const barH = (buf[i] / 255) * h;
+      const x = i * barW;
+      const grad = vizCtx.createLinearGradient(x, h, x, h - barH);
+      grad.addColorStop(0, 'rgba(235,165,60,0.3)');
+      grad.addColorStop(1, 'rgba(235,165,60,0.9)');
+      vizCtx.fillStyle = grad;
+      vizCtx.fillRect(x, h - barH, barW - 1, barH);
     }
-  } catch (err) {
-    alert("Command failed: " + err.message);
-  } finally {
-    const elapsed = Date.now() - started;
-    const wait = Math.max(0, MIN_SPIN_MS - elapsed);
-    setTimeout(() => {
-      ring.classList.remove("spinning");
-      doorState = goingTo;
-      sending = false;
-      if ('vibrate' in navigator) navigator.vibrate(15);
-      renderStatus();
-      setTimeout(poll, 500);
-    }, wait);
+    vizRAF = requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+micBtn.addEventListener('mousedown', startMic);
+micBtn.addEventListener('mouseup', stopMic);
+micBtn.addEventListener('mouseleave', stopMic);
+micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startMic(); });
+micBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopMic(); });
+
+/* ===================== FACE RECOGNITION ===================== */
+const faceBox = document.getElementById('faceBox');
+const faceLabel = document.getElementById('faceLabel');
+const faceVideo = document.getElementById('faceVideo');
+const faceCanvas = document.getElementById('faceCanvas');
+const faceStatus = document.getElementById('faceStatus');
+const enrollBtn = document.getElementById('enrollFaceBtn');
+
+const DB_NAME = 'JarvisFaceDB';
+const STORE = 'faces';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath:'id' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function saveFace(descriptor) {
+  const db = await openDB();
+  const tx = db.transaction(STORE, 'readwrite');
+  tx.objectStore(STORE).put({ id:'primary', descriptor, enrolledAt: Date.now() });
+}
+async function loadFace() {
+  const db = await openDB();
+  const tx = db.transaction(STORE, 'readonly');
+  return new Promise(resolve => {
+    const req = tx.objectStore(STORE).get('primary');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+/* Lightweight face detection using browser FaceDetector if available,
+   otherwise fallback to canvas capture for manual enrollment. */
+async function enrollFace() {
+  faceStatus.textContent = 'Starting camera for enrollment...';
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video:{ width:{ideal:320}, height:{ideal:320}, facingMode:'user' }, audio:false });
+    faceVideo.srcObject = stream;
+    faceVideo.style.display = 'block';
+    faceCanvas.style.display = 'none';
+    await new Promise(r => faceVideo.onloadedmetadata = r);
+    await faceVideo.play();
+    faceStatus.textContent = 'Look at the camera. Capturing in 3s...';
+    await new Promise(r => setTimeout(r, 3000));
+    const ctx = faceCanvas.getContext('2d');
+    faceCanvas.width = faceVideo.videoWidth || 320;
+    faceCanvas.height = faceVideo.videoHeight || 320;
+    ctx.drawImage(faceVideo, 0, 0, faceCanvas.width, faceCanvas.height);
+    const imageData = ctx.getImageData(0, 0, faceCanvas.width, faceCanvas.height);
+    let descriptor = null;
+    if ('FaceDetector' in window) {
+      const detector = new FaceDetector({ fastMode:true, maxDetectedFaces:1 });
+      const faces = await detector.detect(faceVideo);
+      if (faces.length > 0) {
+        const face = faces[0];
+        descriptor = {
+          boundingBox: face.boundingBox,
+          landmarks: face.landmarks ? face.landmarks.map(l => ({ type:l.type, locations:l.locations })) : [],
+          capturedAt: Date.now()
+        };
+      }
+    }
+    if (!descriptor) {
+      descriptor = {
+        imageData: Array.from(imageData.data),
+        width: imageData.width,
+        height: imageData.height,
+        capturedAt: Date.now()
+      };
+    }
+    await saveFace(descriptor);
+    faceLabel.textContent = 'Face enrolled ✓';
+    faceStatus.textContent = 'Enrollment saved locally.';
+    stream.getTracks().forEach(t => t.stop());
+    faceVideo.style.display = 'none';
+  } catch (e) {
+    faceStatus.textContent = 'Enrollment failed: ' + e.message;
   }
 }
 
-poll();
-setInterval(poll, POLL_INTERVAL_MS);
-</script>
+async function checkFace() {
+  const saved = await loadFace();
+  if (!saved) { faceLabel.textContent = 'Face not enrolled'; return; }
+  faceLabel.textContent = 'Face enrolled ✓';
+  faceStatus.textContent = 'Tap Enroll Face to update.';
+}
+enrollBtn.addEventListener('click', enrollFace);
+checkFace();
 
+/* ===================== JARVIS CHAT ===================== */
+const chatBtn = document.getElementById('chatBtn');
+chatBtn.addEventListener('click', () => {
+  // TODO: open JARVIS chat panel / connect to WS
+  alert('JARVIS chat coming soon');
+});
+
+/* ===================== REMOTE BUTTON ===================== */
+const remoteBtn = document.getElementById('remoteBtn');
+remoteBtn.addEventListener('click', () => {
+  window.open('https://akshat2482.github.io', '_blank');
+});
+
+/* ===================== WS / DATA USAGE NOTE ===================== */
+/*
+  Data usage estimate (first session):
+  - HTML page + assets: ~50 KB
+  - Face detection/enrollment (first time): ~0 KB (uses browser FaceDetector API, no model download)
+  - Camera stream (when active): ~1-2 Mbps depending on resolution
+  - Mic stream (when active): ~50-100 Kbps
+  - After first enrollment, face checks use no extra data
+
+  FaceDetector API is supported in Chrome on Android (Samsung A17 5G).
+  If unsupported, enrollment falls back to storing raw image data in IndexedDB.
+*/
+</script>
 </body>
 </html>
