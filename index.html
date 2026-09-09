@@ -137,10 +137,11 @@
       dataChannel = null;
     });
 
-    const call = peer.call(hostPeerId, new MediaStream());
+    const call = peer.call(hostPeerId);
     call.on('stream', (stream) => {
       log('Receiving camera feed');
       phoneCam.srcObject = stream;
+      phoneCam.play().catch(() => {});
       remoteStatus.textContent = 'Camera active. Hold mic to talk.';
     });
 
