@@ -125,6 +125,11 @@
     conn.on('error', (err) => {
       console.error('Connection error:', err);
       remoteStatus.textContent = 'Connection error';
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        log('Retrying connection...');
+        setTimeout(connectToHost, 2000);
+      }
     });
 
     conn.on('close', () => {
@@ -142,6 +147,11 @@
     call.on('error', (err) => {
       console.error('Call error:', err);
       remoteStatus.textContent = 'Video connection failed';
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        log('Retrying connection...');
+        setTimeout(connectToHost, 2000);
+      }
     });
   }
 
