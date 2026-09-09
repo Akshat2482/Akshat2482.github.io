@@ -57,15 +57,15 @@
   </div>
 </div>
 
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js">
+</script>
 <script>
 (function() {
-  // Read signaling server URL from query param, fallback to localhost
+  // Read host peer ID from query param, or use fixed ID matching the host page
   const params = new URLSearchParams(window.location.search);
-  const signalParam = params.get('signal');
-  const WS_URL = signalParam || 'ws://YOUR_LAPTOP_IP:18926/signal';
+  const hostPeerId = params.get('host') || 'jarvis-host-unique';
 
-  let ws = null;
-  let pc = null;
+  let peer = null;
   let dataChannel = null;
   let micStream = null;
   let audioCtx = null;
@@ -81,86 +81,69 @@
     statusLabel.textContent = msg;
   }
 
-  function connectWS() {
-    ws = new WebSocket(WS_URL);
+  function init() {
+    if (!hostPeerId) return;
 
-    ws.onopen = () => {
-      remoteStatus.textContent = 'Connected to JARVIS';
-      remoteStatus.style.color = '#eba53c';
-      ws.send(JSON.stringify({ client: 'phone' }));
-      createPeerConnection();
-    };
-
-    ws.onerror = () => {
-      remoteStatus.textContent = 'Connection failed';
-      remoteStatus.style.color = '#ff6b6b';
-    };
-
-    ws.onclose = () => {
-      remoteStatus.textContent = 'Disconnected from JARVIS';
-      remoteStatus.style.color = '#6b6b76';
-    };
-
-    ws.onmessage = async (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (!pc) return;
-
-        if (data.type === 'offer') {
-          log('Receiving camera from laptop...');
-          await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          ws.send(JSON.stringify({ type: 'answer', sdp: answer }));
-        } else if (data.type === 'answer') {
-          await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-        } else if (data.type === 'ice-candidate') {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-          } catch (e) {}
-        }
-      } catch (e) {
-        console.error('Signaling error:', e);
+    // Create PeerJS instance (connects to public signaling server)
+    peer = new Peer(null, {
+      host: '0.peerjs.com',
+      port: 443,
+      path: '/',
+      secure: true,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+        ]
       }
-    };
-  }
-
-  function createPeerConnection() {
-    pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-      ]
     });
 
-    // Receive video from laptop camera
-    pc.ontrack = (event) => {
-      if (event.track.kind === 'video') {
-        log('Camera feed received');
-        phoneCam.srcObject = event.streams[0];
-      }
-    };
+    peer.on('open', (id) => {
+      log('Connected to signaling server');
+      remoteStatus.textContent = 'Connecting to laptop...';
+      remoteStatus.style.color = '#eba53c';
 
-    // Data channel for sending audio back to laptop
-    pc.ondatachannel = (event) => {
-      dataChannel = event.channel;
-      dataChannel.binaryType = 'arraybuffer';
-    };
+      // Connect to host
+      const conn = peer.connect(hostPeerId, { reliable: false });
+      
+      conn.on('open', () => {
+        log('Connected to laptop');
+        remoteStatus.textContent = 'Connected. Receiving camera...';
+        dataChannel = conn;
+      });
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'ice-candidate', candidate: event.candidate }));
-      }
-    };
+      conn.on('data', (data) => {
+        // Handle incoming data if needed
+      });
 
-    pc.oniceconnectionstatechange = () => {
-      remoteStatus.textContent = 'ICE: ' + pc.iceConnectionState;
-    };
+      conn.on('error', (err) => {
+        console.error('Connection error:', err);
+        remoteStatus.textContent = 'Connection error';
+      });
+
+      // Call host to receive video
+      const call = peer.call(hostPeerId, new MediaStream());
+      call.on('stream', (stream) => {
+        log('Receiving camera feed');
+        phoneCam.srcObject = stream;
+        remoteStatus.textContent = 'Camera active. Hold mic to talk.';
+      });
+
+      call.on('error', (err) => {
+        console.error('Call error:', err);
+        remoteStatus.textContent = 'Video connection failed';
+      });
+    });
+
+    peer.on('error', (err) => {
+      console.error('Peer error:', err);
+      remoteStatus.textContent = 'Signaling error: ' + err.type;
+    });
   }
 
   async function startMic() {
-    if (!pc || !dataChannel || dataChannel.readyState !== 'open') {
-      alert('Not connected to laptop yet. Wait for ICE to connect.');
+    if (!dataChannel || dataChannel.readyState !== 'open') {
+      alert('Not connected to laptop yet');
       return;
     }
 
@@ -186,13 +169,13 @@
         const input = e.inputBuffer.getChannelData(0);
         const int16 = new Int16Array(input.length);
         for (let i = 0; i < input.length; i++) {
-          const s = Math.max(-1, Math(1, input[i]));
+          const s = Math.max(-1, Math.min(1, input[i]));
           int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
 
         try {
           dataChannel.send(int16.buffer);
-        } catch (e) {
+        } catch (err) {
           // Channel closed
         }
       };
@@ -238,8 +221,10 @@
   micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startMic(); });
   micBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopMic(); });
 
-  // Auto-connect on load
-  connectWS();
+  // Initialize on load
+  if (hostPeerId) {
+    init();
+  }
 })();
 </script>
 </body>
