@@ -110,6 +110,7 @@
         log('Connected to laptop');
         remoteStatus.textContent = 'Connected. Receiving camera...';
         dataChannel = conn;
+        dataChannel.binaryType = 'arraybuffer';
       });
 
       conn.on('data', (data) => {
@@ -119,6 +120,10 @@
       conn.on('error', (err) => {
         console.error('Connection error:', err);
         remoteStatus.textContent = 'Connection error';
+      });
+
+      conn.on('close', () => {
+        remoteStatus.textContent = 'Disconnected from laptop';
       });
 
       // Call host to receive video
@@ -181,7 +186,6 @@
       };
 
       source.connect(scriptProcessor);
-      scriptProcessor.connect(audioCtx.destination);
 
       micBtn.style.animation = 'pulse 1.2s infinite';
       remoteStatus.textContent = 'Talking...';
