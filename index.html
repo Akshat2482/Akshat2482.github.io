@@ -61,7 +61,6 @@
 </script>
 <script>
 (function() {
-  // Read host peer ID from query param, or use fixed ID matching the host page
   const params = new URLSearchParams(window.location.search);
   const hostPeerId = params.get('host') || 'jarvis-host-unique';
 
@@ -70,6 +69,8 @@
   let micStream = null;
   let audioCtx = null;
   let scriptProcessor = null;
+  let retryCount = 0;
+  const MAX_RETRIES = 10;
 
   const phoneCam = document.getElementById('phoneCam');
   const statusLabel = document.getElementById('statusLabel');
@@ -81,10 +82,70 @@
     statusLabel.textContent = msg;
   }
 
-  function init() {
-    if (!hostPeerId) return;
+  function playAudioChunk(int16Array) {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const float32 = new Float32Array(int16Array.length);
+    for (let i = 0; i < int16Array.length; i++) {
+      float32[i] = int16Array[i] / 0x8000;
+    }
+    const buffer = audioCtx.createBuffer(1, float32.length, 16000);
+    buffer.getChannelData(0).set(float32);
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    source.start();
+  }
 
-    // Create PeerJS instance (connects to public signaling server)
+  function connectToHost() {
+    if (!peer || !peer.id) return;
+
+    log('Connecting to laptop...');
+    remoteStatus.textContent = 'Connecting to laptop...';
+    remoteStatus.style.color = '#eba53c';
+
+    const conn = peer.connect(hostPeerId, { reliable: false });
+    
+    conn.on('open', () => {
+      log('Connected to laptop');
+      remoteStatus.textContent = 'Connected. Receiving camera...';
+      dataChannel = conn;
+      dataChannel.binaryType = 'arraybuffer';
+      retryCount = 0;
+    });
+
+    conn.on('data', (data) => {
+      if (data instanceof ArrayBuffer) {
+        const int16 = new Int16Array(data);
+        playAudioChunk(int16);
+      }
+    });
+
+    conn.on('error', (err) => {
+      console.error('Connection error:', err);
+      remoteStatus.textContent = 'Connection error';
+    });
+
+    conn.on('close', () => {
+      remoteStatus.textContent = 'Disconnected from laptop';
+      dataChannel = null;
+    });
+
+    const call = peer.call(hostPeerId, new MediaStream());
+    call.on('stream', (stream) => {
+      log('Receiving camera feed');
+      phoneCam.srcObject = stream;
+      remoteStatus.textContent = 'Camera active. Hold mic to talk.';
+    });
+
+    call.on('error', (err) => {
+      console.error('Call error:', err);
+      remoteStatus.textContent = 'Video connection failed';
+    });
+  }
+
+  function init() {
     peer = new Peer(null, {
       host: '0.peerjs.com',
       port: 443,
@@ -100,49 +161,18 @@
 
     peer.on('open', (id) => {
       log('Connected to signaling server');
-      remoteStatus.textContent = 'Connecting to laptop...';
-      remoteStatus.style.color = '#eba53c';
-
-      // Connect to host
-      const conn = peer.connect(hostPeerId, { reliable: false });
-      
-      conn.on('open', () => {
-        log('Connected to laptop');
-        remoteStatus.textContent = 'Connected. Receiving camera...';
-        dataChannel = conn;
-        dataChannel.binaryType = 'arraybuffer';
-      });
-
-      conn.on('data', (data) => {
-        // Handle incoming data if needed
-      });
-
-      conn.on('error', (err) => {
-        console.error('Connection error:', err);
-        remoteStatus.textContent = 'Connection error';
-      });
-
-      conn.on('close', () => {
-        remoteStatus.textContent = 'Disconnected from laptop';
-      });
-
-      // Call host to receive video
-      const call = peer.call(hostPeerId, new MediaStream());
-      call.on('stream', (stream) => {
-        log('Receiving camera feed');
-        phoneCam.srcObject = stream;
-        remoteStatus.textContent = 'Camera active. Hold mic to talk.';
-      });
-
-      call.on('error', (err) => {
-        console.error('Call error:', err);
-        remoteStatus.textContent = 'Video connection failed';
-      });
+      connectToHost();
     });
 
     peer.on('error', (err) => {
       console.error('Peer error:', err);
-      remoteStatus.textContent = 'Signaling error: ' + err.type;
+      if (err.type === 'peer-unavailable' && retryCount < MAX_RETRIES) {
+        retryCount++;
+        log('Laptop not found, retrying...');
+        setTimeout(connectToHost, 2000);
+      } else {
+        remoteStatus.textContent = 'Signaling error: ' + err.type;
+      }
     });
   }
 
@@ -213,22 +243,17 @@
     remoteStatus.style.color = '#eba53c';
   }
 
-  // Pulse animation
   const style = document.createElement('style');
   style.textContent = '@keyframes pulse { 0%,100% { box-shadow:0 0 20px rgba(235,165,60,0.4); } 50% { box-shadow:0 0 40px rgba(235,165,60,0.7); } }';
   document.head.appendChild(style);
 
-  // Mic button events
   micBtn.addEventListener('mousedown', startMic);
   micBtn.addEventListener('mouseup', stopMic);
   micBtn.addEventListener('mouseleave', stopMic);
   micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startMic(); });
   micBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopMic(); });
 
-  // Initialize on load
-  if (hostPeerId) {
-    init();
-  }
+  init();
 })();
 </script>
 </body>
