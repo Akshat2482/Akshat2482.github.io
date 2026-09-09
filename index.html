@@ -66,6 +66,7 @@
 
   let peer = null;
   let dataChannel = null;
+  let currentCall = null;
   let micStream = null;
   let audioCtx = null;
   let scriptProcessor = null;
@@ -101,6 +102,15 @@
   function connectToHost() {
     if (!peer || !peer.id) return;
 
+    if (currentCall) {
+      try { currentCall.close(); } catch (e) {}
+      currentCall = null;
+    }
+    if (dataChannel) {
+      try { dataChannel.close(); } catch (e) {}
+      dataChannel = null;
+    }
+
     log('Connecting to laptop...');
     remoteStatus.textContent = 'Connecting to laptop...';
     remoteStatus.style.color = '#eba53c';
@@ -108,8 +118,9 @@
     const conn = peer.connect(hostPeerId, { reliable: false });
     
     conn.on('open', () => {
-      log('Connected to laptop');
-      remoteStatus.textContent = 'Connected. Receiving camera...';
+      log('Data channel open');
+      remoteStatus.textContent = 'Data connected. Establishing video...';
+      remoteStatus.style.color = '#eba53c';
       dataChannel = conn;
       dataChannel.binaryType = 'arraybuffer';
       retryCount = 0;
@@ -124,12 +135,7 @@
 
     conn.on('error', (err) => {
       console.error('Connection error:', err);
-      remoteStatus.textContent = 'Connection error';
-      if (retryCount < MAX_RETRIES) {
-        retryCount++;
-        log('Retrying connection...');
-        setTimeout(connectToHost, 2000);
-      }
+      remoteStatus.textContent = 'Data connection error';
     });
 
     conn.on('close', () => {
@@ -137,7 +143,36 @@
       dataChannel = null;
     });
 
-    const call = peer.call(hostPeerId);
+    let call = null;
+    try {
+      call = peer.call(hostPeerId);
+    } catch (e) {
+      console.error('Call failed:', e);
+      remoteStatus.textContent = 'Video call failed to start';
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        log('Retrying connection...');
+        setTimeout(connectToHost, 2000);
+      } else {
+        remoteStatus.textContent = 'Cannot reach host. Verify host ID.';
+      }
+      return;
+    }
+
+    if (!call) {
+      remoteStatus.textContent = 'Video call failed to start';
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        log('Retrying connection...');
+        setTimeout(connectToHost, 2000);
+      } else {
+        remoteStatus.textContent = 'Cannot reach host. Verify host ID.';
+      }
+      return;
+    }
+
+    currentCall = call;
+
     call.on('stream', (stream) => {
       log('Receiving camera feed');
       phoneCam.srcObject = stream;
@@ -147,11 +182,14 @@
 
     call.on('error', (err) => {
       console.error('Call error:', err);
-      remoteStatus.textContent = 'Video connection failed';
+      const msg = err.type || err.message || 'unknown';
+      remoteStatus.textContent = 'Video connection failed: ' + msg;
       if (retryCount < MAX_RETRIES) {
         retryCount++;
         log('Retrying connection...');
         setTimeout(connectToHost, 2000);
+      } else {
+        remoteStatus.textContent = 'Cannot reach host. Verify host ID.';
       }
     });
   }
@@ -171,7 +209,10 @@
     });
 
     peer.on('open', (id) => {
-      log('Connected to signaling server');
+      log('Phone peer ID: ' + id);
+      log('Connecting to host: ' + hostPeerId);
+      remoteStatus.textContent = 'Phone ready. Connecting to ' + hostPeerId + '...';
+      remoteStatus.style.color = '#eba53c';
       connectToHost();
     });
 
