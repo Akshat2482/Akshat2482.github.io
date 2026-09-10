@@ -69,7 +69,7 @@
 
   let peer = null;
   let dataChannel = null;
-  let currentCall = null;
+  let pc = null;
   let micStream = null;
   let audioCtx = null;
   let scriptProcessor = null;
@@ -124,9 +124,9 @@
     if (!peer || !peer.id || connecting) return;
     connecting = true;
 
-    if (currentCall) {
-      try { currentCall.close(); } catch (e) {}
-      currentCall = null;
+    if (pc) {
+      try { pc.close(); } catch (e) {}
+      pc = null;
     }
 
     log('Connecting to laptop...');
@@ -173,58 +173,95 @@
   }
 
   function makeCall() {
-    if (!peer || !peer.id) return;
-
-    let call = null;
-    try {
-      call = peer.call(hostPeerId);
-      console.log('Phone initiated call to:', hostPeerId, 'call object:', call);
-    } catch (e) {
-      console.error('Call failed:', e);
-      remoteStatus.textContent = 'Video call failed to start';
+    if (!dataChannel || dataChannel.readyState !== 'open') {
       scheduleRetry(makeCall, retryCount);
       return;
     }
 
-    if (!call) {
-      console.error('Call is null after peer.call');
-      remoteStatus.textContent = 'Video call failed to start';
-      scheduleRetry(makeCall, retryCount);
-      return;
-    }
+    console.log('Phone creating RTCPeerConnection for media');
+    pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ]
+    });
 
-    currentCall = call;
-
-    call.on('stream', (stream) => {
-      const videoTracks = stream.getVideoTracks();
-      const audioTracks = stream.getAudioTracks();
-      console.log('Phone got stream tracks:', { video: videoTracks.length, audio: audioTracks.length });
-      if (videoTracks.length === 0 && audioTracks.length === 0) {
-        remoteStatus.textContent = 'Connected but no media from host';
-        return;
+    pc.ontrack = (event) => {
+      console.log('Phone ontrack:', event.track.kind, event.streams.length);
+      if (event.track.kind === 'video' && event.streams[0]) {
+        log('Receiving camera feed');
+        phoneCam.srcObject = event.streams[0];
+        phoneCam.play().catch(() => {});
+        remoteStatus.textContent = 'Camera active. Hold mic to talk.';
+        retryCount = 0;
       }
-      if (videoTracks.length === 0) {
-        remoteStatus.textContent = 'Audio connected but no video from host';
+    };
+
+    pc.ondatachannel = (event) => {
+      console.log('Phone got data channel from host');
+      const channel = event.channel;
+      channel.binaryType = 'arraybuffer';
+      channel.onmessage = (e) => {
+        if (e.data instanceof ArrayBuffer) {
+          const int16 = new Int16Array(e.data);
+          playAudioChunk(int16);
+        }
+      };
+    };
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && dataChannel && dataChannel.readyState === 'open') {
+        console.log('Phone sending ICE candidate');
+        dataChannel.send(JSON.stringify({ type: 'ice-candidate', candidate: event.candidate }));
       }
-      log('Receiving camera feed');
-      phoneCam.srcObject = stream;
-      phoneCam.play().catch(() => {});
-      remoteStatus.textContent = 'Camera active. Hold mic to talk.';
-      retryCount = 0;
-    });
+    };
 
-    call.on('error', (err) => {
-      console.error('Call error:', err);
-      console.error('Call error details:', err.type, err.message);
-      const msg = err.type || err.message || 'unknown';
-      remoteStatus.textContent = 'Video connection failed: ' + msg;
-      scheduleRetry(makeCall, retryCount);
-    });
+    pc.oniceconnectionstatechange = () => {
+      console.log('Phone ICE state:', pc.iceConnectionState);
+      remoteStatus.textContent = 'ICE: ' + pc.iceConnectionState;
+    };
 
-    call.on('close', () => {
-      console.log('Phone call closed');
-      currentCall = null;
-    });
+    pc.onnegotiationneeded = async () => {
+      console.log('Phone negotiation needed, creating offer');
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        dataChannel.send(JSON.stringify({ type: 'offer', sdp: offer }));
+        remoteStatus.textContent = 'Sent offer, waiting for answer...';
+      } catch (e) {
+        console.error('Phone create offer failed:', e);
+      }
+    };
+
+    dataChannel.onmessage = (event) => {
+      let msg;
+      try {
+        msg = typeof event.data === 'string' ? JSON.parse(event.data) : null;
+      } catch (e) {
+        msg = null;
+      }
+
+      if (msg && msg.type === 'answer' && pc) {
+        console.log('Phone got answer');
+        pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)).catch(e => console.error('Set remote failed:', e));
+      } else if (msg && msg.type === 'ice-candidate' && pc) {
+        console.log('Phone got ICE candidate');
+        pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(e => {});
+      } else if (msg && msg.type === 'offer' && pc) {
+        console.log('Phone got offer, creating answer');
+        pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)).then(() => {
+          return pc.createAnswer();
+        }).then(answer => {
+          return pc.setLocalDescription(answer);
+        }).then(() => {
+          dataChannel.send(JSON.stringify({ type: 'answer', sdp: pc.localDescription }));
+          remoteStatus.textContent = 'Sent answer, waiting for ICE...';
+        }).catch(e => console.error('Phone answer failed:', e));
+      } else if (event.data instanceof ArrayBuffer) {
+        const int16 = new Int16Array(event.data);
+        playAudioChunk(int16);
+      }
+    };
   }
 
   function init() {
@@ -254,7 +291,7 @@
       if (err.type === 'peer-unavailable' && retryCount < MAX_RETRIES) {
         retryCount++;
         log('Laptop not found, retrying...');
-        setTimeout(connectToHost, 2000);
+        scheduleRetry(connectToHost, 0);
       } else {
         remoteStatus.textContent = 'Signaling error: ' + err.type;
       }
@@ -343,5 +380,3 @@
 </script>
 </body>
 </html>
-
-
