@@ -172,7 +172,7 @@
     });
   }
 
-  function makeCall() {
+  async function makeCall() {
     if (!dataChannel || dataChannel.readyState !== 'open') {
       scheduleRetry(makeCall, retryCount);
       return;
@@ -197,18 +197,6 @@
       }
     };
 
-    pc.ondatachannel = (event) => {
-      console.log('Phone got data channel from host');
-      const channel = event.channel;
-      channel.binaryType = 'arraybuffer';
-      channel.onmessage = (e) => {
-        if (e.data instanceof ArrayBuffer) {
-          const int16 = new Int16Array(e.data);
-          playAudioChunk(int16);
-        }
-      };
-    };
-
     pc.onicecandidate = (event) => {
       if (event.candidate && dataChannel && dataChannel.readyState === 'open') {
         console.log('Phone sending ICE candidate');
@@ -221,47 +209,47 @@
       remoteStatus.textContent = 'ICE: ' + pc.iceConnectionState;
     };
 
-    pc.onnegotiationneeded = async () => {
-      console.log('Phone negotiation needed, creating offer');
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        dataChannel.send(JSON.stringify({ type: 'offer', sdp: offer }));
-        remoteStatus.textContent = 'Sent offer, waiting for answer...';
-      } catch (e) {
-        console.error('Phone create offer failed:', e);
+    dataChannel.on('data', (event) => {
+      if (typeof event === 'string') {
+        handleSignaling(event);
+        return;
       }
-    };
-
-    dataChannel.onmessage = (event) => {
-      let msg;
-      try {
-        msg = typeof event.data === 'string' ? JSON.parse(event.data) : null;
-      } catch (e) {
-        msg = null;
-      }
-
-      if (msg && msg.type === 'answer' && pc) {
-        console.log('Phone got answer');
-        pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)).catch(e => console.error('Set remote failed:', e));
-      } else if (msg && msg.type === 'ice-candidate' && pc) {
-        console.log('Phone got ICE candidate');
-        pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(e => {});
-      } else if (msg && msg.type === 'offer' && pc) {
-        console.log('Phone got offer, creating answer');
-        pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)).then(() => {
-          return pc.createAnswer();
-        }).then(answer => {
-          return pc.setLocalDescription(answer);
-        }).then(() => {
-          dataChannel.send(JSON.stringify({ type: 'answer', sdp: pc.localDescription }));
-          remoteStatus.textContent = 'Sent answer, waiting for ICE...';
-        }).catch(e => console.error('Phone answer failed:', e));
-      } else if (event.data instanceof ArrayBuffer) {
-        const int16 = new Int16Array(event.data);
+      if (event instanceof ArrayBuffer) {
+        const int16 = new Int16Array(event);
         playAudioChunk(int16);
       }
-    };
+    });
+
+    console.log('Phone creating offer');
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      dataChannel.send(JSON.stringify({ type: 'offer', sdp: offer }));
+      remoteStatus.textContent = 'Sent offer, waiting for answer...';
+    } catch (e) {
+      console.error('Phone create offer failed:', e);
+      remoteStatus.textContent = 'Video offer failed';
+      scheduleRetry(makeCall, retryCount);
+    }
+  }
+
+  async function handleSignaling(msg) {
+    if (!pc) return;
+    try {
+      const data = typeof msg === 'string' ? JSON.parse(msg) : msg;
+      if (data.type === 'answer') {
+        console.log('Phone got answer');
+        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        remoteStatus.textContent = 'Got answer, waiting for video...';
+      } else if (data.type === 'ice-candidate') {
+        console.log('Phone got ICE candidate');
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (e) {}
+      }
+    } catch (e) {
+      console.error('Phone signaling error:', e);
+    }
   }
 
   function init() {
