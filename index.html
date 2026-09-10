@@ -178,6 +178,7 @@
     let call = null;
     try {
       call = peer.call(hostPeerId);
+      console.log('Phone initiated call to:', hostPeerId, 'call object:', call);
     } catch (e) {
       console.error('Call failed:', e);
       remoteStatus.textContent = 'Video call failed to start';
@@ -186,6 +187,7 @@
     }
 
     if (!call) {
+      console.error('Call is null after peer.call');
       remoteStatus.textContent = 'Video call failed to start';
       scheduleRetry(makeCall, retryCount);
       return;
@@ -217,6 +219,11 @@
       const msg = err.type || err.message || 'unknown';
       remoteStatus.textContent = 'Video connection failed: ' + msg;
       scheduleRetry(makeCall, retryCount);
+    });
+
+    call.on('close', () => {
+      console.log('Phone call closed');
+      currentCall = null;
     });
   }
 
@@ -336,3 +343,5 @@
 </script>
 </body>
 </html>
+
+
