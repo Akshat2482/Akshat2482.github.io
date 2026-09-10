@@ -62,7 +62,10 @@
 <script>
 (function() {
   const params = new URLSearchParams(window.location.search);
-  const hostPeerId = params.get('host') || 'jarvis-host-unique';
+  let hostPeerId = params.get('host') || '1234567890';
+  if (hostPeerId) {
+    hostPeerId = hostPeerId.replace(/^<|>$/g, '').trim();
+  }
 
   let peer = null;
   let dataChannel = null;
