@@ -72,6 +72,8 @@
   let scriptProcessor = null;
   let retryCount = 0;
   const MAX_RETRIES = 10;
+  let retryTimer = null;
+  let connecting = false;
 
   const phoneCam = document.getElementById('phoneCam');
   const statusLabel = document.getElementById('statusLabel');
@@ -99,16 +101,29 @@
     source.start();
   }
 
+  function clearRetry() {
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+  }
+
+  function scheduleRetry(fn, attempt) {
+    clearRetry();
+    const delay = Math.min(1000 * Math.pow(1.5, attempt), 8000);
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      fn();
+    }, delay);
+  }
+
   function connectToHost() {
-    if (!peer || !peer.id) return;
+    if (!peer || !peer.id || connecting) return;
+    connecting = true;
 
     if (currentCall) {
       try { currentCall.close(); } catch (e) {}
       currentCall = null;
-    }
-    if (dataChannel) {
-      try { dataChannel.close(); } catch (e) {}
-      dataChannel = null;
     }
 
     log('Connecting to laptop...');
@@ -124,6 +139,13 @@
       dataChannel = conn;
       dataChannel.binaryType = 'arraybuffer';
       retryCount = 0;
+      connecting = false;
+
+      setTimeout(() => {
+        log('Starting video call...');
+        remoteStatus.textContent = 'Starting video call...';
+        makeCall();
+      }, 2000);
     });
 
     conn.on('data', (data) => {
@@ -136,12 +158,19 @@
     conn.on('error', (err) => {
       console.error('Connection error:', err);
       remoteStatus.textContent = 'Data connection error';
+      connecting = false;
     });
 
     conn.on('close', () => {
       remoteStatus.textContent = 'Disconnected from laptop';
       dataChannel = null;
+      connecting = false;
+      scheduleRetry(connectToHost, 0);
     });
+  }
+
+  function makeCall() {
+    if (!peer || !peer.id) return;
 
     let call = null;
     try {
@@ -149,25 +178,13 @@
     } catch (e) {
       console.error('Call failed:', e);
       remoteStatus.textContent = 'Video call failed to start';
-      if (retryCount < MAX_RETRIES) {
-        retryCount++;
-        log('Retrying connection...');
-        setTimeout(connectToHost, 2000);
-      } else {
-        remoteStatus.textContent = 'Cannot reach host. Verify host ID.';
-      }
+      scheduleRetry(makeCall, retryCount);
       return;
     }
 
     if (!call) {
       remoteStatus.textContent = 'Video call failed to start';
-      if (retryCount < MAX_RETRIES) {
-        retryCount++;
-        log('Retrying connection...');
-        setTimeout(connectToHost, 2000);
-      } else {
-        remoteStatus.textContent = 'Cannot reach host. Verify host ID.';
-      }
+      scheduleRetry(makeCall, retryCount);
       return;
     }
 
@@ -188,6 +205,7 @@
       phoneCam.srcObject = stream;
       phoneCam.play().catch(() => {});
       remoteStatus.textContent = 'Camera active. Hold mic to talk.';
+      retryCount = 0;
     });
 
     call.on('error', (err) => {
@@ -195,13 +213,7 @@
       console.error('Call error details:', err.type, err.message);
       const msg = err.type || err.message || 'unknown';
       remoteStatus.textContent = 'Video connection failed: ' + msg;
-      if (retryCount < MAX_RETRIES) {
-        retryCount++;
-        log('Retrying connection...');
-        setTimeout(connectToHost, 2000);
-      } else {
-        remoteStatus.textContent = 'Cannot reach host. Verify host ID.';
-      }
+      scheduleRetry(makeCall, retryCount);
     });
   }
 
