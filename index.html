@@ -174,6 +174,16 @@
     currentCall = call;
 
     call.on('stream', (stream) => {
+      const videoTracks = stream.getVideoTracks();
+      const audioTracks = stream.getAudioTracks();
+      console.log('Phone got stream tracks:', { video: videoTracks.length, audio: audioTracks.length });
+      if (videoTracks.length === 0 && audioTracks.length === 0) {
+        remoteStatus.textContent = 'Connected but no media from host';
+        return;
+      }
+      if (videoTracks.length === 0) {
+        remoteStatus.textContent = 'Audio connected but no video from host';
+      }
       log('Receiving camera feed');
       phoneCam.srcObject = stream;
       phoneCam.play().catch(() => {});
@@ -182,6 +192,7 @@
 
     call.on('error', (err) => {
       console.error('Call error:', err);
+      console.error('Call error details:', err.type, err.message);
       const msg = err.type || err.message || 'unknown';
       remoteStatus.textContent = 'Video connection failed: ' + msg;
       if (retryCount < MAX_RETRIES) {
