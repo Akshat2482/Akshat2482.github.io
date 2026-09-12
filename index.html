@@ -1,370 +1,269 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>JARVIS Remote</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Garage Control</title>
+
+<!-- iOS "Add to Home Screen" support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Garage">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
-    height:100%; width:100%; overflow:hidden;
-    background:#0a0a0c; color:#ebebf0;
-    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    touch-action:manipulation; user-select:none;
+    margin: 0; padding: 0; height: 100%;
+    background: #000000;
+    font-family: -apple-system, "SF Mono", ui-monospace, monospace;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
   }
-  #app {
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    height:100vh; width:100vw; padding:20px; gap:16px;
+  .app {
+    min-height: 100vh;
+    min-height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: calc(env(safe-area-inset-top, 20px) + 8px) 20px calc(env(safe-area-inset-bottom, 20px) + 8px);
+    display: flex;
+    flex-direction: column;
   }
-  .preview {
-    width:100%; max-width:640px; aspect-ratio:4/3; border-radius:14px;
-    background:#141416; border:1.5px solid #2a2a30; overflow:hidden; position:relative;
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #17232f;
+    margin-bottom: 8px;
   }
-  .preview video {
-    width:100%; height:100%; object-fit:contain; display:block;
+  .brand { display: flex; align-items: center; gap: 8px; }
+  .brand-dot {
+    width: 8px; height: 8px; background: #33e0ff;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   }
-  .preview .label {
-    position:absolute; top:10px; left:10px;
-    background:rgba(0,0,0,0.6); color:#eba53c;
-    padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600;
+  .brand-text { color: #d8ecf5; font-size: 12px; font-weight: 700; letter-spacing: 2px; }
+  .status-pill {
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border: 1px solid #64808f; border-radius: 4px;
   }
-  .btn {
-    padding:14px 28px; border-radius:12px; border:none;
-    background:linear-gradient(180deg,#eba53c,#c7852a); color:#0a0a0c;
-    font-size:14px; font-weight:700; cursor:pointer;
-    display:flex; align-items:center; gap:8px;
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #64808f; }
+  .status-text { font-size: 10px; font-weight: 700; color: #64808f; }
+  .status-pill.online { border-color: #35e08a; }
+  .status-pill.online .status-dot { background: #35e08a; }
+  .status-pill.online .status-text { color: #35e08a; }
+  .status-pill.offline { border-color: #ff4b4b; }
+  .status-pill.offline .status-dot { background: #ff4b4b; }
+  .status-pill.offline .status-text { color: #ff4b4b; }
+
+  .center-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
-  .btn:active { transform:scale(0.96); }
-  .btn:disabled { opacity:0.5; cursor:not-allowed; }
-  .status {
-    font-size:13px; color:#6b6b76; text-align:center; max-width:500px;
+  .dial-wrap {
+    position: relative;
+    width: 204px; height: 204px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px;
   }
+  .ring {
+    position: absolute;
+    width: 204px; height: 204px;
+    border-radius: 102px;
+    border: 4px solid transparent;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .ring.spinning {
+    animation: spin 0.9s linear infinite;
+    opacity: 1;
+    border-top-color: #33e0ff;
+    border-right-color: #33e0ff;
+  }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  .dial {
+    border: none; padding: 0; cursor: pointer;
+    width: 180px; height: 180px; border-radius: 90px;
+    background: #64808f;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.3s, opacity 0.2s, transform 0.1s;
+    -webkit-touch-callout: none;
+  }
+  .dial:active:not(:disabled) { transform: scale(0.96); }
+  .dial:disabled { opacity: 0.4; cursor: default; }
+  .dial.open { background: #33e0ff; }
+
+  .sub-label { color: #64808f; font-size: 11px; letter-spacing: 2px; margin-bottom: 4px; }
+  .center-label { color: #d8ecf5; font-size: 20px; font-weight: 700; letter-spacing: 2px; }
+  .center-label.sending { color: #64808f; }
+
+  .footer { text-align: center; color: #64808f; font-size: 10px; letter-spacing: 1px; padding-top: 12px; }
 </style>
 </head>
 <body>
-<div id="app">
-  <div class="preview">
-    <video id="phoneCam" autoplay playsinline></video>
-    <div class="label" id="statusLabel">Waiting for laptop...</div>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <span class="brand-text">GARAGE CONTROL</span>
+    </div>
+    <div id="statusPill" class="status-pill offline">
+      <div class="status-dot"></div>
+      <span id="statusText" class="status-text">CONNECTING</span>
+    </div>
   </div>
 
-  <button class="btn" id="micBtn">
-    <span>🎤</span> Hold to Talk
-  </button>
-
-  <div class="status" id="remoteStatus">
-    Connect to JARVIS to receive camera and send audio.
+  <div class="center-area">
+    <div class="dial-wrap">
+      <div id="ring" class="ring"></div>
+      <button id="dial" class="dial" onclick="pressButton()" disabled>
+        <svg width="64" height="56" viewBox="0 0 64 56">
+          <path d="M2 20 L32 2 L62 20 Z" fill="#000000"/>
+          <rect x="6" y="18" width="52" height="34" rx="4" fill="#000000"/>
+          <rect x="14" y="26" width="36" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
+          <rect x="14" y="34" width="36" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
+          <rect x="14" y="42" width="36" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
+        </svg>
+      </button>
+    </div>
+    <div class="sub-label">GARAGE DOOR</div>
+    <div id="label" class="center-label">CONNECTING</div>
   </div>
+
+  <div id="footer" class="footer">Auto-refreshing every 3s</div>
 </div>
 
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js">
-</script>
 <script>
-(function() {
-  const params = new URLSearchParams(window.location.search);
-  let hostPeerId = params.get('host') || '1234567890';
-  if (hostPeerId) {
-    hostPeerId = hostPeerId.replace(/^<|>$/g, '').trim();
+// ---- Fill these in with your own Firebase details ----
+const FIREBASE_URL = "https://garagecontroller-593f2-default-rtdb.firebaseio.com";
+const FIREBASE_SECRET = "PASTE_YOUR_DATABASE_SECRET_HERE";
+// --------------------------------------------------------
+
+const POLL_INTERVAL_MS = 3000;
+const MIN_SPIN_MS = 1400;
+
+let online = null;      // null = unknown, true/false = known
+let doorOpen = null;    // null = no reading yet; real sensor state once known
+let sending = false;
+
+const dial = document.getElementById("dial");
+const ring = document.getElementById("ring");
+const label = document.getElementById("label");
+const statusPill = document.getElementById("statusPill");
+const statusText = document.getElementById("statusText");
+const footer = document.getElementById("footer");
+
+function baseUrl() {
+  return `${FIREBASE_URL}/.json?auth=${FIREBASE_SECRET}`;
+}
+
+async function fetchStatus() {
+  const res = await fetch(baseUrl());
+  if (!res.ok) throw new Error("GET failed: " + res.status);
+  const data = await res.json();
+  return {
+    online: Boolean(data && data.garageOnline),
+    doorOpen: typeof (data && data.doorOpen) === "boolean" ? data.doorOpen : null,
+  };
+}
+
+async function patchGarage(patch) {
+  const res = await fetch(baseUrl(), {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error("PATCH failed: " + res.status);
+}
+
+function renderStatus() {
+  statusPill.classList.remove("online", "offline");
+  if (online === true) {
+    statusPill.classList.add("online");
+    statusText.textContent = "ONLINE";
+  } else if (online === false) {
+    statusPill.classList.add("offline");
+    statusText.textContent = "OFFLINE";
+  } else {
+    statusText.textContent = "CONNECTING";
   }
 
-  let peer = null;
-  let dataChannel = null;
-  let pc = null;
-  let micStream = null;
-  let audioCtx = null;
-  let scriptProcessor = null;
-  let retryCount = 0;
-  const MAX_RETRIES = 10;
-  let retryTimer = null;
-  let connecting = false;
+  dial.disabled = online !== true || sending;
+  footer.textContent = online === false
+    ? "Garage unit unreachable \u2014 controls disabled"
+    : "Tap to toggle";
 
-  const phoneCam = document.getElementById('phoneCam');
-  const statusLabel = document.getElementById('statusLabel');
-  const remoteStatus = document.getElementById('remoteStatus');
-  const micBtn = document.getElementById('micBtn');
-
-  function log(msg) {
-    console.log('[JARVIS Remote]', msg);
-    statusLabel.textContent = msg;
+  if (!sending) {
+    dial.classList.toggle("open", doorOpen === true);
+    label.classList.remove("sending");
+    label.textContent = online === null
+      ? "CONNECTING"
+      : (doorOpen === null ? "UNKNOWN" : (doorOpen ? "OPEN" : "CLOSED"));
   }
+}
 
-  function playAudioChunk(int16Array) {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    const float32 = new Float32Array(int16Array.length);
-    for (let i = 0; i < int16Array.length; i++) {
-      float32[i] = int16Array[i] / 0x8000;
-    }
-    const buffer = audioCtx.createBuffer(1, float32.length, 16000);
-    buffer.getChannelData(0).set(float32);
-    const source = audioCtx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioCtx.destination);
-    source.start();
+async function poll() {
+  try {
+    const status = await fetchStatus();
+    online = status.online;
+    doorOpen = status.doorOpen;
+  } catch (err) {
+    console.warn("Status poll failed:", err);
+    online = null;
   }
+  renderStatus();
+}
 
-  function clearRetry() {
-    if (retryTimer) {
-      clearTimeout(retryTimer);
-      retryTimer = null;
+async function pressButton() {
+  if (sending || online !== true) return;
+  sending = true;
+
+  if ('vibrate' in navigator) navigator.vibrate(40); // no-op on iOS Safari, works on Android Chrome
+
+  // Base the action on the REAL current sensor state, not a guess --
+  // if we don't have a reading yet, default to opening.
+  const goingToOpen = doorOpen === true ? false : true;
+  label.textContent = goingToOpen ? "Opening" : "Closing";
+  label.classList.add("sending");
+  ring.classList.add("spinning");
+  renderStatus();
+
+  const started = Date.now();
+  try {
+    if (goingToOpen) {
+      await patchGarage({ openGarage: true });
+    } else {
+      await patchGarage({ closeGarage: true });
     }
+  } catch (err) {
+    alert("Command failed: " + err.message);
+  } finally {
+    const elapsed = Date.now() - started;
+    const wait = Math.max(0, MIN_SPIN_MS - elapsed);
+    setTimeout(() => {
+      ring.classList.remove("spinning");
+      sending = false;
+      if ('vibrate' in navigator) navigator.vibrate(15);
+      renderStatus();
+      // Poll again to pick up the REAL sensor-confirmed state once the
+      // door actually finishes moving, rather than trusting a guess.
+      setTimeout(poll, 500);
+      setTimeout(poll, 3000);
+    }, wait);
   }
+}
 
-  function scheduleRetry(fn, attempt) {
-    clearRetry();
-    const delay = Math.min(1000 * Math.pow(1.5, attempt), 8000);
-    retryTimer = setTimeout(() => {
-      retryTimer = null;
-      fn();
-    }, delay);
-  }
-
-  function connectToHost() {
-    if (!peer || !peer.id || connecting) return;
-    connecting = true;
-
-    if (pc) {
-      try { pc.close(); } catch (e) {}
-      pc = null;
-    }
-
-    log('Connecting to laptop...');
-    remoteStatus.textContent = 'Connecting to laptop...';
-    remoteStatus.style.color = '#eba53c';
-
-    const conn = peer.connect(hostPeerId, { reliable: false });
-    
-    conn.on('open', () => {
-      log('Data channel open');
-      remoteStatus.textContent = 'Data connected. Establishing video...';
-      remoteStatus.style.color = '#eba53c';
-      dataChannel = conn;
-      dataChannel.binaryType = 'arraybuffer';
-      retryCount = 0;
-      connecting = false;
-
-      setTimeout(() => {
-        log('Starting video call...');
-        remoteStatus.textContent = 'Starting video call...';
-        makeCall();
-      }, 2000);
-    });
-
-    conn.on('data', (data) => {
-      if (data instanceof ArrayBuffer) {
-        const int16 = new Int16Array(data);
-        playAudioChunk(int16);
-      }
-    });
-
-    conn.on('error', (err) => {
-      console.error('Connection error:', err);
-      remoteStatus.textContent = 'Data connection error';
-      connecting = false;
-    });
-
-    conn.on('close', () => {
-      remoteStatus.textContent = 'Disconnected from laptop';
-      dataChannel = null;
-      connecting = false;
-      scheduleRetry(connectToHost, 0);
-    });
-  }
-
-  async function makeCall() {
-    if (!dataChannel || dataChannel.readyState !== 'open') {
-      scheduleRetry(makeCall, retryCount);
-      return;
-    }
-
-    console.log('Phone creating RTCPeerConnection for media');
-    pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-      ]
-    });
-
-    pc.ontrack = (event) => {
-      console.log('Phone ontrack:', event.track.kind, event.streams.length);
-      if (event.track.kind === 'video' && event.streams[0]) {
-        log('Receiving camera feed');
-        phoneCam.srcObject = event.streams[0];
-        phoneCam.play().catch(() => {});
-        remoteStatus.textContent = 'Camera active. Hold mic to talk.';
-        retryCount = 0;
-      }
-    };
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate && dataChannel && dataChannel.readyState === 'open') {
-        console.log('Phone sending ICE candidate');
-        dataChannel.send(JSON.stringify({ type: 'ice-candidate', candidate: event.candidate }));
-      }
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      console.log('Phone ICE state:', pc.iceConnectionState);
-      remoteStatus.textContent = 'ICE: ' + pc.iceConnectionState;
-    };
-
-    dataChannel.on('data', (event) => {
-      if (typeof event === 'string') {
-        handleSignaling(event);
-        return;
-      }
-      if (event instanceof ArrayBuffer) {
-        const int16 = new Int16Array(event);
-        playAudioChunk(int16);
-      }
-    });
-
-    console.log('Phone creating offer');
-    try {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      dataChannel.send(JSON.stringify({ type: 'offer', sdp: offer }));
-      remoteStatus.textContent = 'Sent offer, waiting for answer...';
-    } catch (e) {
-      console.error('Phone create offer failed:', e);
-      remoteStatus.textContent = 'Video offer failed';
-      scheduleRetry(makeCall, retryCount);
-    }
-  }
-
-  async function handleSignaling(msg) {
-    if (!pc) return;
-    try {
-      const data = typeof msg === 'string' ? JSON.parse(msg) : msg;
-      if (data.type === 'answer') {
-        console.log('Phone got answer');
-        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-        remoteStatus.textContent = 'Got answer, waiting for video...';
-      } else if (data.type === 'ice-candidate') {
-        console.log('Phone got ICE candidate');
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch (e) {}
-      }
-    } catch (e) {
-      console.error('Phone signaling error:', e);
-    }
-  }
-
-  function init() {
-    peer = new Peer(null, {
-      host: '0.peerjs.com',
-      port: 443,
-      path: '/',
-      secure: true,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-        ]
-      }
-    });
-
-    peer.on('open', (id) => {
-      log('Phone peer ID: ' + id);
-      log('Connecting to host: ' + hostPeerId);
-      remoteStatus.textContent = 'Phone ready. Connecting to ' + hostPeerId + '...';
-      remoteStatus.style.color = '#eba53c';
-      connectToHost();
-    });
-
-    peer.on('error', (err) => {
-      console.error('Peer error:', err);
-      if (err.type === 'peer-unavailable' && retryCount < MAX_RETRIES) {
-        retryCount++;
-        log('Laptop not found, retrying...');
-        scheduleRetry(connectToHost, 0);
-      } else {
-        remoteStatus.textContent = 'Signaling error: ' + err.type;
-      }
-    });
-  }
-
-  async function startMic() {
-    if (!dataChannel || dataChannel.readyState !== 'open') {
-      alert('Not connected to laptop yet');
-      return;
-    }
-
-    try {
-      micStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 16000,
-          channelCount: 1
-        },
-        video: false
-      });
-
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const source = audioCtx.createMediaStreamSource(micStream);
-      scriptProcessor = audioCtx.createScriptProcessor(4096, 1, 1);
-
-      scriptProcessor.onaudioprocess = (e) => {
-        if (!dataChannel || dataChannel.readyState !== 'open') return;
-
-        const input = e.inputBuffer.getChannelData(0);
-        const int16 = new Int16Array(input.length);
-        for (let i = 0; i < input.length; i++) {
-          const s = Math.max(-1, Math.min(1, input[i]));
-          int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-
-        try {
-          dataChannel.send(int16.buffer);
-        } catch (err) {
-          // Channel closed
-        }
-      };
-
-      source.connect(scriptProcessor);
-
-      micBtn.style.animation = 'pulse 1.2s infinite';
-      remoteStatus.textContent = 'Talking...';
-
-    } catch (e) {
-      alert('Mic access denied: ' + e.message);
-    }
-  }
-
-  function stopMic() {
-    if (micStream) {
-      micStream.getTracks().forEach(t => t.stop());
-      micStream = null;
-    }
-    if (audioCtx) {
-      audioCtx.close();
-      audioCtx = null;
-    }
-    if (scriptProcessor) {
-      scriptProcessor.disconnect();
-      scriptProcessor = null;
-    }
-    micBtn.style.animation = '';
-    remoteStatus.textContent = 'Connected to JARVIS';
-    remoteStatus.style.color = '#eba53c';
-  }
-
-  const style = document.createElement('style');
-  style.textContent = '@keyframes pulse { 0%,100% { box-shadow:0 0 20px rgba(235,165,60,0.4); } 50% { box-shadow:0 0 40px rgba(235,165,60,0.7); } }';
-  document.head.appendChild(style);
-
-  micBtn.addEventListener('mousedown', startMic);
-  micBtn.addEventListener('mouseup', stopMic);
-  micBtn.addEventListener('mouseleave', stopMic);
-  micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startMic(); });
-  micBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopMic(); });
-
-  init();
-})();
+poll();
+setInterval(poll, POLL_INTERVAL_MS);
 </script>
+
 </body>
 </html>
