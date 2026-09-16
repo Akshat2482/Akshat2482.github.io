@@ -2,267 +2,749 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Garage Control</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- iOS "Add to Home Screen" support -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Garage">
-<meta name="theme-color" content="#000000">
-<link rel="manifest" href="manifest.json">
+<title>RoomSwitch ESP32</title>
 
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body {
-    margin: 0; padding: 0; height: 100%;
-    background: #000000;
-    font-family: -apple-system, "SF Mono", ui-monospace, monospace;
-    overscroll-behavior: none;
-    touch-action: manipulation;
-    -webkit-user-select: none;
-    user-select: none;
+  * {
+    box-sizing: border-box;
   }
-  .app {
-    min-height: 100vh;
-    min-height: 100dvh;
-    max-width: 480px;
-    margin: 0 auto;
-    padding: calc(env(safe-area-inset-top, 20px) + 8px) 20px calc(env(safe-area-inset-bottom, 20px) + 8px);
-    display: flex;
-    flex-direction: column;
-  }
-  .topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-bottom: 14px;
-    border-bottom: 1px solid #17232f;
-    margin-bottom: 8px;
-  }
-  .brand { display: flex; align-items: center; gap: 8px; }
-  .brand-dot {
-    width: 8px; height: 8px; background: #33e0ff;
-    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-  }
-  .brand-text { color: #d8ecf5; font-size: 12px; font-weight: 700; letter-spacing: 2px; }
-  .status-pill {
-    display: flex; align-items: center; gap: 5px;
-    padding: 4px 10px; border: 1px solid #64808f; border-radius: 4px;
-  }
-  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #64808f; }
-  .status-text { font-size: 10px; font-weight: 700; color: #64808f; }
-  .status-pill.online { border-color: #35e08a; }
-  .status-pill.online .status-dot { background: #35e08a; }
-  .status-pill.online .status-text { color: #35e08a; }
-  .status-pill.offline { border-color: #ff4b4b; }
-  .status-pill.offline .status-dot { background: #ff4b4b; }
-  .status-pill.offline .status-text { color: #ff4b4b; }
 
-  .center-area {
-    flex: 1;
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: #050505;
+    color: #f2f2f2;
+    font-family: Arial, Helvetica, sans-serif;
     display: flex;
-    flex-direction: column;
-    align-items: center;
     justify-content: center;
+    align-items: center;
   }
-  .dial-wrap {
-    position: relative;
-    width: 204px; height: 204px;
-    display: flex; align-items: center; justify-content: center;
+
+  .panel {
+    width: min(650px, 92vw);
+    background: #0d0d0d;
+    border: 1px solid #292929;
+    border-radius: 22px;
+    padding: 30px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 26px;
+    letter-spacing: .5px;
+  }
+
+  .subtitle {
+    color: #888;
+    margin-top: 6px;
+    font-size: 13px;
+  }
+
+  .status {
+    padding: 9px 13px;
+    border-radius: 999px;
+    background: #191919;
+    color: #aaa;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .status.connected {
+    color: #fff;
+    border: 1px solid #444;
+  }
+
+  .section {
+    background: #111;
+    border: 1px solid #242424;
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 15px;
+  }
+
+  .section-title {
+    font-size: 14px;
+    color: #aaa;
+    margin-bottom: 17px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .angle-row {
+    display: grid;
+    grid-template-columns: 1fr 100px;
+    align-items: center;
+    gap: 18px;
     margin-bottom: 20px;
   }
-  .ring {
-    position: absolute;
-    width: 204px; height: 204px;
-    border-radius: 102px;
-    border: 4px solid transparent;
-    opacity: 0;
-    pointer-events: none;
-  }
-  .ring.spinning {
-    animation: spin 0.9s linear infinite;
-    opacity: 1;
-    border-top-color: #33e0ff;
-    border-right-color: #33e0ff;
-  }
-  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-  .dial {
-    border: none; padding: 0; cursor: pointer;
-    width: 180px; height: 180px; border-radius: 90px;
-    background: #64808f;
-    display: flex; align-items: center; justify-content: center;
-    transition: background 0.3s, opacity 0.2s, transform 0.1s;
-    -webkit-touch-callout: none;
+  .angle-row:last-child {
+    margin-bottom: 0;
   }
-  .dial:active:not(:disabled) { transform: scale(0.96); }
-  .dial:disabled { opacity: 0.4; cursor: default; }
-  .dial.open { background: #33e0ff; }
 
-  .sub-label { color: #64808f; font-size: 11px; letter-spacing: 2px; margin-bottom: 4px; }
-  .center-label { color: #d8ecf5; font-size: 20px; font-weight: 700; letter-spacing: 2px; }
-  .center-label.sending { color: #64808f; }
+  label {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
 
-  .footer { text-align: center; color: #64808f; font-size: 10px; letter-spacing: 1px; padding-top: 12px; }
+  input[type="range"] {
+    width: 100%;
+    accent-color: white;
+    cursor: pointer;
+  }
+
+  input[type="number"] {
+    width: 100%;
+    background: #080808;
+    border: 1px solid #333;
+    color: white;
+    border-radius: 10px;
+    padding: 11px;
+    font-size: 16px;
+    text-align: center;
+  }
+
+  .angle-value {
+    color: #aaa;
+    font-size: 12px;
+  }
+
+  .buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+
+  button {
+    border: 1px solid #333;
+    background: #171717;
+    color: white;
+    border-radius: 12px;
+    padding: 13px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: .15s;
+  }
+
+  button:hover {
+    background: #242424;
+    border-color: #555;
+  }
+
+  button.primary {
+    background: white;
+    color: black;
+    border-color: white;
+  }
+
+  button.primary:hover {
+    background: #ddd;
+  }
+
+  button:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+  }
+
+  .connect {
+    width: 100%;
+    margin-top: 18px;
+    padding: 15px;
+  }
+
+  .log {
+    margin-top: 15px;
+    min-height: 90px;
+    max-height: 150px;
+    overflow-y: auto;
+    background: #070707;
+    border: 1px solid #222;
+    border-radius: 12px;
+    padding: 12px;
+    color: #777;
+    font-family: Consolas, monospace;
+    font-size: 11px;
+    white-space: pre-wrap;
+  }
+
+  .hint {
+    color: #666;
+    font-size: 11px;
+    line-height: 1.5;
+    margin-top: 16px;
+  }
+
+  @media (max-width: 560px) {
+    .angle-row {
+      grid-template-columns: 1fr;
+    }
+
+    .buttons {
+      grid-template-columns: 1fr;
+    }
+
+    .top {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
 </style>
 </head>
+
 <body>
 
-<div class="app">
-  <div class="topbar">
-    <div class="brand">
-      <div class="brand-dot"></div>
-      <span class="brand-text">GARAGE CONTROL</span>
+<div class="panel">
+
+  <div class="top">
+    <div>
+      <h1>RoomSwitch</h1>
+      <div class="subtitle">
+        ESP32 • 28BYJ-48 • ULN2003
+      </div>
     </div>
-    <div id="statusPill" class="status-pill offline">
-      <div class="status-dot"></div>
-      <span id="statusText" class="status-text">CONNECTING</span>
+
+    <div id="status" class="status">
+      Disconnected
     </div>
   </div>
 
-  <div class="center-area">
-    <div class="dial-wrap">
-      <div id="ring" class="ring"></div>
-      <button id="dial" class="dial" onclick="pressButton()" disabled>
-        <svg width="64" height="56" viewBox="0 0 64 56">
-          <path d="M2 20 L32 2 L62 20 Z" fill="#000000"/>
-          <rect x="6" y="18" width="52" height="34" rx="4" fill="#000000"/>
-          <rect x="14" y="26" width="36" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
-          <rect x="14" y="34" width="36" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
-          <rect x="14" y="42" width="36" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
-        </svg>
+  <div class="section">
+
+    <div class="section-title">
+      Motor Angles
+    </div>
+
+    <div class="angle-row">
+      <div>
+        <label for="onSlider">
+          ON Angle
+          <span class="angle-value">
+            — motor position when switch is ON
+          </span>
+        </label>
+
+        <input
+          id="onSlider"
+          type="range"
+          min="0"
+          max="360"
+          value="45"
+        >
+      </div>
+
+      <input
+        id="onNumber"
+        type="number"
+        min="0"
+        max="360"
+        value="45"
+      >
+    </div>
+
+    <div class="angle-row">
+      <div>
+        <label for="offSlider">
+          OFF Angle
+          <span class="angle-value">
+            — motor position when switch is OFF
+          </span>
+        </label>
+
+        <input
+          id="offSlider"
+          type="range"
+          min="0"
+          max="360"
+          value="0"
+        >
+      </div>
+
+      <input
+        id="offNumber"
+        type="number"
+        min="0"
+        max="360"
+        value="0"
+      >
+    </div>
+
+  </div>
+
+  <div class="section">
+
+    <div class="section-title">
+      Switch Control
+    </div>
+
+    <div class="buttons">
+      <button id="onButton" onclick="sendState('ON')" disabled>
+        ON
+      </button>
+
+      <button id="offButton" onclick="sendState('OFF')" disabled>
+        OFF
+      </button>
+
+      <button id="toggleButton" onclick="sendState('TOGGLE')" disabled>
+        TOGGLE
       </button>
     </div>
-    <div class="sub-label">GARAGE DOOR</div>
-    <div id="label" class="center-label">CONNECTING</div>
+
   </div>
 
-  <div id="footer" class="footer">Auto-refreshing every 3s</div>
+  <button
+    id="connectButton"
+    class="connect primary"
+    onclick="connectBluetooth()"
+  >
+    Connect to ESP32
+  </button>
+
+  <div id="log" class="log">Waiting for Bluetooth...</div>
+
+  <div class="hint">
+    This page uses Web Bluetooth. Use Chrome or Edge on a computer/device
+    that supports Bluetooth. The ESP32 must be powered on and advertising
+    as "RoomSwitch-ESP32".
+  </div>
+
 </div>
 
 <script>
-// ---- Fill these in with your own Firebase details ----
-const FIREBASE_URL = "https://garagecontroller-593f2-default-rtdb.firebaseio.com";
-const FIREBASE_SECRET = "N4nIXKzkrCW4QuwWXu6BnKcxOHJlqiTvIVCocdr4";
-// --------------------------------------------------------
+  // ============================================================
+  // BLE UUIDs — MUST MATCH THE ESP32 .INO
+  // ============================================================
 
-const POLL_INTERVAL_MS = 3000;
-const MIN_SPIN_MS = 1400;
+  const SERVICE_UUID =
+    "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 
-let online = null;      // null = unknown, true/false = known
-let doorOpen = null;    // null = no reading yet; real sensor state once known
-let sending = false;
+  const ON_ANGLE_UUID =
+    "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-const dial = document.getElementById("dial");
-const ring = document.getElementById("ring");
-const label = document.getElementById("label");
-const statusPill = document.getElementById("statusPill");
-const statusText = document.getElementById("statusText");
-const footer = document.getElementById("footer");
+  const OFF_ANGLE_UUID =
+    "beb5483e-36e1-4688-b7f5-ea07361b26b";
 
-function baseUrl() {
-  return `${FIREBASE_URL}/.json?auth=${FIREBASE_SECRET}`;
-}
+  const STATE_UUID =
+    "beb5483e-36e1-4688-b7f5-ea07361b26c";
 
-async function fetchStatus() {
-  const res = await fetch(baseUrl());
-  if (!res.ok) throw new Error("GET failed: " + res.status);
-  const data = await res.json();
-  return {
-    online: Boolean(data && data.garageOnline),
-    doorOpen: typeof (data && data.doorOpen) === "boolean" ? data.doorOpen : null,
-  };
-}
+  let bluetoothDevice = null;
+  let onAngleCharacteristic = null;
+  let offAngleCharacteristic = null;
+  let stateCharacteristic = null;
 
-async function patchGarage(patch) {
-  const res = await fetch(baseUrl(), {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) throw new Error("PATCH failed: " + res.status);
-}
+  const statusElement =
+    document.getElementById("status");
 
-function renderStatus() {
-  statusPill.classList.remove("online", "offline");
-  if (online === true) {
-    statusPill.classList.add("online");
-    statusText.textContent = "ONLINE";
-  } else if (online === false) {
-    statusPill.classList.add("offline");
-    statusText.textContent = "OFFLINE";
-  } else {
-    statusText.textContent = "CONNECTING";
+  const logElement =
+    document.getElementById("log");
+
+  const connectButton =
+    document.getElementById("connectButton");
+
+  const onButton =
+    document.getElementById("onButton");
+
+  const offButton =
+    document.getElementById("offButton");
+
+  const toggleButton =
+    document.getElementById("toggleButton");
+
+  function log(message) {
+    const time =
+      new Date().toLocaleTimeString();
+
+    logElement.textContent +=
+      `[${time}] ${message}\n`;
+
+    logElement.scrollTop =
+      logElement.scrollHeight;
   }
 
-  dial.disabled = online !== true || sending;
-  footer.textContent = online === false
-    ? "Garage unit unreachable \u2014 controls disabled"
-    : "Tap to toggle";
+  function setConnectedUI(connected) {
+    if (connected) {
+      statusElement.textContent = "Connected";
+      statusElement.classList.add("connected");
 
-  if (!sending) {
-    dial.classList.toggle("open", doorOpen === true);
-    label.classList.remove("sending");
-    label.textContent = online === null
-      ? "CONNECTING"
-      : (doorOpen === null ? "UNKNOWN" : (doorOpen ? "OPEN" : "CLOSED"));
-  }
-}
+      connectButton.textContent =
+        "Connected to RoomSwitch-ESP32";
 
-async function poll() {
-  try {
-    const status = await fetchStatus();
-    online = status.online;
-    doorOpen = status.doorOpen;
-  } catch (err) {
-    console.warn("Status poll failed:", err);
-    online = null;
-  }
-  renderStatus();
-}
-
-async function pressButton() {
-  if (sending || online !== true) return;
-  sending = true;
-
-  if ('vibrate' in navigator) navigator.vibrate(40); // no-op on iOS Safari, works on Android Chrome
-
-  // Base the action on the REAL current sensor state, not a guess --
-  // if we don't have a reading yet, default to opening.
-  const goingToOpen = doorOpen === true ? false : true;
-  label.textContent = goingToOpen ? "Opening" : "Closing";
-  label.classList.add("sending");
-  ring.classList.add("spinning");
-  renderStatus();
-
-  const started = Date.now();
-  try {
-    if (goingToOpen) {
-      await patchGarage({ openGarage: true });
-    } else {
-      await patchGarage({ closeGarage: true });
+      onButton.disabled = false;
+      offButton.disabled = false;
+      toggleButton.disabled = false;
     }
-  } catch (err) {
-    alert("Command failed: " + err.message);
-  } finally {
-    const elapsed = Date.now() - started;
-    const wait = Math.max(0, MIN_SPIN_MS - elapsed);
-    setTimeout(() => {
-      ring.classList.remove("spinning");
-      sending = false;
-      if ('vibrate' in navigator) navigator.vibrate(15);
-      renderStatus();
-      // Poll again to pick up the REAL sensor-confirmed state once the
-      // door actually finishes moving, rather than trusting a guess.
-      setTimeout(poll, 500);
-      setTimeout(poll, 3000);
-    }, wait);
-  }
-}
+    else {
+      statusElement.textContent =
+        "Disconnected";
 
-poll();
-setInterval(poll, POLL_INTERVAL_MS);
+      statusElement.classList.remove(
+        "connected"
+      );
+
+      connectButton.textContent =
+        "Connect to ESP32";
+
+      onButton.disabled = true;
+      offButton.disabled = true;
+      toggleButton.disabled = true;
+    }
+  }
+
+  // ============================================================
+  // BYTE / TEXT HELPERS
+  // ============================================================
+
+  function textFromDataView(dataView) {
+    return new TextDecoder().decode(dataView);
+  }
+
+  async function writeText(characteristic, text) {
+    const data =
+      new TextEncoder().encode(text);
+
+    await characteristic.writeValue(data);
+  }
+
+  // ============================================================
+  // READ CURRENT SETTINGS
+  // ============================================================
+
+  async function readSettings() {
+    try {
+      const onValue =
+        await onAngleCharacteristic.readValue();
+
+      const offValue =
+        await offAngleCharacteristic.readValue();
+
+      const onAngle =
+        parseInt(textFromDataView(onValue));
+
+      const offAngle =
+        parseInt(textFromDataView(offValue));
+
+      if (!isNaN(onAngle)) {
+        setOnAngle(onAngle);
+      }
+
+      if (!isNaN(offAngle)) {
+        setOffAngle(offAngle);
+      }
+
+      log(
+        `Loaded angles: ON ${onAngle}°, OFF ${offAngle}°`
+      );
+    }
+    catch (error) {
+      log(
+        "Could not read settings: " +
+        error
+      );
+    }
+  }
+
+  // ============================================================
+  // ANGLE UI
+  // ============================================================
+
+  const onSlider =
+    document.getElementById("onSlider");
+
+  const onNumber =
+    document.getElementById("onNumber");
+
+  const offSlider =
+    document.getElementById("offSlider");
+
+  const offNumber =
+    document.getElementById("offNumber");
+
+  function setOnAngle(value) {
+    value = Math.max(
+      0,
+      Math.min(360, parseInt(value) || 0)
+    );
+
+    onSlider.value = value;
+    onNumber.value = value;
+  }
+
+  function setOffAngle(value) {
+    value = Math.max(
+      0,
+      Math.min(360, parseInt(value) || 0)
+    );
+
+    offSlider.value = value;
+    offNumber.value = value;
+  }
+
+  onSlider.addEventListener(
+    "input",
+    () => {
+      setOnAngle(onSlider.value);
+    }
+  );
+
+  onNumber.addEventListener(
+    "change",
+    () => {
+      setOnAngle(onNumber.value);
+      sendOnAngle();
+    }
+  );
+
+  offSlider.addEventListener(
+    "input",
+    () => {
+      setOffAngle(offSlider.value);
+    }
+  );
+
+  offNumber.addEventListener(
+    "change",
+    () => {
+      setOffAngle(offNumber.value);
+      sendOffAngle();
+    }
+  );
+
+  // Send slider value after user releases it.
+  onSlider.addEventListener(
+    "change",
+    sendOnAngle
+  );
+
+  offSlider.addEventListener(
+    "change",
+    sendOffAngle
+  );
+
+  async function sendOnAngle() {
+    if (!onAngleCharacteristic) {
+      log("Not connected.");
+      return;
+    }
+
+    const value =
+      parseInt(onNumber.value);
+
+    if (isNaN(value)) {
+      return;
+    }
+
+    try {
+      await writeText(
+        onAngleCharacteristic,
+        String(value)
+      );
+
+      log(
+        `ON angle -> ${value}°`
+      );
+    }
+    catch (error) {
+      log(
+        "ON angle error: " + error
+      );
+    }
+  }
+
+  async function sendOffAngle() {
+    if (!offAngleCharacteristic) {
+      log("Not connected.");
+      return;
+    }
+
+    const value =
+      parseInt(offNumber.value);
+
+    if (isNaN(value)) {
+      return;
+    }
+
+    try {
+      await writeText(
+        offAngleCharacteristic,
+        String(value)
+      );
+
+      log(
+        `OFF angle -> ${value}°`
+      );
+    }
+    catch (error) {
+      log(
+        "OFF angle error: " + error
+      );
+    }
+  }
+
+  // ============================================================
+  // STATE CONTROL
+  // ============================================================
+
+  async function sendState(state) {
+    if (!stateCharacteristic) {
+      log("Not connected.");
+      return;
+    }
+
+    try {
+      await writeText(
+        stateCharacteristic,
+        state
+      );
+
+      log(
+        `Switch command -> ${state}`
+      );
+    }
+    catch (error) {
+      log(
+        "State error: " + error
+      );
+    }
+  }
+
+  // ============================================================
+  // BLUETOOTH
+  // ============================================================
+
+  async function connectBluetooth() {
+
+    if (!navigator.bluetooth) {
+      alert(
+        "Web Bluetooth is not available in this browser. " +
+        "Try Chrome or Edge."
+      );
+
+      return;
+    }
+
+    try {
+      log(
+        "Opening Bluetooth device picker..."
+      );
+
+      bluetoothDevice =
+        await navigator.bluetooth.requestDevice({
+          filters: [
+            {
+              name: "RoomSwitch-ESP32"
+            }
+          ],
+          optionalServices: [
+            SERVICE_UUID
+          ]
+        });
+
+      bluetoothDevice.addEventListener(
+        "gattserverdisconnected",
+        handleDisconnect
+      );
+
+      log(
+        "Device selected: " +
+        bluetoothDevice.name
+      );
+
+      const server =
+        await bluetoothDevice.gatt.connect();
+
+      log("GATT connected.");
+
+      const service =
+        await server.getPrimaryService(
+          SERVICE_UUID
+        );
+
+      onAngleCharacteristic =
+        await service.getCharacteristic(
+          ON_ANGLE_UUID
+        );
+
+      offAngleCharacteristic =
+        await service.getCharacteristic(
+          OFF_ANGLE_UUID
+        );
+
+      stateCharacteristic =
+        await service.getCharacteristic(
+          STATE_UUID
+        );
+
+      setConnectedUI(true);
+
+      log(
+        "RoomSwitch Bluetooth connected."
+      );
+
+      await readSettings();
+
+      // Read current state
+      try {
+        const stateValue =
+          await stateCharacteristic.readValue();
+
+        const state =
+          textFromDataView(stateValue);
+
+        log(
+          `Current state: ${state}`
+        );
+      }
+      catch (error) {
+        log(
+          "Could not read state: " +
+          error
+        );
+      }
+
+    }
+    catch (error) {
+      log(
+        "Bluetooth connection failed: " +
+        error
+      );
+
+      setConnectedUI(false);
+    }
+  }
+
+  function handleDisconnect() {
+    log("ESP32 disconnected.");
+    setConnectedUI(false);
+
+    onAngleCharacteristic = null;
+    offAngleCharacteristic = null;
+    stateCharacteristic = null;
+  }
+
+  // ============================================================
+  // INITIAL UI
+  // ============================================================
+
+  setOnAngle(45);
+  setOffAngle(0);
+
+  if (!navigator.bluetooth) {
+    log(
+      "Web Bluetooth is unavailable in this browser."
+    );
+  }
 </script>
 
 </body>
