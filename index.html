@@ -3,747 +3,337 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>RoomSwitch ESP32</title>
-
+<title>RoomSwitch — Threshold Control</title>
 <style>
-  * {
-    box-sizing: border-box;
+  :root {
+    --bg: #06090c;
+    --panel: #0c1218;
+    --line: #1c2a33;
+    --cyan: #4de3d4;
+    --cyan-dim: #276a63;
+    --amber: #e0a458;
+    --text: #cfe7e3;
+    --text-dim: #6c8a86;
   }
-
+  * { box-sizing: border-box; }
   body {
     margin: 0;
     min-height: 100vh;
-    background: #050505;
-    color: #f2f2f2;
-    font-family: Arial, Helvetica, sans-serif;
+    background:
+      radial-gradient(ellipse at top, #0d1a1f 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: 'Consolas', 'SF Mono', 'Courier New', monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .panel {
+    width: 100%;
+    max-width: 420px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 28px 28px 24px;
+    position: relative;
+  }
+  .panel::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: .5;
+  }
+  h1 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin: 0 0 2px;
+    color: var(--text);
+  }
+  .sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 22px;
+  }
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 22px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #3a4a4a;
+    box-shadow: none;
+    transition: all .2s;
+  }
+  .dot.live {
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+  }
+
+  .dial-row {
     display: flex;
     justify-content: center;
-    align-items: center;
-  }
-
-  .panel {
-    width: min(650px, 92vw);
-    background: #0d0d0d;
-    border: 1px solid #292929;
-    border-radius: 22px;
-    padding: 30px;
-    box-shadow: 0 20px 60px rgba(0,0,0,.5);
-  }
-
-  .top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     gap: 20px;
-    margin-bottom: 28px;
+    margin-bottom: 18px;
   }
-
-  h1 {
-    margin: 0;
-    font-size: 26px;
-    letter-spacing: .5px;
-  }
-
-  .subtitle {
-    color: #888;
-    margin-top: 6px;
-    font-size: 13px;
-  }
-
-  .status {
-    padding: 9px 13px;
-    border-radius: 999px;
-    background: #191919;
-    color: #aaa;
-    font-size: 12px;
-    white-space: nowrap;
-  }
-
-  .status.connected {
-    color: #fff;
-    border: 1px solid #444;
-  }
-
-  .section {
-    background: #111;
-    border: 1px solid #242424;
-    border-radius: 16px;
-    padding: 20px;
-    margin-top: 15px;
-  }
-
-  .section-title {
-    font-size: 14px;
-    color: #aaa;
-    margin-bottom: 17px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-
-  .angle-row {
-    display: grid;
-    grid-template-columns: 1fr 100px;
+  .dial-wrap {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 18px;
-    margin-bottom: 20px;
   }
-
-  .angle-row:last-child {
-    margin-bottom: 0;
+  svg { overflow: visible; }
+  .dial-track { fill: none; stroke: var(--line); stroke-width: 6; }
+  .dial-fill {
+    fill: none;
+    stroke-width: 6;
+    stroke-linecap: round;
+    transition: stroke-dashoffset .25s ease;
   }
-
-  label {
+  .dial-fill.on {
+    stroke: var(--cyan);
+    filter: drop-shadow(0 0 4px rgba(77,227,212,.5));
+  }
+  .dial-fill.off {
+    stroke: var(--amber);
+    filter: drop-shadow(0 0 4px rgba(224,164,88,.5));
+  }
+  .dial-center {
+    font-size: 26px;
+    font-weight: 300;
+    fill: var(--text);
+  }
+  .dial-tag {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1.5px;
+    margin-top: 6px;
+  }
+  .slider-label {
     display: block;
-    font-size: 14px;
-    margin-bottom: 10px;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-bottom: 2px;
   }
 
   input[type="range"] {
     width: 100%;
-    accent-color: white;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--line);
+    border-radius: 2px;
+    margin: 4px 0 20px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 6px var(--cyan);
+    cursor: pointer;
+    margin-top: -5.5px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px;
+    border: none;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 6px var(--cyan);
     cursor: pointer;
   }
 
-  input[type="number"] {
-    width: 100%;
-    background: #080808;
-    border: 1px solid #333;
-    color: white;
-    border-radius: 10px;
-    padding: 11px;
-    font-size: 16px;
-    text-align: center;
-  }
-
-  .angle-value {
-    color: #aaa;
-    font-size: 12px;
-  }
-
-  .buttons {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px;
-  }
-
+  .row { display: flex; gap: 10px; }
   button {
-    border: 1px solid #333;
-    background: #171717;
-    color: white;
-    border-radius: 12px;
-    padding: 13px;
-    font-size: 14px;
+    flex: 1;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: .5px;
+    padding: 11px 14px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--text);
     cursor: pointer;
-    transition: .15s;
+    transition: border-color .15s, color .15s;
   }
-
-  button:hover {
-    background: #242424;
-    border-color: #555;
-  }
-
+  button:hover:not(:disabled) { border-color: var(--cyan-dim); color: var(--cyan); }
+  button:disabled { opacity: .35; cursor: not-allowed; }
   button.primary {
-    background: white;
-    color: black;
-    border-color: white;
+    background: var(--cyan);
+    color: #062421;
+    border-color: var(--cyan);
+    font-weight: 600;
   }
-
-  button.primary:hover {
-    background: #ddd;
-  }
-
-  button:disabled {
-    opacity: .4;
-    cursor: not-allowed;
-  }
-
-  .connect {
-    width: 100%;
-    margin-top: 18px;
-    padding: 15px;
-  }
+  button.primary:hover:not(:disabled) { background: #6ef0e0; color: #062421; }
 
   .log {
-    margin-top: 15px;
-    min-height: 90px;
-    max-height: 150px;
-    overflow-y: auto;
-    background: #070707;
-    border: 1px solid #222;
-    border-radius: 12px;
-    padding: 12px;
-    color: #777;
-    font-family: Consolas, monospace;
-    font-size: 11px;
-    white-space: pre-wrap;
+    margin-top: 18px;
+    font-size: 10.5px;
+    color: var(--text-dim);
+    min-height: 16px;
+    letter-spacing: .3px;
   }
-
-  .hint {
-    color: #666;
-    font-size: 11px;
-    line-height: 1.5;
-    margin-top: 16px;
-  }
-
-  @media (max-width: 560px) {
-    .angle-row {
-      grid-template-columns: 1fr;
-    }
-
-    .buttons {
-      grid-template-columns: 1fr;
-    }
-
-    .top {
-      align-items: flex-start;
-      flex-direction: column;
-    }
-  }
+  .log.err { color: var(--amber); }
 </style>
 </head>
-
 <body>
 
 <div class="panel">
+  <h1>ROOMSWITCH — THRESHOLD</h1>
+  <div class="sub">Bluetooth control · target angle for stepper travel</div>
 
-  <div class="top">
-    <div>
-      <h1>RoomSwitch</h1>
-      <div class="subtitle">
-        ESP32 • 28BYJ-48 • ULN2003
-      </div>
+  <div class="status-row">
+    <div class="dot" id="dot"></div>
+    <span id="statusText">Not connected</span>
+  </div>
+
+  <div class="dial-row">
+    <div class="dial-wrap">
+      <svg width="140" height="140" viewBox="0 0 140 140">
+        <circle class="dial-track" cx="70" cy="70" r="58"></circle>
+        <circle class="dial-fill on" id="onDialFill" cx="70" cy="70" r="58"
+                stroke-dasharray="364.4" stroke-dashoffset="364.4"
+                transform="rotate(-90 70 70)"></circle>
+        <text x="70" y="75" text-anchor="middle" class="dial-center" id="onDialValue">--</text>
+      </svg>
+      <div class="dial-tag">ON ANGLE</div>
     </div>
-
-    <div id="status" class="status">
-      Disconnected
+    <div class="dial-wrap">
+      <svg width="140" height="140" viewBox="0 0 140 140">
+        <circle class="dial-track" cx="70" cy="70" r="58"></circle>
+        <circle class="dial-fill off" id="offDialFill" cx="70" cy="70" r="58"
+                stroke-dasharray="364.4" stroke-dashoffset="364.4"
+                transform="rotate(-90 70 70)"></circle>
+        <text x="70" y="75" text-anchor="middle" class="dial-center" id="offDialValue">--</text>
+      </svg>
+      <div class="dial-tag">OFF ANGLE</div>
     </div>
   </div>
 
-  <div class="section">
+  <label class="slider-label">On angle</label>
+  <input type="range" id="onSlider" min="0" max="180" value="45" disabled>
 
-    <div class="section-title">
-      Motor Angles
-    </div>
+  <label class="slider-label">Off angle</label>
+  <input type="range" id="offSlider" min="0" max="180" value="0" disabled>
 
-    <div class="angle-row">
-      <div>
-        <label for="onSlider">
-          ON Angle
-          <span class="angle-value">
-            — motor position when switch is ON
-          </span>
-        </label>
-
-        <input
-          id="onSlider"
-          type="range"
-          min="0"
-          max="360"
-          value="45"
-        >
-      </div>
-
-      <input
-        id="onNumber"
-        type="number"
-        min="0"
-        max="360"
-        value="45"
-      >
-    </div>
-
-    <div class="angle-row">
-      <div>
-        <label for="offSlider">
-          OFF Angle
-          <span class="angle-value">
-            — motor position when switch is OFF
-          </span>
-        </label>
-
-        <input
-          id="offSlider"
-          type="range"
-          min="0"
-          max="360"
-          value="0"
-        >
-      </div>
-
-      <input
-        id="offNumber"
-        type="number"
-        min="0"
-        max="360"
-        value="0"
-      >
-    </div>
-
+  <div class="row">
+    <button id="connectBtn">Connect</button>
+    <button id="applyBtn" class="primary" disabled>Set Thresholds</button>
   </div>
 
-  <div class="section">
-
-    <div class="section-title">
-      Switch Control
-    </div>
-
-    <div class="buttons">
-      <button id="onButton" onclick="sendState('ON')" disabled>
-        ON
-      </button>
-
-      <button id="offButton" onclick="sendState('OFF')" disabled>
-        OFF
-      </button>
-
-      <button id="toggleButton" onclick="sendState('TOGGLE')" disabled>
-        TOGGLE
-      </button>
-    </div>
-
-  </div>
-
-  <button
-    id="connectButton"
-    class="connect primary"
-    onclick="connectBluetooth()"
-  >
-    Connect to ESP32
-  </button>
-
-  <div id="log" class="log">Waiting for Bluetooth...</div>
-
-  <div class="hint">
-    This page uses Web Bluetooth. Use Chrome or Edge on a computer/device
-    that supports Bluetooth. The ESP32 must be powered on and advertising
-    as "RoomSwitch-ESP32".
-  </div>
-
+  <div class="log" id="log"></div>
 </div>
 
 <script>
-  // ============================================================
-  // BLE UUIDs — MUST MATCH THE ESP32 .INO
-  // ============================================================
+  const SERVICE_UUID     = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+  const ON_CHAR_UUID     = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+  const OFF_CHAR_UUID    = 'd4e0e0e0-1a2b-4c3d-9e8f-7a6b5c4d3e2f';
+  const MAX_ANGLE        = 180; // dial display range; motor itself accepts 0-360
 
-  const SERVICE_UUID =
-    "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+  let onCharacteristic = null;
+  let offCharacteristic = null;
 
-  const ON_ANGLE_UUID =
-    "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+  const dot = document.getElementById('dot');
+  const statusText = document.getElementById('statusText');
+  const onSlider = document.getElementById('onSlider');
+  const offSlider = document.getElementById('offSlider');
+  const onDialFill = document.getElementById('onDialFill');
+  const offDialFill = document.getElementById('offDialFill');
+  const onDialValue = document.getElementById('onDialValue');
+  const offDialValue = document.getElementById('offDialValue');
+  const connectBtn = document.getElementById('connectBtn');
+  const applyBtn = document.getElementById('applyBtn');
+  const log = document.getElementById('log');
 
-  const OFF_ANGLE_UUID =
-    "beb5483e-36e1-4688-b7f5-ea07361b26b";
+  const CIRC = 2 * Math.PI * 58;
 
-  const STATE_UUID =
-    "beb5483e-36e1-4688-b7f5-ea07361b26c";
-
-  let bluetoothDevice = null;
-  let onAngleCharacteristic = null;
-  let offAngleCharacteristic = null;
-  let stateCharacteristic = null;
-
-  const statusElement =
-    document.getElementById("status");
-
-  const logElement =
-    document.getElementById("log");
-
-  const connectButton =
-    document.getElementById("connectButton");
-
-  const onButton =
-    document.getElementById("onButton");
-
-  const offButton =
-    document.getElementById("offButton");
-
-  const toggleButton =
-    document.getElementById("toggleButton");
-
-  function log(message) {
-    const time =
-      new Date().toLocaleTimeString();
-
-    logElement.textContent +=
-      `[${time}] ${message}\n`;
-
-    logElement.scrollTop =
-      logElement.scrollHeight;
+  function setLog(msg, isErr) {
+    log.textContent = msg || '';
+    log.className = 'log' + (isErr ? ' err' : '');
   }
 
-  function setConnectedUI(connected) {
-    if (connected) {
-      statusElement.textContent = "Connected";
-      statusElement.classList.add("connected");
-
-      connectButton.textContent =
-        "Connected to RoomSwitch-ESP32";
-
-      onButton.disabled = false;
-      offButton.disabled = false;
-      toggleButton.disabled = false;
-    }
-    else {
-      statusElement.textContent =
-        "Disconnected";
-
-      statusElement.classList.remove(
-        "connected"
-      );
-
-      connectButton.textContent =
-        "Connect to ESP32";
-
-      onButton.disabled = true;
-      offButton.disabled = true;
-      toggleButton.disabled = true;
-    }
+  function updateDial(fillEl, valueEl, sliderEl, angle) {
+    valueEl.textContent = angle;
+    const frac = Math.min(angle / MAX_ANGLE, 1);
+    fillEl.setAttribute('stroke-dashoffset', CIRC * (1 - frac));
+    sliderEl.value = angle;
   }
 
-  // ============================================================
-  // BYTE / TEXT HELPERS
-  // ============================================================
+  onSlider.addEventListener('input', () =>
+    updateDial(onDialFill, onDialValue, onSlider, Number(onSlider.value)));
+  offSlider.addEventListener('input', () =>
+    updateDial(offDialFill, offDialValue, offSlider, Number(offSlider.value)));
 
-  function textFromDataView(dataView) {
-    return new TextDecoder().decode(dataView);
-  }
-
-  async function writeText(characteristic, text) {
-    const data =
-      new TextEncoder().encode(text);
-
-    await characteristic.writeValue(data);
-  }
-
-  // ============================================================
-  // READ CURRENT SETTINGS
-  // ============================================================
-
-  async function readSettings() {
-    try {
-      const onValue =
-        await onAngleCharacteristic.readValue();
-
-      const offValue =
-        await offAngleCharacteristic.readValue();
-
-      const onAngle =
-        parseInt(textFromDataView(onValue));
-
-      const offAngle =
-        parseInt(textFromDataView(offValue));
-
-      if (!isNaN(onAngle)) {
-        setOnAngle(onAngle);
-      }
-
-      if (!isNaN(offAngle)) {
-        setOffAngle(offAngle);
-      }
-
-      log(
-        `Loaded angles: ON ${onAngle}°, OFF ${offAngle}°`
-      );
-    }
-    catch (error) {
-      log(
-        "Could not read settings: " +
-        error
-      );
-    }
-  }
-
-  // ============================================================
-  // ANGLE UI
-  // ============================================================
-
-  const onSlider =
-    document.getElementById("onSlider");
-
-  const onNumber =
-    document.getElementById("onNumber");
-
-  const offSlider =
-    document.getElementById("offSlider");
-
-  const offNumber =
-    document.getElementById("offNumber");
-
-  function setOnAngle(value) {
-    value = Math.max(
-      0,
-      Math.min(360, parseInt(value) || 0)
-    );
-
-    onSlider.value = value;
-    onNumber.value = value;
-  }
-
-  function setOffAngle(value) {
-    value = Math.max(
-      0,
-      Math.min(360, parseInt(value) || 0)
-    );
-
-    offSlider.value = value;
-    offNumber.value = value;
-  }
-
-  onSlider.addEventListener(
-    "input",
-    () => {
-      setOnAngle(onSlider.value);
-    }
-  );
-
-  onNumber.addEventListener(
-    "change",
-    () => {
-      setOnAngle(onNumber.value);
-      sendOnAngle();
-    }
-  );
-
-  offSlider.addEventListener(
-    "input",
-    () => {
-      setOffAngle(offSlider.value);
-    }
-  );
-
-  offNumber.addEventListener(
-    "change",
-    () => {
-      setOffAngle(offNumber.value);
-      sendOffAngle();
-    }
-  );
-
-  // Send slider value after user releases it.
-  onSlider.addEventListener(
-    "change",
-    sendOnAngle
-  );
-
-  offSlider.addEventListener(
-    "change",
-    sendOffAngle
-  );
-
-  async function sendOnAngle() {
-    if (!onAngleCharacteristic) {
-      log("Not connected.");
-      return;
-    }
-
-    const value =
-      parseInt(onNumber.value);
-
-    if (isNaN(value)) {
-      return;
-    }
-
-    try {
-      await writeText(
-        onAngleCharacteristic,
-        String(value)
-      );
-
-      log(
-        `ON angle -> ${value}°`
-      );
-    }
-    catch (error) {
-      log(
-        "ON angle error: " + error
-      );
-    }
-  }
-
-  async function sendOffAngle() {
-    if (!offAngleCharacteristic) {
-      log("Not connected.");
-      return;
-    }
-
-    const value =
-      parseInt(offNumber.value);
-
-    if (isNaN(value)) {
-      return;
-    }
-
-    try {
-      await writeText(
-        offAngleCharacteristic,
-        String(value)
-      );
-
-      log(
-        `OFF angle -> ${value}°`
-      );
-    }
-    catch (error) {
-      log(
-        "OFF angle error: " + error
-      );
-    }
-  }
-
-  // ============================================================
-  // STATE CONTROL
-  // ============================================================
-
-  async function sendState(state) {
-    if (!stateCharacteristic) {
-      log("Not connected.");
-      return;
-    }
-
-    try {
-      await writeText(
-        stateCharacteristic,
-        state
-      );
-
-      log(
-        `Switch command -> ${state}`
-      );
-    }
-    catch (error) {
-      log(
-        "State error: " + error
-      );
-    }
-  }
-
-  // ============================================================
-  // BLUETOOTH
-  // ============================================================
-
-  async function connectBluetooth() {
-
+  connectBtn.addEventListener('click', async () => {
     if (!navigator.bluetooth) {
-      alert(
-        "Web Bluetooth is not available in this browser. " +
-        "Try Chrome or Edge."
-      );
-
+      setLog('Web Bluetooth not supported — use Chrome or Edge, over HTTPS.', true);
       return;
     }
-
     try {
-      log(
-        "Opening Bluetooth device picker..."
-      );
+      setLog('Requesting device…');
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [SERVICE_UUID] }]
+      });
 
-      bluetoothDevice =
-        await navigator.bluetooth.requestDevice({
-          filters: [
-            {
-              name: "RoomSwitch-ESP32"
-            }
-          ],
-          optionalServices: [
-            SERVICE_UUID
-          ]
-        });
+      setLog('Connecting…');
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      onCharacteristic = await service.getCharacteristic(ON_CHAR_UUID);
+      offCharacteristic = await service.getCharacteristic(OFF_CHAR_UUID);
 
-      bluetoothDevice.addEventListener(
-        "gattserverdisconnected",
-        handleDisconnect
-      );
+      const onValue = await onCharacteristic.readValue();
+      const offValue = await offCharacteristic.readValue();
+      updateDial(onDialFill, onDialValue, onSlider, Number(new TextDecoder().decode(onValue)) || 0);
+      updateDial(offDialFill, offDialValue, offSlider, Number(new TextDecoder().decode(offValue)) || 0);
 
-      log(
-        "Device selected: " +
-        bluetoothDevice.name
-      );
+      dot.classList.add('live');
+      statusText.textContent = device.name || 'Connected';
+      connectBtn.textContent = 'Connected';
+      connectBtn.disabled = true;
+      applyBtn.disabled = false;
+      onSlider.disabled = false;
+      offSlider.disabled = false;
+      setLog('');
 
-      const server =
-        await bluetoothDevice.gatt.connect();
-
-      log("GATT connected.");
-
-      const service =
-        await server.getPrimaryService(
-          SERVICE_UUID
-        );
-
-      onAngleCharacteristic =
-        await service.getCharacteristic(
-          ON_ANGLE_UUID
-        );
-
-      offAngleCharacteristic =
-        await service.getCharacteristic(
-          OFF_ANGLE_UUID
-        );
-
-      stateCharacteristic =
-        await service.getCharacteristic(
-          STATE_UUID
-        );
-
-      setConnectedUI(true);
-
-      log(
-        "RoomSwitch Bluetooth connected."
-      );
-
-      await readSettings();
-
-      // Read current state
-      try {
-        const stateValue =
-          await stateCharacteristic.readValue();
-
-        const state =
-          textFromDataView(stateValue);
-
-        log(
-          `Current state: ${state}`
-        );
-      }
-      catch (error) {
-        log(
-          "Could not read state: " +
-          error
-        );
-      }
-
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+    } catch (err) {
+      setLog(err.message || 'Connection failed.', true);
     }
-    catch (error) {
-      log(
-        "Bluetooth connection failed: " +
-        error
-      );
+  });
 
-      setConnectedUI(false);
+  applyBtn.addEventListener('click', async () => {
+    if (!onCharacteristic || !offCharacteristic) return;
+    try {
+      const onAngle = Number(onSlider.value);
+      const offAngle = Number(offSlider.value);
+      await onCharacteristic.writeValue(new TextEncoder().encode(String(onAngle)));
+      await offCharacteristic.writeValue(new TextEncoder().encode(String(offAngle)));
+      setLog('On: ' + onAngle + '° · Off: ' + offAngle + '°');
+    } catch (err) {
+      setLog(err.message || 'Write failed.', true);
     }
-  }
+  });
 
-  function handleDisconnect() {
-    log("ESP32 disconnected.");
-    setConnectedUI(false);
-
-    onAngleCharacteristic = null;
-    offAngleCharacteristic = null;
-    stateCharacteristic = null;
-  }
-
-  // ============================================================
-  // INITIAL UI
-  // ============================================================
-
-  setOnAngle(45);
-  setOffAngle(0);
-
-  if (!navigator.bluetooth) {
-    log(
-      "Web Bluetooth is unavailable in this browser."
-    );
+  function onDisconnected() {
+    dot.classList.remove('live');
+    statusText.textContent = 'Not connected';
+    connectBtn.textContent = 'Connect';
+    connectBtn.disabled = false;
+    applyBtn.disabled = true;
+    onSlider.disabled = true;
+    offSlider.disabled = true;
+    onCharacteristic = null;
+    offCharacteristic = null;
+    setLog('Device disconnected.', true);
   }
 </script>
 
