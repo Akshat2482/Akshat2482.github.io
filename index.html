@@ -1,341 +1,708 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RoomSwitch — Threshold Control</title>
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>RoomSwitch Control</title>
+
 <style>
-  :root {
-    --bg: #06090c;
-    --panel: #0c1218;
-    --line: #1c2a33;
-    --cyan: #4de3d4;
-    --cyan-dim: #276a63;
-    --amber: #e0a458;
-    --text: #cfe7e3;
-    --text-dim: #6c8a86;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    background:
-      radial-gradient(ellipse at top, #0d1a1f 0%, var(--bg) 60%);
-    color: var(--text);
-    font-family: 'Consolas', 'SF Mono', 'Courier New', monospace;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-  }
-  .panel {
-    width: 100%;
-    max-width: 420px;
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: 28px 28px 24px;
-    position: relative;
-  }
-  .panel::before {
-    content: "";
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
-    opacity: .5;
-  }
-  h1 {
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    margin: 0 0 2px;
-    color: var(--text);
-  }
-  .sub {
-    font-size: 11px;
-    color: var(--text-dim);
-    margin-bottom: 22px;
-  }
-  .status-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: var(--text-dim);
-    margin-bottom: 22px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--line);
-  }
-  .dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: #3a4a4a;
-    box-shadow: none;
-    transition: all .2s;
-  }
-  .dot.live {
-    background: var(--cyan);
-    box-shadow: 0 0 8px var(--cyan);
-  }
 
-  .dial-row {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin-bottom: 18px;
-  }
-  .dial-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  svg { overflow: visible; }
-  .dial-track { fill: none; stroke: var(--line); stroke-width: 6; }
-  .dial-fill {
-    fill: none;
-    stroke-width: 6;
-    stroke-linecap: round;
-    transition: stroke-dashoffset .25s ease;
-  }
-  .dial-fill.on {
-    stroke: var(--cyan);
-    filter: drop-shadow(0 0 4px rgba(77,227,212,.5));
-  }
-  .dial-fill.off {
-    stroke: var(--amber);
-    filter: drop-shadow(0 0 4px rgba(224,164,88,.5));
-  }
-  .dial-center {
-    font-size: 26px;
-    font-weight: 300;
-    fill: var(--text);
-  }
-  .dial-tag {
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 1.5px;
-    margin-top: 6px;
-  }
-  .slider-label {
-    display: block;
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 1px;
-    margin-bottom: 2px;
-  }
+* {
+  box-sizing: border-box;
+}
 
-  input[type="range"] {
-    width: 100%;
-    -webkit-appearance: none;
-    height: 3px;
-    background: var(--line);
-    border-radius: 2px;
-    margin: 4px 0 20px;
-  }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    background: var(--cyan);
-    box-shadow: 0 0 6px var(--cyan);
-    cursor: pointer;
-    margin-top: -5.5px;
-  }
-  input[type="range"]::-moz-range-thumb {
-    width: 14px; height: 14px;
-    border: none;
-    border-radius: 50%;
-    background: var(--cyan);
-    box-shadow: 0 0 6px var(--cyan);
-    cursor: pointer;
-  }
+body {
+  margin: 0;
+  min-height: 100vh;
 
-  .row { display: flex; gap: 10px; }
-  button {
-    flex: 1;
-    font-family: inherit;
-    font-size: 12px;
-    letter-spacing: .5px;
-    padding: 11px 14px;
-    border-radius: 3px;
-    border: 1px solid var(--line);
-    background: transparent;
-    color: var(--text);
-    cursor: pointer;
-    transition: border-color .15s, color .15s;
-  }
-  button:hover:not(:disabled) { border-color: var(--cyan-dim); color: var(--cyan); }
-  button:disabled { opacity: .35; cursor: not-allowed; }
-  button.primary {
-    background: var(--cyan);
-    color: #062421;
-    border-color: var(--cyan);
-    font-weight: 600;
-  }
-  button.primary:hover:not(:disabled) { background: #6ef0e0; color: #062421; }
+  background: #080808;
+  color: white;
 
-  .log {
-    margin-top: 18px;
-    font-size: 10.5px;
-    color: var(--text-dim);
-    min-height: 16px;
-    letter-spacing: .3px;
-  }
-  .log.err { color: var(--amber); }
+  font-family: Arial, sans-serif;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.container {
+
+  width: 420px;
+  max-width: 92%;
+
+  background: #111;
+
+  border: 1px solid #333;
+
+  border-radius: 20px;
+
+  padding: 30px;
+
+  box-shadow:
+    0 0 30px rgba(255,255,255,0.08);
+}
+
+h1 {
+
+  margin-top: 0;
+
+  text-align: center;
+
+  font-size: 28px;
+}
+
+.subtitle {
+
+  text-align: center;
+
+  color: #999;
+
+  margin-bottom: 30px;
+}
+
+label {
+
+  display: block;
+
+  margin-top: 18px;
+
+  margin-bottom: 8px;
+
+  color: #ccc;
+
+  font-size: 14px;
+}
+
+input {
+
+  width: 100%;
+
+  padding: 14px;
+
+  background: #080808;
+
+  border: 1px solid #444;
+
+  border-radius: 10px;
+
+  color: white;
+
+  font-size: 18px;
+
+  outline: none;
+}
+
+input:focus {
+
+  border-color: white;
+}
+
+button {
+
+  width: 100%;
+
+  padding: 15px;
+
+  margin-top: 20px;
+
+  border: none;
+
+  border-radius: 10px;
+
+  background: white;
+
+  color: black;
+
+  font-size: 17px;
+
+  font-weight: bold;
+
+  cursor: pointer;
+}
+
+button:hover {
+
+  background: #ddd;
+}
+
+button:disabled {
+
+  background: #444;
+
+  color: #888;
+
+  cursor: not-allowed;
+}
+
+.status {
+
+  margin-top: 20px;
+
+  padding: 12px;
+
+  border-radius: 10px;
+
+  background: #080808;
+
+  text-align: center;
+
+  color: #aaa;
+}
+
+.current {
+
+  margin-top: 25px;
+
+  padding: 15px;
+
+  background: #0a0a0a;
+
+  border-radius: 12px;
+
+  border: 1px solid #292929;
+}
+
+.current-title {
+
+  color: #888;
+
+  font-size: 13px;
+
+  margin-bottom: 10px;
+}
+
+.value {
+
+  display: flex;
+
+  justify-content: space-between;
+
+  margin: 7px 0;
+
+  color: #ddd;
+}
+
+.value span:last-child {
+
+  color: white;
+
+  font-weight: bold;
+}
+
 </style>
+
 </head>
+
 <body>
 
-<div class="panel">
-  <h1>ROOMSWITCH — THRESHOLD</h1>
-  <div class="sub">Bluetooth control · target angle for stepper travel</div>
+<div class="container">
 
-  <div class="status-row">
-    <div class="dot" id="dot"></div>
-    <span id="statusText">Not connected</span>
+  <h1>RoomSwitch</h1>
+
+  <div class="subtitle">
+    ESP32 Stepper Control
   </div>
 
-  <div class="dial-row">
-    <div class="dial-wrap">
-      <svg width="140" height="140" viewBox="0 0 140 140">
-        <circle class="dial-track" cx="70" cy="70" r="58"></circle>
-        <circle class="dial-fill on" id="onDialFill" cx="70" cy="70" r="58"
-                stroke-dasharray="364.4" stroke-dashoffset="364.4"
-                transform="rotate(-90 70 70)"></circle>
-        <text x="70" y="75" text-anchor="middle" class="dial-center" id="onDialValue">--</text>
-      </svg>
-      <div class="dial-tag">ON ANGLE</div>
+
+  <button id="connectButton">
+    Connect to ESP32
+  </button>
+
+
+  <label for="onAngle">
+    ON Angle
+  </label>
+
+  <input
+    id="onAngle"
+    type="number"
+    min="0"
+    max="360"
+    value="0"
+  >
+
+
+  <label for="offAngle">
+    OFF Angle
+  </label>
+
+  <input
+    id="offAngle"
+    type="number"
+    min="0"
+    max="360"
+    value="360"
+  >
+
+
+  <label for="times">
+    360° Rotation Times
+  </label>
+
+  <input
+    id="times"
+    type="number"
+    min="1"
+    max="100"
+    value="1"
+  >
+
+
+  <button
+    id="saveButton"
+    disabled
+  >
+    Save Settings
+  </button>
+
+
+  <div class="status" id="status">
+    Not connected
+  </div>
+
+
+  <div class="current">
+
+    <div class="current-title">
+      SAVED SETTINGS
     </div>
-    <div class="dial-wrap">
-      <svg width="140" height="140" viewBox="0 0 140 140">
-        <circle class="dial-track" cx="70" cy="70" r="58"></circle>
-        <circle class="dial-fill off" id="offDialFill" cx="70" cy="70" r="58"
-                stroke-dasharray="364.4" stroke-dashoffset="364.4"
-                transform="rotate(-90 70 70)"></circle>
-        <text x="70" y="75" text-anchor="middle" class="dial-center" id="offDialValue">--</text>
-      </svg>
-      <div class="dial-tag">OFF ANGLE</div>
+
+    <div class="value">
+      <span>ON</span>
+      <span id="currentOn">---</span>
     </div>
+
+    <div class="value">
+      <span>OFF</span>
+      <span id="currentOff">---</span>
+    </div>
+
+    <div class="value">
+      <span>Times</span>
+      <span id="currentTimes">---</span>
+    </div>
+
   </div>
 
-  <label class="slider-label">On angle</label>
-  <input type="range" id="onSlider" min="0" max="180" value="45" disabled>
-
-  <label class="slider-label">Off angle</label>
-  <input type="range" id="offSlider" min="0" max="180" value="0" disabled>
-
-  <div class="row">
-    <button id="connectBtn">Connect</button>
-    <button id="applyBtn" class="primary" disabled>Set Thresholds</button>
-  </div>
-
-  <div class="log" id="log"></div>
 </div>
 
+
 <script>
-  const SERVICE_UUID     = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
-  const ON_CHAR_UUID     = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
-  const OFF_CHAR_UUID    = 'd4e0e0e0-1a2b-4c3d-9e8f-7a6b5c4d3e2f';
-  const MAX_ANGLE        = 180; // dial display range; motor itself accepts 0-360
 
-  let onCharacteristic = null;
-  let offCharacteristic = null;
+// ============================================================
+// UUIDs
+// ============================================================
 
-  const dot = document.getElementById('dot');
-  const statusText = document.getElementById('statusText');
-  const onSlider = document.getElementById('onSlider');
-  const offSlider = document.getElementById('offSlider');
-  const onDialFill = document.getElementById('onDialFill');
-  const offDialFill = document.getElementById('offDialFill');
-  const onDialValue = document.getElementById('onDialValue');
-  const offDialValue = document.getElementById('offDialValue');
-  const connectBtn = document.getElementById('connectBtn');
-  const applyBtn = document.getElementById('applyBtn');
-  const log = document.getElementById('log');
+const SERVICE_UUID =
+  "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 
-  const CIRC = 2 * Math.PI * 58;
+const ON_ANGLE_UUID =
+  "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-  function setLog(msg, isErr) {
-    log.textContent = msg || '';
-    log.className = 'log' + (isErr ? ' err' : '');
+const OFF_ANGLE_UUID =
+  "d4e0e0e0-1a2b-4c3d-9e8f-7a6b5c4d3e2f";
+
+const TIMES_UUID =
+  "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d";
+
+
+// ============================================================
+// VARIABLES
+// ============================================================
+
+let device = null;
+
+let server = null;
+
+let service = null;
+
+let onCharacteristic = null;
+
+let offCharacteristic = null;
+
+let timesCharacteristic = null;
+
+
+// ============================================================
+// ELEMENTS
+// ============================================================
+
+const connectButton =
+  document.getElementById("connectButton");
+
+const saveButton =
+  document.getElementById("saveButton");
+
+const status =
+  document.getElementById("status");
+
+const onInput =
+  document.getElementById("onAngle");
+
+const offInput =
+  document.getElementById("offAngle");
+
+const timesInput =
+  document.getElementById("times");
+
+const currentOn =
+  document.getElementById("currentOn");
+
+const currentOff =
+  document.getElementById("currentOff");
+
+const currentTimes =
+  document.getElementById("currentTimes");
+
+
+// ============================================================
+// STATUS
+// ============================================================
+
+function setStatus(message) {
+
+  status.textContent =
+    message;
+}
+
+
+// ============================================================
+// READ BLE VALUE
+// ============================================================
+
+async function readValue(characteristic) {
+
+  const data =
+    await characteristic.readValue();
+
+  return new TextDecoder().decode(data);
+}
+
+
+// ============================================================
+// LOAD CURRENT SETTINGS
+// ============================================================
+
+async function loadSettings() {
+
+  try {
+
+    const onValue =
+      await readValue(
+        onCharacteristic
+      );
+
+    const offValue =
+      await readValue(
+        offCharacteristic
+      );
+
+    const timesValue =
+      await readValue(
+        timesCharacteristic
+      );
+
+
+    onInput.value =
+      parseInt(onValue);
+
+    offInput.value =
+      parseInt(offValue);
+
+    timesInput.value =
+      parseInt(timesValue);
+
+
+    currentOn.textContent =
+      onValue + "°";
+
+    currentOff.textContent =
+      offValue + "°";
+
+    currentTimes.textContent =
+      timesValue + "x";
+
+
+    setStatus(
+      "Connected"
+    );
+
   }
 
-  function updateDial(fillEl, valueEl, sliderEl, angle) {
-    valueEl.textContent = angle;
-    const frac = Math.min(angle / MAX_ANGLE, 1);
-    fillEl.setAttribute('stroke-dashoffset', CIRC * (1 - frac));
-    sliderEl.value = angle;
+  catch (error) {
+
+    console.error(error);
+
+    setStatus(
+      "Connected, but could not read settings"
+    );
   }
+}
 
-  onSlider.addEventListener('input', () =>
-    updateDial(onDialFill, onDialValue, onSlider, Number(onSlider.value)));
-  offSlider.addEventListener('input', () =>
-    updateDial(offDialFill, offDialValue, offSlider, Number(offSlider.value)));
 
-  connectBtn.addEventListener('click', async () => {
-    if (!navigator.bluetooth) {
-      setLog('Web Bluetooth not supported — use Chrome or Edge, over HTTPS.', true);
-      return;
-    }
+// ============================================================
+// CONNECT
+// ============================================================
+
+connectButton.addEventListener(
+  "click",
+  async function() {
+
     try {
-      setLog('Requesting device…');
-      const device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: [SERVICE_UUID] }]
-      });
 
-      setLog('Connecting…');
-      const server = await device.gatt.connect();
-      const service = await server.getPrimaryService(SERVICE_UUID);
-      onCharacteristic = await service.getCharacteristic(ON_CHAR_UUID);
-      offCharacteristic = await service.getCharacteristic(OFF_CHAR_UUID);
+      setStatus(
+        "Searching for ESP32..."
+      );
 
-      const onValue = await onCharacteristic.readValue();
-      const offValue = await offCharacteristic.readValue();
-      updateDial(onDialFill, onDialValue, onSlider, Number(new TextDecoder().decode(onValue)) || 0);
-      updateDial(offDialFill, offDialValue, offSlider, Number(new TextDecoder().decode(offValue)) || 0);
 
-      dot.classList.add('live');
-      statusText.textContent = device.name || 'Connected';
-      connectBtn.textContent = 'Connected';
-      connectBtn.disabled = true;
-      applyBtn.disabled = false;
-      onSlider.disabled = false;
-      offSlider.disabled = false;
-      setLog('');
+      device =
+        await navigator.bluetooth.requestDevice({
 
-      device.addEventListener('gattserverdisconnected', onDisconnected);
-    } catch (err) {
-      setLog(err.message || 'Connection failed.', true);
+          filters: [
+            {
+              name: "RoomSwitch-ESP32"
+            }
+          ],
+
+          optionalServices: [
+            SERVICE_UUID
+          ]
+        });
+
+
+      device.addEventListener(
+        "gattserverdisconnected",
+        function() {
+
+          setStatus(
+            "ESP32 disconnected"
+          );
+
+          saveButton.disabled =
+            true;
+
+          connectButton.disabled =
+            false;
+        }
+      );
+
+
+      setStatus(
+        "Connecting..."
+      );
+
+
+      server =
+        await device.gatt.connect();
+
+
+      service =
+        await server.getPrimaryService(
+          SERVICE_UUID
+        );
+
+
+      onCharacteristic =
+        await service.getCharacteristic(
+          ON_ANGLE_UUID
+        );
+
+
+      offCharacteristic =
+        await service.getCharacteristic(
+          OFF_ANGLE_UUID
+        );
+
+
+      timesCharacteristic =
+        await service.getCharacteristic(
+          TIMES_UUID
+        );
+
+
+      await loadSettings();
+
+
+      saveButton.disabled =
+        false;
+
+      connectButton.textContent =
+        "Connected";
+
+      connectButton.disabled =
+        true;
+
     }
-  });
 
-  applyBtn.addEventListener('click', async () => {
-    if (!onCharacteristic || !offCharacteristic) return;
-    try {
-      const onAngle = Number(onSlider.value);
-      const offAngle = Number(offSlider.value);
-      await onCharacteristic.writeValue(new TextEncoder().encode(String(onAngle)));
-      await offCharacteristic.writeValue(new TextEncoder().encode(String(offAngle)));
-      setLog('On: ' + onAngle + '° · Off: ' + offAngle + '°');
-    } catch (err) {
-      setLog(err.message || 'Write failed.', true);
+    catch (error) {
+
+      console.error(error);
+
+      setStatus(
+        "Connection failed"
+      );
     }
-  });
 
-  function onDisconnected() {
-    dot.classList.remove('live');
-    statusText.textContent = 'Not connected';
-    connectBtn.textContent = 'Connect';
-    connectBtn.disabled = false;
-    applyBtn.disabled = true;
-    onSlider.disabled = true;
-    offSlider.disabled = true;
-    onCharacteristic = null;
-    offCharacteristic = null;
-    setLog('Device disconnected.', true);
   }
+);
+
+
+// ============================================================
+// SAVE SETTINGS
+// ============================================================
+
+saveButton.addEventListener(
+  "click",
+  async function() {
+
+    try {
+
+      let on =
+        parseInt(onInput.value);
+
+      let off =
+        parseInt(offInput.value);
+
+      let times =
+        parseInt(timesInput.value);
+
+
+      // Validate ON
+
+      if (
+        isNaN(on) ||
+        on < 0 ||
+        on > 360
+      ) {
+
+        alert(
+          "ON angle must be between 0 and 360."
+        );
+
+        return;
+      }
+
+
+      // Validate OFF
+
+      if (
+        isNaN(off) ||
+        off < 0 ||
+        off > 360
+      ) {
+
+        alert(
+          "OFF angle must be between 0 and 360."
+        );
+
+        return;
+      }
+
+
+      // Validate times
+
+      if (
+        isNaN(times) ||
+        times < 1 ||
+        times > 100
+      ) {
+
+        alert(
+          "Times must be between 1 and 100."
+        );
+
+        return;
+      }
+
+
+      setStatus(
+        "Saving..."
+      );
+
+
+      const encoder =
+        new TextEncoder();
+
+
+      // Save ON
+
+      await onCharacteristic.writeValue(
+        encoder.encode(
+          String(on)
+        )
+      );
+
+
+      // Save OFF
+
+      await offCharacteristic.writeValue(
+        encoder.encode(
+          String(off)
+        )
+      );
+
+
+      // Save TIMES
+
+      await timesCharacteristic.writeValue(
+        encoder.encode(
+          String(times)
+        )
+      );
+
+
+      // Update display
+
+      currentOn.textContent =
+        on + "°";
+
+      currentOff.textContent =
+        off + "°";
+
+      currentTimes.textContent =
+        times + "x";
+
+
+      setStatus(
+        "Settings saved to ESP32"
+      );
+
+    }
+
+    catch (error) {
+
+      console.error(error);
+
+      setStatus(
+        "Could not save settings"
+      );
+    }
+
+  }
+);
+
+
+// ============================================================
+// CHECK WEB BLUETOOTH
+// ============================================================
+
+if (!navigator.bluetooth) {
+
+  setStatus(
+    "Web Bluetooth is not supported in this browser"
+  );
+
+  connectButton.disabled =
+    true;
+}
+
 </script>
 
 </body>
 </html>
+```
