@@ -1,708 +1,589 @@
-```html
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-
 <meta charset="UTF-8">
 
 <meta name="viewport"
       content="width=device-width, initial-scale=1.0">
 
-<title>RoomSwitch Control</title>
+<title>Room Switch Control</title>
 
 <style>
 
-* {
-  box-sizing: border-box;
-}
-
 body {
-  margin: 0;
-  min-height: 100vh;
-
-  background: #080808;
-  color: white;
-
-  font-family: Arial, sans-serif;
-
-  display: flex;
-  justify-content: center;
-  align-items: center;
+    margin: 0;
+    padding: 30px;
+    background: #000;
+    color: white;
+    font-family: Arial, sans-serif;
 }
 
 .container {
-
-  width: 420px;
-  max-width: 92%;
-
-  background: #111;
-
-  border: 1px solid #333;
-
-  border-radius: 20px;
-
-  padding: 30px;
-
-  box-shadow:
-    0 0 30px rgba(255,255,255,0.08);
+    max-width: 500px;
+    margin: auto;
 }
 
 h1 {
-
-  margin-top: 0;
-
-  text-align: center;
-
-  font-size: 28px;
+    text-align: center;
+    margin-bottom: 30px;
 }
 
-.subtitle {
+.section {
+    border: 1px solid #333;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
 
-  text-align: center;
-
-  color: #999;
-
-  margin-bottom: 30px;
+.section h2 {
+    margin-top: 0;
 }
 
 label {
-
-  display: block;
-
-  margin-top: 18px;
-
-  margin-bottom: 8px;
-
-  color: #ccc;
-
-  font-size: 14px;
+    display: block;
+    margin-top: 15px;
+    margin-bottom: 7px;
 }
 
 input {
-
-  width: 100%;
-
-  padding: 14px;
-
-  background: #080808;
-
-  border: 1px solid #444;
-
-  border-radius: 10px;
-
-  color: white;
-
-  font-size: 18px;
-
-  outline: none;
-}
-
-input:focus {
-
-  border-color: white;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 13px;
+    border-radius: 10px;
+    border: 1px solid #444;
+    background: #111;
+    color: white;
+    font-size: 17px;
 }
 
 button {
-
-  width: 100%;
-
-  padding: 15px;
-
-  margin-top: 20px;
-
-  border: none;
-
-  border-radius: 10px;
-
-  background: white;
-
-  color: black;
-
-  font-size: 17px;
-
-  font-weight: bold;
-
-  cursor: pointer;
+    width: 100%;
+    padding: 15px;
+    margin-top: 15px;
+    border: none;
+    border-radius: 10px;
+    background: white;
+    color: black;
+    font-size: 17px;
+    cursor: pointer;
 }
 
 button:hover {
-
-  background: #ddd;
+    opacity: 0.85;
 }
 
-button:disabled {
-
-  background: #444;
-
-  color: #888;
-
-  cursor: not-allowed;
+#status {
+    text-align: center;
+    margin-top: 20px;
+    color: #aaa;
 }
 
-.status {
-
-  margin-top: 20px;
-
-  padding: 12px;
-
-  border-radius: 10px;
-
-  background: #080808;
-
-  text-align: center;
-
-  color: #aaa;
-}
-
-.current {
-
-  margin-top: 25px;
-
-  padding: 15px;
-
-  background: #0a0a0a;
-
-  border-radius: 12px;
-
-  border: 1px solid #292929;
-}
-
-.current-title {
-
-  color: #888;
-
-  font-size: 13px;
-
-  margin-bottom: 10px;
-}
-
-.value {
-
-  display: flex;
-
-  justify-content: space-between;
-
-  margin: 7px 0;
-
-  color: #ddd;
-}
-
-.value span:last-child {
-
-  color: white;
-
-  font-weight: bold;
+.saved {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 10px;
+    background: #111;
+    border: 1px solid #333;
 }
 
 </style>
-
 </head>
 
 <body>
 
 <div class="container">
 
-  <h1>RoomSwitch</h1>
+<h1>Room Switch</h1>
 
-  <div class="subtitle">
-    ESP32 Stepper Control
-  </div>
-
-
-  <button id="connectButton">
+<button onclick="connectBluetooth()">
     Connect to ESP32
-  </button>
+</button>
 
+<div id="status">
+    Not connected
+</div>
 
-  <label for="onAngle">
-    ON Angle
-  </label>
+<!-- ========================================= -->
+<!-- ON -> OFF -->
+<!-- ========================================= -->
 
-  <input
-    id="onAngle"
-    type="number"
-    min="0"
-    max="360"
-    value="0"
-  >
+<div class="section">
 
+<h2>ON → OFF</h2>
 
-  <label for="offAngle">
-    OFF Angle
-  </label>
+<label>
+    Angle (degrees)
+</label>
 
-  <input
-    id="offAngle"
+<input
+    id="onOffAngle"
     type="number"
     min="0"
     max="360"
     value="360"
-  >
+>
 
+<label>
+    Times
+</label>
 
-  <label for="times">
-    360° Rotation Times
-  </label>
-
-  <input
-    id="times"
+<input
+    id="onOffTimes"
     type="number"
     min="1"
     max="100"
     value="1"
-  >
-
-
-  <button
-    id="saveButton"
-    disabled
-  >
-    Save Settings
-  </button>
-
-
-  <div class="status" id="status">
-    Not connected
-  </div>
-
-
-  <div class="current">
-
-    <div class="current-title">
-      SAVED SETTINGS
-    </div>
-
-    <div class="value">
-      <span>ON</span>
-      <span id="currentOn">---</span>
-    </div>
-
-    <div class="value">
-      <span>OFF</span>
-      <span id="currentOff">---</span>
-    </div>
-
-    <div class="value">
-      <span>Times</span>
-      <span id="currentTimes">---</span>
-    </div>
-
-  </div>
+>
 
 </div>
 
+<!-- ========================================= -->
+<!-- OFF -> ON -->
+<!-- ========================================= -->
+
+<div class="section">
+
+<h2>OFF → ON</h2>
+
+<label>
+    Angle (degrees)
+</label>
+
+<input
+    id="offOnAngle"
+    type="number"
+    min="0"
+    max="360"
+    value="360"
+>
+
+<label>
+    Times
+</label>
+
+<input
+    id="offOnTimes"
+    type="number"
+    min="1"
+    max="100"
+    value="1"
+>
+
+</div>
+
+<button onclick="saveSettings()">
+    Save Settings
+</button>
+
+<div class="saved">
+
+    <strong>Current Saved Settings</strong>
+
+    <div id="savedValues">
+        Not connected
+    </div>
+
+</div>
+
+</div>
 
 <script>
 
-// ============================================================
-// UUIDs
-// ============================================================
+// =====================================================
+// BLE UUIDS
+// =====================================================
 
 const SERVICE_UUID =
-  "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+    "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 
-const ON_ANGLE_UUID =
-  "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+const ON_TO_OFF_ANGLE_UUID =
+    "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-const OFF_ANGLE_UUID =
-  "d4e0e0e0-1a2b-4c3d-9e8f-7a6b5c4d3e2f";
+const ON_TO_OFF_TIMES_UUID =
+    "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d";
 
-const TIMES_UUID =
-  "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d";
+const OFF_TO_ON_ANGLE_UUID =
+    "d4e0e0e0-1a2b-4c3d-9e8f-7a6b5c4d3e2f";
 
+const OFF_TO_ON_TIMES_UUID =
+    "c3d2e1f0-9a8b-7c6d-5e4f-3a2b1c0d9e8f";
 
-// ============================================================
-// VARIABLES
-// ============================================================
+// =====================================================
+// BLE VARIABLES
+// =====================================================
 
 let device = null;
 
-let server = null;
+let onToOffAngleCharacteristic = null;
+let onToOffTimesCharacteristic = null;
 
-let service = null;
+let offToOnAngleCharacteristic = null;
+let offToOnTimesCharacteristic = null;
 
-let onCharacteristic = null;
-
-let offCharacteristic = null;
-
-let timesCharacteristic = null;
-
-
-// ============================================================
-// ELEMENTS
-// ============================================================
-
-const connectButton =
-  document.getElementById("connectButton");
-
-const saveButton =
-  document.getElementById("saveButton");
-
-const status =
-  document.getElementById("status");
-
-const onInput =
-  document.getElementById("onAngle");
-
-const offInput =
-  document.getElementById("offAngle");
-
-const timesInput =
-  document.getElementById("times");
-
-const currentOn =
-  document.getElementById("currentOn");
-
-const currentOff =
-  document.getElementById("currentOff");
-
-const currentTimes =
-  document.getElementById("currentTimes");
-
-
-// ============================================================
+// =====================================================
 // STATUS
-// ============================================================
+// =====================================================
 
 function setStatus(message) {
 
-  status.textContent =
-    message;
+    document.getElementById("status").textContent =
+        message;
 }
 
+// =====================================================
+// CONNECT
+// =====================================================
 
-// ============================================================
-// READ BLE VALUE
-// ============================================================
+async function connectBluetooth() {
+
+    try {
+
+        if (!navigator.bluetooth) {
+
+            setStatus(
+                "Web Bluetooth is not supported. Use Chrome or Edge."
+            );
+
+            return;
+        }
+
+        setStatus("Looking for ESP32...");
+
+        device =
+            await navigator.bluetooth.requestDevice({
+
+                filters: [
+                    {
+                        name: "RoomSwitch-ESP32"
+                    }
+                ],
+
+                optionalServices: [
+                    SERVICE_UUID
+                ]
+            });
+
+        setStatus("Connecting...");
+
+        const server =
+            await device.gatt.connect();
+
+        const service =
+            await server.getPrimaryService(
+                SERVICE_UUID
+            );
+
+        onToOffAngleCharacteristic =
+            await service.getCharacteristic(
+                ON_TO_OFF_ANGLE_UUID
+            );
+
+        onToOffTimesCharacteristic =
+            await service.getCharacteristic(
+                ON_TO_OFF_TIMES_UUID
+            );
+
+        offToOnAngleCharacteristic =
+            await service.getCharacteristic(
+                OFF_TO_ON_ANGLE_UUID
+            );
+
+        offToOnTimesCharacteristic =
+            await service.getCharacteristic(
+                OFF_TO_ON_TIMES_UUID
+            );
+
+        setStatus("Connected to ESP32");
+
+        await readSettings();
+
+    } catch (error) {
+
+        console.error(error);
+
+        setStatus(
+            "Connection failed: " + error.message
+        );
+    }
+}
+
+// =====================================================
+// READ CHARACTERISTIC
+// =====================================================
 
 async function readValue(characteristic) {
 
-  const data =
-    await characteristic.readValue();
+    const result =
+        await characteristic.readValue();
 
-  return new TextDecoder().decode(data);
+    const decoder =
+        new TextDecoder();
+
+    return decoder.decode(result);
 }
 
+// =====================================================
+// READ SETTINGS
+// =====================================================
 
-// ============================================================
-// LOAD CURRENT SETTINGS
-// ============================================================
-
-async function loadSettings() {
-
-  try {
-
-    const onValue =
-      await readValue(
-        onCharacteristic
-      );
-
-    const offValue =
-      await readValue(
-        offCharacteristic
-      );
-
-    const timesValue =
-      await readValue(
-        timesCharacteristic
-      );
-
-
-    onInput.value =
-      parseInt(onValue);
-
-    offInput.value =
-      parseInt(offValue);
-
-    timesInput.value =
-      parseInt(timesValue);
-
-
-    currentOn.textContent =
-      onValue + "°";
-
-    currentOff.textContent =
-      offValue + "°";
-
-    currentTimes.textContent =
-      timesValue + "x";
-
-
-    setStatus(
-      "Connected"
-    );
-
-  }
-
-  catch (error) {
-
-    console.error(error);
-
-    setStatus(
-      "Connected, but could not read settings"
-    );
-  }
-}
-
-
-// ============================================================
-// CONNECT
-// ============================================================
-
-connectButton.addEventListener(
-  "click",
-  async function() {
+async function readSettings() {
 
     try {
 
-      setStatus(
-        "Searching for ESP32..."
-      );
+        const onOffAngle =
+            await readValue(
+                onToOffAngleCharacteristic
+            );
 
+        const onOffTimes =
+            await readValue(
+                onToOffTimesCharacteristic
+            );
 
-      device =
-        await navigator.bluetooth.requestDevice({
+        const offOnAngle =
+            await readValue(
+                offToOnAngleCharacteristic
+            );
 
-          filters: [
-            {
-              name: "RoomSwitch-ESP32"
-            }
-          ],
+        const offOnTimes =
+            await readValue(
+                offToOnTimesCharacteristic
+            );
 
-          optionalServices: [
-            SERVICE_UUID
-          ]
-        });
+        document.getElementById(
+            "onOffAngle"
+        ).value = parseInt(onOffAngle);
 
+        document.getElementById(
+            "onOffTimes"
+        ).value = parseInt(onOffTimes);
 
-      device.addEventListener(
-        "gattserverdisconnected",
-        function() {
+        document.getElementById(
+            "offOnAngle"
+        ).value = parseInt(offOnAngle);
 
-          setStatus(
-            "ESP32 disconnected"
-          );
+        document.getElementById(
+            "offOnTimes"
+        ).value = parseInt(offOnTimes);
 
-          saveButton.disabled =
-            true;
-
-          connectButton.disabled =
-            false;
-        }
-      );
-
-
-      setStatus(
-        "Connecting..."
-      );
-
-
-      server =
-        await device.gatt.connect();
-
-
-      service =
-        await server.getPrimaryService(
-          SERVICE_UUID
+        updateSavedDisplay(
+            onOffAngle,
+            onOffTimes,
+            offOnAngle,
+            offOnTimes
         );
 
+    } catch (error) {
 
-      onCharacteristic =
-        await service.getCharacteristic(
-          ON_ANGLE_UUID
+        console.error(error);
+
+        setStatus(
+            "Could not read settings"
         );
-
-
-      offCharacteristic =
-        await service.getCharacteristic(
-          OFF_ANGLE_UUID
-        );
-
-
-      timesCharacteristic =
-        await service.getCharacteristic(
-          TIMES_UUID
-        );
-
-
-      await loadSettings();
-
-
-      saveButton.disabled =
-        false;
-
-      connectButton.textContent =
-        "Connected";
-
-      connectButton.disabled =
-        true;
-
     }
+}
 
-    catch (error) {
+// =====================================================
+// WRITE VALUE
+// =====================================================
 
-      console.error(error);
+async function writeValue(
+    characteristic,
+    value
+) {
 
-      setStatus(
-        "Connection failed"
-      );
-    }
-
-  }
-);
-
-
-// ============================================================
-// SAVE SETTINGS
-// ============================================================
-
-saveButton.addEventListener(
-  "click",
-  async function() {
-
-    try {
-
-      let on =
-        parseInt(onInput.value);
-
-      let off =
-        parseInt(offInput.value);
-
-      let times =
-        parseInt(timesInput.value);
-
-
-      // Validate ON
-
-      if (
-        isNaN(on) ||
-        on < 0 ||
-        on > 360
-      ) {
-
-        alert(
-          "ON angle must be between 0 and 360."
-        );
-
-        return;
-      }
-
-
-      // Validate OFF
-
-      if (
-        isNaN(off) ||
-        off < 0 ||
-        off > 360
-      ) {
-
-        alert(
-          "OFF angle must be between 0 and 360."
-        );
-
-        return;
-      }
-
-
-      // Validate times
-
-      if (
-        isNaN(times) ||
-        times < 1 ||
-        times > 100
-      ) {
-
-        alert(
-          "Times must be between 1 and 100."
-        );
-
-        return;
-      }
-
-
-      setStatus(
-        "Saving..."
-      );
-
-
-      const encoder =
+    const encoder =
         new TextEncoder();
 
-
-      // Save ON
-
-      await onCharacteristic.writeValue(
+    await characteristic.writeValue(
         encoder.encode(
-          String(on)
+            String(value)
         )
-      );
+    );
+}
 
+// =====================================================
+// SAVE SETTINGS
+// =====================================================
 
-      // Save OFF
+async function saveSettings() {
 
-      await offCharacteristic.writeValue(
-        encoder.encode(
-          String(off)
-        )
-      );
+    if (
+        !onToOffAngleCharacteristic ||
+        !onToOffTimesCharacteristic ||
+        !offToOnAngleCharacteristic ||
+        !offToOnTimesCharacteristic
+    ) {
 
+        setStatus(
+            "Connect to ESP32 first"
+        );
 
-      // Save TIMES
-
-      await timesCharacteristic.writeValue(
-        encoder.encode(
-          String(times)
-        )
-      );
-
-
-      // Update display
-
-      currentOn.textContent =
-        on + "°";
-
-      currentOff.textContent =
-        off + "°";
-
-      currentTimes.textContent =
-        times + "x";
-
-
-      setStatus(
-        "Settings saved to ESP32"
-      );
-
+        return;
     }
 
-    catch (error) {
+    try {
 
-      console.error(error);
+        let onOffAngle =
+            parseInt(
+                document.getElementById(
+                    "onOffAngle"
+                ).value
+            );
 
-      setStatus(
-        "Could not save settings"
-      );
+        let onOffTimes =
+            parseInt(
+                document.getElementById(
+                    "onOffTimes"
+                ).value
+            );
+
+        let offOnAngle =
+            parseInt(
+                document.getElementById(
+                    "offOnAngle"
+                ).value
+            );
+
+        let offOnTimes =
+            parseInt(
+                document.getElementById(
+                    "offOnTimes"
+                ).value
+            );
+
+        // Safety limits
+
+        onOffAngle =
+            Math.max(
+                0,
+                Math.min(360, onOffAngle)
+            );
+
+        onOffTimes =
+            Math.max(
+                1,
+                Math.min(100, onOffTimes)
+            );
+
+        offOnAngle =
+            Math.max(
+                0,
+                Math.min(360, offOnAngle)
+            );
+
+        offOnTimes =
+            Math.max(
+                1,
+                Math.min(100, offOnTimes)
+            );
+
+        // Put corrected values back into inputs
+
+        document.getElementById(
+            "onOffAngle"
+        ).value = onOffAngle;
+
+        document.getElementById(
+            "onOffTimes"
+        ).value = onOffTimes;
+
+        document.getElementById(
+            "offOnAngle"
+        ).value = offOnAngle;
+
+        document.getElementById(
+            "offOnTimes"
+        ).value = offOnTimes;
+
+        setStatus(
+            "Saving settings..."
+        );
+
+        // Save ON -> OFF
+
+        await writeValue(
+            onToOffAngleCharacteristic,
+            onOffAngle
+        );
+
+        await writeValue(
+            onToOffTimesCharacteristic,
+            onOffTimes
+        );
+
+        // Save OFF -> ON
+
+        await writeValue(
+            offToOnAngleCharacteristic,
+            offOnAngle
+        );
+
+        await writeValue(
+            offToOnTimesCharacteristic,
+            offOnTimes
+        );
+
+        updateSavedDisplay(
+            onOffAngle,
+            onOffTimes,
+            offOnAngle,
+            offOnTimes
+        );
+
+        setStatus(
+            "Settings saved to ESP32"
+        );
+
+    } catch (error) {
+
+        console.error(error);
+
+        setStatus(
+            "Save failed: " + error.message
+        );
     }
+}
 
-  }
-);
+// =====================================================
+// SAVED SETTINGS DISPLAY
+// =====================================================
 
+function updateSavedDisplay(
+    onOffAngle,
+    onOffTimes,
+    offOnAngle,
+    offOnTimes
+) {
 
-// ============================================================
-// CHECK WEB BLUETOOTH
-// ============================================================
+    document.getElementById(
+        "savedValues"
+    ).innerHTML =
 
-if (!navigator.bluetooth) {
+        "ON → OFF: " +
+        onOffAngle +
+        "° × " +
+        onOffTimes +
+        "<br><br>" +
 
-  setStatus(
-    "Web Bluetooth is not supported in this browser"
-  );
+        "OFF → ON: " +
+        offOnAngle +
+        "° × " +
+        offOnTimes;
+}
 
-  connectButton.disabled =
-    true;
+// =====================================================
+// DISCONNECT DETECTION
+// =====================================================
+
+function disconnected() {
+
+    setStatus(
+        "ESP32 disconnected"
+    );
 }
 
 </script>
 
 </body>
 </html>
-```
