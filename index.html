@@ -1,589 +1,481 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-
-<meta name="viewport"
-      content="width=device-width, initial-scale=1.0">
-
-<title>Room Switch Control</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HUD Flight Sim</title>
+<script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.121.1/Build/Cesium/';</script>
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.121.1/Build/Cesium/Cesium.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.121.1/Build/Cesium/Widgets/widgets.css">
 <style>
+  :root{
+    --cy:#5ff2ff; --cy-dim:#5ff2ff88; --cy-faint:#5ff2ff33;
+    --red:#ff4d4d; --amber:#ffb347;
+  }
+  html,body{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden;
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;color:var(--cy);}
+  #cesiumContainer{position:absolute;inset:0;}
+  .cesium-viewer-bottom,.cesium-widget-credits{display:none!important;}
 
-body {
-    margin: 0;
-    padding: 30px;
-    background: #000;
-    color: white;
-    font-family: Arial, sans-serif;
-}
+  /* ---------- start screen ---------- */
+  #startScreen{position:absolute;inset:0;z-index:50;background:rgba(0,4,6,0.92);
+    display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;}
+  #startScreen h1{letter-spacing:4px;font-size:20px;color:var(--cy);text-shadow:0 0 12px var(--cy-dim);margin:0;}
+  #startScreen p{max-width:420px;text-align:center;font-size:12px;line-height:1.6;color:var(--cy-dim);margin:0;}
+  #startScreen input{background:transparent;border:1px solid var(--cy-dim);color:var(--cy);
+    padding:10px 12px;width:340px;max-width:80vw;font-family:inherit;font-size:12px;outline:none;}
+  #startScreen input:focus{border-color:var(--cy);}
+  #startScreen button{background:transparent;border:1px solid var(--cy);color:var(--cy);
+    padding:10px 24px;font-family:inherit;letter-spacing:2px;cursor:pointer;font-size:12px;}
+  #startScreen button:hover{background:var(--cy-faint);}
+  #startScreen small{color:#5ff2ff66;font-size:10px;}
 
-.container {
-    max-width: 500px;
-    margin: auto;
-}
+  /* ---------- HUD overlay ---------- */
+  #hud{position:absolute;inset:0;pointer-events:none;z-index:20;display:none;}
+  #hud svg{position:absolute;inset:0;width:100%;height:100%;}
+  .hud-line{stroke:var(--cy);stroke-width:1;fill:none;opacity:0.9;}
+  .hud-line-dim{stroke:var(--cy);stroke-width:0.6;fill:none;opacity:0.4;}
+  .hud-text{fill:var(--cy);font-family:inherit;font-size:11px;}
+  .hud-text-lg{fill:var(--cy);font-family:inherit;font-size:15px;font-weight:600;}
 
-h1 {
-    text-align: center;
-    margin-bottom: 30px;
-}
+  #cornerTL,#cornerTR,#cornerBL,#cornerBR{position:absolute;width:36px;height:36px;opacity:0.8;}
+  #cornerTL{top:14px;left:14px;border-top:1.5px solid var(--cy);border-left:1.5px solid var(--cy);}
+  #cornerTR{top:14px;right:14px;border-top:1.5px solid var(--cy);border-right:1.5px solid var(--cy);}
+  #cornerBL{bottom:14px;left:14px;border-bottom:1.5px solid var(--cy);border-left:1.5px solid var(--cy);}
+  #cornerBR{bottom:14px;right:14px;border-bottom:1.5px solid var(--cy);border-right:1.5px solid var(--cy);}
 
-.section {
-    border: 1px solid #333;
-    border-radius: 15px;
-    padding: 20px;
-    margin-bottom: 20px;
-}
+  #coordBox{position:absolute;top:16px;right:60px;text-align:right;font-size:11px;line-height:1.7;
+    color:var(--cy);text-shadow:0 0 6px var(--cy-faint);}
+  #coordBox .lbl{opacity:0.55;margin-right:6px;}
 
-.section h2 {
-    margin-top: 0;
-}
+  #modeBox{position:absolute;top:16px;left:60px;font-size:11px;line-height:1.7;color:var(--cy);}
+  #modeBox .lbl{opacity:0.55;margin-right:6px;}
+  #hyperFlag{color:var(--red);text-shadow:0 0 10px var(--red);opacity:0;transition:opacity .15s;}
+  #hyperFlag.on{opacity:1;}
 
-label {
-    display: block;
-    margin-top: 15px;
-    margin-bottom: 7px;
-}
+  #throttleGauge,#rollGauge,#gforceGauge{position:absolute;bottom:22px;width:64px;height:64px;}
+  #throttleGauge{left:70px;} #rollGauge{left:150px;} #gforceGauge{right:70px;}
+  .dial-label{position:absolute;bottom:-16px;width:100%;text-align:center;font-size:9px;
+    letter-spacing:1px;opacity:0.6;}
 
-input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 13px;
-    border-radius: 10px;
-    border: 1px solid #444;
-    background: #111;
-    color: white;
-    font-size: 17px;
-}
+  #cityLabelTag{position:absolute;padding:4px 10px;border:1px solid var(--cy);
+    background:rgba(0,20,24,0.55);font-size:11px;white-space:nowrap;transform:translate(-50%,-130%);
+    text-shadow:0 0 6px var(--cy-faint);}
 
-button {
-    width: 100%;
-    padding: 15px;
-    margin-top: 15px;
-    border: none;
-    border-radius: 10px;
-    background: white;
-    color: black;
-    font-size: 17px;
-    cursor: pointer;
-}
-
-button:hover {
-    opacity: 0.85;
-}
-
-#status {
-    text-align: center;
-    margin-top: 20px;
-    color: #aaa;
-}
-
-.saved {
-    margin-top: 20px;
-    padding: 15px;
-    border-radius: 10px;
-    background: #111;
-    border: 1px solid #333;
-}
-
+  /* speed-warp motion streak layer */
+  #warpLayer{position:absolute;inset:0;z-index:15;pointer-events:none;opacity:0;
+    background:radial-gradient(ellipse at center, transparent 0%, transparent 35%, rgba(95,242,255,0.08) 60%, rgba(95,242,255,0.25) 100%);
+    transition:opacity .25s;}
+  #warpLayer.on{opacity:1;}
 </style>
 </head>
-
 <body>
 
-<div class="container">
-
-<h1>Room Switch</h1>
-
-<button onclick="connectBluetooth()">
-    Connect to ESP32
-</button>
-
-<div id="status">
-    Not connected
+<div id="startScreen">
+  <h1>&#9671; FLIGHT SIM — HUD LINK</h1>
+  <p>Paste a free Cesium ion access token to fly over real photorealistic 3D terrain
+     (get one at cesium.com/ion — free Community plan). Leave blank to launch now
+     over flat OpenStreetMap imagery as a placeholder while you fly the controls.</p>
+  <input id="tokenInput" placeholder="Cesium ion access token (optional)" autocomplete="off">
+  <button id="launchBtn">ENGAGE</button>
+  <small>Arrow keys: pitch/roll &nbsp;·&nbsp; Number keys 1–0: throttle (1=idle, 0=max) &nbsp;·&nbsp; H: hypersonic</small>
 </div>
 
-<!-- ========================================= -->
-<!-- ON -> OFF -->
-<!-- ========================================= -->
+<div id="cesiumContainer"></div>
+<div id="warpLayer"></div>
 
-<div class="section">
+<div id="hud">
+  <div id="cornerTL"></div><div id="cornerTR"></div><div id="cornerBL"></div><div id="cornerBR"></div>
 
-<h2>ON → OFF</h2>
+  <svg id="hudSvg" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+    <!-- pitch ladder group: translated/rotated by JS -->
+    <g id="pitchLadder"></g>
 
-<label>
-    Angle (degrees)
-</label>
+    <!-- left altitude ticks -->
+    <g id="altTicks"></g>
+    <!-- right speed ticks -->
+    <g id="spdTicks"></g>
+  </svg>
 
-<input
-    id="onOffAngle"
-    type="number"
-    min="0"
-    max="360"
-    value="360"
->
+  <div id="coordBox">
+    <div><span class="lbl">LAT</span><span id="latVal">--</span></div>
+    <div><span class="lbl">LON</span><span id="lonVal">--</span></div>
+    <div><span class="lbl">HDG</span><span id="hdgVal">--</span></div>
+  </div>
 
-<label>
-    Times
-</label>
+  <div id="modeBox">
+    <div><span class="lbl">ALT</span><span id="altValTop">-- M</span></div>
+    <div><span class="lbl">SPD</span><span id="spdValTop">-- M/S</span></div>
+    <div id="hyperFlag">HYPERSONIC</div>
+  </div>
 
-<input
-    id="onOffTimes"
-    type="number"
-    min="1"
-    max="100"
-    value="1"
->
+  <div id="throttleGauge"></div>
+  <div id="rollGauge"></div>
+  <div id="gforceGauge"></div>
 
-</div>
-
-<!-- ========================================= -->
-<!-- OFF -> ON -->
-<!-- ========================================= -->
-
-<div class="section">
-
-<h2>OFF → ON</h2>
-
-<label>
-    Angle (degrees)
-</label>
-
-<input
-    id="offOnAngle"
-    type="number"
-    min="0"
-    max="360"
-    value="360"
->
-
-<label>
-    Times
-</label>
-
-<input
-    id="offOnTimes"
-    type="number"
-    min="1"
-    max="100"
-    value="1"
->
-
-</div>
-
-<button onclick="saveSettings()">
-    Save Settings
-</button>
-
-<div class="saved">
-
-    <strong>Current Saved Settings</strong>
-
-    <div id="savedValues">
-        Not connected
-    </div>
-
-</div>
-
+  <div id="cityLabelTag" style="display:none;"></div>
 </div>
 
 <script>
+const CITIES = [
+  {n:"BERN",lat:46.9480,lon:7.4474},{n:"ZURICH",lat:47.3769,lon:8.5417},
+  {n:"GENEVA",lat:46.2044,lon:6.1432},{n:"GRINDELWALD",lat:46.6244,lon:8.0362},
+  {n:"MILAN",lat:45.4642,lon:9.1900},{n:"PARIS",lat:48.8566,lon:2.3522},
+  {n:"LONDON",lat:51.5074,lon:-0.1278},{n:"BERLIN",lat:52.5200,lon:13.4050},
+  {n:"ROME",lat:41.9028,lon:12.4964},{n:"MADRID",lat:40.4168,lon:-3.7038},
+  {n:"VIENNA",lat:48.2082,lon:16.3738},{n:"NEW YORK",lat:40.7128,lon:-74.0060},
+  {n:"LOS ANGELES",lat:34.0522,lon:-118.2437},{n:"SAN FRANCISCO",lat:37.7749,lon:-122.4194},
+  {n:"TOKYO",lat:35.6762,lon:139.6503},{n:"DUBAI",lat:25.2048,lon:55.2708},
+  {n:"MUMBAI",lat:19.0760,lon:72.8777},{n:"DELHI",lat:28.6139,lon:77.2090},
+  {n:"BANGALORE",lat:12.9716,lon:77.5946},{n:"SYDNEY",lat:-33.8688,lon:151.2093},
+  {n:"CAIRO",lat:30.0444,lon:31.2357},{n:"MOSCOW",lat:55.7558,lon:37.6173},
+  {n:"BEIJING",lat:39.9042,lon:116.4074},{n:"SINGAPORE",lat:1.3521,lon:103.8198},
+  {n:"RIO DE JANEIRO",lat:-22.9068,lon:-43.1729},{n:"CAPE TOWN",lat:-33.9249,lon:18.4241},
+  {n:"MEXICO CITY",lat:19.4326,lon:-99.1332},{n:"TORONTO",lat:43.6532,lon:-79.3832},
+  {n:"ISTANBUL",lat:41.0082,lon:28.9784},{n:"SEOUL",lat:37.5665,lon:126.9780}
+];
 
-// =====================================================
-// BLE UUIDS
-// =====================================================
+let viewer, scene, camera;
+let state = {
+  lon: 8.0362, lat: 46.6244, height: 3500,   // start over Grindelwald, matching the reference view
+  heading: 30, pitch: -5, roll: 0,
+  throttle: 1.0,          // 1 = idle, 0 = max power (per spec)
+  maxSpeed: 260,          // m/s at throttle 0, normal (non-hyper) ceiling
+  hyperMaxSpeed: 2300,    // m/s during hypersonic boost
+  hyper: false, hyperT: 0,
+  keys: {}
+};
 
-const SERVICE_UUID =
-    "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+const TURN_RATE = 45;     // deg/sec roll authority
+const PITCH_RATE = 35;    // deg/sec
+const ROLL_SELF_LEVEL = 55; // deg/sec return to level when no roll input
+const TURN_COEFF = 0.55;  // how much roll angle contributes to yaw (coordinated turn)
 
-const ON_TO_OFF_ANGLE_UUID =
-    "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+document.getElementById('launchBtn').addEventListener('click', () => {
+  const token = document.getElementById('tokenInput').value.trim();
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  init(token);
+});
 
-const ON_TO_OFF_TIMES_UUID =
-    "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d";
+async function init(token) {
+  let terrainProvider, imageryProvider = null, useTileset = false;
 
-const OFF_TO_ON_ANGLE_UUID =
-    "d4e0e0e0-1a2b-4c3d-9e8f-7a6b5c4d3e2f";
-
-const OFF_TO_ON_TIMES_UUID =
-    "c3d2e1f0-9a8b-7c6d-5e4f-3a2b1c0d9e8f";
-
-// =====================================================
-// BLE VARIABLES
-// =====================================================
-
-let device = null;
-
-let onToOffAngleCharacteristic = null;
-let onToOffTimesCharacteristic = null;
-
-let offToOnAngleCharacteristic = null;
-let offToOnTimesCharacteristic = null;
-
-// =====================================================
-// STATUS
-// =====================================================
-
-function setStatus(message) {
-
-    document.getElementById("status").textContent =
-        message;
-}
-
-// =====================================================
-// CONNECT
-// =====================================================
-
-async function connectBluetooth() {
-
+  if (token) {
+    Cesium.Ion.defaultAccessToken = token;
     try {
-
-        if (!navigator.bluetooth) {
-
-            setStatus(
-                "Web Bluetooth is not supported. Use Chrome or Edge."
-            );
-
-            return;
-        }
-
-        setStatus("Looking for ESP32...");
-
-        device =
-            await navigator.bluetooth.requestDevice({
-
-                filters: [
-                    {
-                        name: "RoomSwitch-ESP32"
-                    }
-                ],
-
-                optionalServices: [
-                    SERVICE_UUID
-                ]
-            });
-
-        setStatus("Connecting...");
-
-        const server =
-            await device.gatt.connect();
-
-        const service =
-            await server.getPrimaryService(
-                SERVICE_UUID
-            );
-
-        onToOffAngleCharacteristic =
-            await service.getCharacteristic(
-                ON_TO_OFF_ANGLE_UUID
-            );
-
-        onToOffTimesCharacteristic =
-            await service.getCharacteristic(
-                ON_TO_OFF_TIMES_UUID
-            );
-
-        offToOnAngleCharacteristic =
-            await service.getCharacteristic(
-                OFF_TO_ON_ANGLE_UUID
-            );
-
-        offToOnTimesCharacteristic =
-            await service.getCharacteristic(
-                OFF_TO_ON_TIMES_UUID
-            );
-
-        setStatus("Connected to ESP32");
-
-        await readSettings();
-
-    } catch (error) {
-
-        console.error(error);
-
-        setStatus(
-            "Connection failed: " + error.message
-        );
+      terrainProvider = await Cesium.Terrain.fromWorldTerrain();
+      useTileset = true;
+    } catch (e) {
+      console.warn('Falling back — ion terrain failed to load', e);
+      terrainProvider = new Cesium.EllipsoidTerrainProvider();
     }
-}
+  } else {
+    terrainProvider = new Cesium.EllipsoidTerrainProvider();
+  }
 
-// =====================================================
-// READ CHARACTERISTIC
-// =====================================================
+  const baseLayer = token
+    ? false
+    : new Cesium.ImageryLayer(new Cesium.OpenStreetMapImageryProvider({ url: 'https://a.tile.openstreetmap.org/' }));
 
-async function readValue(characteristic) {
+  viewer = new Cesium.Viewer('cesiumContainer', {
+    terrainProvider: terrainProvider,
+    baseLayer: baseLayer,
+    animation:false, timeline:false, sceneModePicker:false, baseLayerPicker:false,
+    geocoder:false, homeButton:false, navigationHelpButton:false, fullscreenButton:false,
+    infoBox:false, selectionIndicator:false, shadows:false
+  });
 
-    const result =
-        await characteristic.readValue();
+  scene = viewer.scene;
+  camera = viewer.camera;
+  scene.screenSpaceCameraController.enableInputs = false;
+  scene.globe.depthTestAgainstTerrain = true;
+  viewer._cesiumWidget._creditContainer.style.display = "none";
 
-    const decoder =
-        new TextDecoder();
-
-    return decoder.decode(result);
-}
-
-// =====================================================
-// READ SETTINGS
-// =====================================================
-
-async function readSettings() {
-
+  if (useTileset) {
     try {
-
-        const onOffAngle =
-            await readValue(
-                onToOffAngleCharacteristic
-            );
-
-        const onOffTimes =
-            await readValue(
-                onToOffTimesCharacteristic
-            );
-
-        const offOnAngle =
-            await readValue(
-                offToOnAngleCharacteristic
-            );
-
-        const offOnTimes =
-            await readValue(
-                offToOnTimesCharacteristic
-            );
-
-        document.getElementById(
-            "onOffAngle"
-        ).value = parseInt(onOffAngle);
-
-        document.getElementById(
-            "onOffTimes"
-        ).value = parseInt(onOffTimes);
-
-        document.getElementById(
-            "offOnAngle"
-        ).value = parseInt(offOnAngle);
-
-        document.getElementById(
-            "offOnTimes"
-        ).value = parseInt(offOnTimes);
-
-        updateSavedDisplay(
-            onOffAngle,
-            onOffTimes,
-            offOnAngle,
-            offOnTimes
-        );
-
-    } catch (error) {
-
-        console.error(error);
-
-        setStatus(
-            "Could not read settings"
-        );
+      const tileset = await Cesium.createGooglePhotorealistic3DTileset();
+      scene.primitives.add(tileset);
+      scene.globe.show = false; // photorealistic tileset supplies imagery+terrain+buildings
+    } catch (e) {
+      console.warn('Google Photorealistic 3D Tiles unavailable, using ion terrain only', e);
     }
+  }
+
+  addCityLabels();
+  buildStaticHudSvg();
+  setupInput();
+  viewer.clock.onTick.addEventListener(tick);
 }
 
-// =====================================================
-// WRITE VALUE
-// =====================================================
-
-async function writeValue(
-    characteristic,
-    value
-) {
-
-    const encoder =
-        new TextEncoder();
-
-    await characteristic.writeValue(
-        encoder.encode(
-            String(value)
-        )
-    );
+function addCityLabels() {
+  CITIES.forEach(c => {
+    viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(c.lon, c.lat, 0),
+      label: {
+        text: c.n,
+        font: '11px Consolas, monospace',
+        fillColor: Cesium.Color.fromCssColorString('#5ff2ff'),
+        outlineColor: Cesium.Color.fromCssColorString('#001a1e'),
+        outlineWidth: 3,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        pixelOffset: new Cesium.Cartesian2(0, -14),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        scaleByDistance: new Cesium.NearFarScalar(5000, 1.1, 600000, 0.4),
+        translucencyByDistance: new Cesium.NearFarScalar(5000, 1.0, 900000, 0.15)
+      },
+      point: {
+        pixelSize: 4,
+        color: Cesium.Color.fromCssColorString('#5ff2ff'),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      }
+    });
+  });
 }
 
-// =====================================================
-// SAVE SETTINGS
-// =====================================================
+// ---------- state / country boundaries (Esri World Administrative Divisions, free, no key) ----------
+const BOUNDARY_SERVICE = 'https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/World_Administrative_Divisions/FeatureServer/0/query';
+const boundaryCache = new Set();
+let lastBoundaryFetchTime = 0;
+let lastBoundaryCenter = null;
 
-async function saveSettings() {
+function maybeFetchBoundaries() {
+  const now = performance.now();
+  if (now - lastBoundaryFetchTime < 6000) return; // don't hammer the free service
+  if (lastBoundaryCenter) {
+    const d = Math.hypot(state.lat - lastBoundaryCenter.lat, state.lon - lastBoundaryCenter.lon);
+    if (d < 0.6 && now - lastBoundaryFetchTime < 20000) return;
+  }
+  lastBoundaryFetchTime = now;
+  lastBoundaryCenter = { lat: state.lat, lon: state.lon };
+  fetchBoundaries(state.lat, state.lon, state.height);
+}
 
-    if (
-        !onToOffAngleCharacteristic ||
-        !onToOffTimesCharacteristic ||
-        !offToOnAngleCharacteristic ||
-        !offToOnTimesCharacteristic
-    ) {
+async function fetchBoundaries(lat, lon, height) {
+  const radius = Cesium.Math.clamp(height / 40000, 0.6, 6); // wider query when higher up
+  const minLon = lon - radius, maxLon = lon + radius;
+  const minLat = lat - radius, maxLat = lat + radius;
+  const params = new URLSearchParams({
+    where: '1=1',
+    outFields: 'NAME,COUNTRY',
+    geometry: `${minLon},${minLat},${maxLon},${maxLat}`,
+    geometryType: 'esriGeometryEnvelope',
+    inSR: '4326', outSR: '4326', spatialRel: 'esriSpatialRelIntersects',
+    f: 'geojson'
+  });
+  try {
+    const res = await fetch(`${BOUNDARY_SERVICE}?${params.toString()}`);
+    const gj = await res.json();
+    if (!gj.features) return;
+    gj.features.forEach(addBoundaryFeature);
+  } catch (e) {
+    console.warn('boundary fetch failed', e);
+  }
+}
 
-        setStatus(
-            "Connect to ESP32 first"
-        );
+function ringToPositions(ring) {
+  const flat = [];
+  ring.forEach(([lo, la]) => { flat.push(lo, la); });
+  return Cesium.Cartesian3.fromDegreesArray(flat);
+}
+function ringCentroid(ring) {
+  let sx = 0, sy = 0;
+  ring.forEach(([lo, la]) => { sx += lo; sy += la; });
+  return [sx / ring.length, sy / ring.length];
+}
 
-        return;
+function addBoundaryFeature(feature) {
+  const name = feature.properties && feature.properties.NAME;
+  const country = feature.properties && feature.properties.COUNTRY;
+  if (!name) return;
+  const key = name + '|' + country;
+  if (boundaryCache.has(key)) return;
+  boundaryCache.add(key);
+
+  const geom = feature.geometry;
+  if (!geom) return;
+  const polygons = geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates;
+  let biggestRing = null;
+  polygons.forEach(poly => {
+    const outer = poly[0];
+    if (!outer || outer.length < 3) return;
+    if (!biggestRing || outer.length > biggestRing.length) biggestRing = outer;
+    viewer.entities.add({
+      polyline: {
+        positions: ringToPositions(outer),
+        width: 1.1,
+        material: Cesium.Color.fromCssColorString('#5ff2ff').withAlpha(0.55),
+        clampToGround: true
+      }
+    });
+  });
+  if (biggestRing) {
+    const [clon, clat] = ringCentroid(biggestRing);
+    viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(clon, clat, 0),
+      label: {
+        text: name,
+        font: '10px Consolas, monospace',
+        fillColor: Cesium.Color.fromCssColorString('#5ff2ff').withAlpha(0.65),
+        outlineColor: Cesium.Color.fromCssColorString('#001a1e'),
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        scaleByDistance: new Cesium.NearFarScalar(20000, 1.0, 1200000, 0.35),
+        translucencyByDistance: new Cesium.NearFarScalar(20000, 0.8, 1500000, 0.1)
+      }
+    });
+  }
+}
+
+function setupInput() {
+  window.addEventListener('keydown', e => {
+    state.keys[e.key] = true;
+    if (e.key >= '0' && e.key <= '9') {
+      // number row as throttle: 1=idle(1.0) ... 9=0.1 ... 0=max(0.0)
+      const n = e.key === '0' ? 10 : parseInt(e.key, 10);
+      state.throttle = Math.round((1 - (n - 1) / 9) * 100) / 100;
     }
-
-    try {
-
-        let onOffAngle =
-            parseInt(
-                document.getElementById(
-                    "onOffAngle"
-                ).value
-            );
-
-        let onOffTimes =
-            parseInt(
-                document.getElementById(
-                    "onOffTimes"
-                ).value
-            );
-
-        let offOnAngle =
-            parseInt(
-                document.getElementById(
-                    "offOnAngle"
-                ).value
-            );
-
-        let offOnTimes =
-            parseInt(
-                document.getElementById(
-                    "offOnTimes"
-                ).value
-            );
-
-        // Safety limits
-
-        onOffAngle =
-            Math.max(
-                0,
-                Math.min(360, onOffAngle)
-            );
-
-        onOffTimes =
-            Math.max(
-                1,
-                Math.min(100, onOffTimes)
-            );
-
-        offOnAngle =
-            Math.max(
-                0,
-                Math.min(360, offOnAngle)
-            );
-
-        offOnTimes =
-            Math.max(
-                1,
-                Math.min(100, offOnTimes)
-            );
-
-        // Put corrected values back into inputs
-
-        document.getElementById(
-            "onOffAngle"
-        ).value = onOffAngle;
-
-        document.getElementById(
-            "onOffTimes"
-        ).value = onOffTimes;
-
-        document.getElementById(
-            "offOnAngle"
-        ).value = offOnAngle;
-
-        document.getElementById(
-            "offOnTimes"
-        ).value = offOnTimes;
-
-        setStatus(
-            "Saving settings..."
-        );
-
-        // Save ON -> OFF
-
-        await writeValue(
-            onToOffAngleCharacteristic,
-            onOffAngle
-        );
-
-        await writeValue(
-            onToOffTimesCharacteristic,
-            onOffTimes
-        );
-
-        // Save OFF -> ON
-
-        await writeValue(
-            offToOnAngleCharacteristic,
-            offOnAngle
-        );
-
-        await writeValue(
-            offToOnTimesCharacteristic,
-            offOnTimes
-        );
-
-        updateSavedDisplay(
-            onOffAngle,
-            onOffTimes,
-            offOnAngle,
-            offOnTimes
-        );
-
-        setStatus(
-            "Settings saved to ESP32"
-        );
-
-    } catch (error) {
-
-        console.error(error);
-
-        setStatus(
-            "Save failed: " + error.message
-        );
+    if (e.key === 'h' || e.key === 'H') {
+      state.hyper = true; state.hyperT = 0;
     }
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+  });
+  window.addEventListener('keyup', e => {
+    state.keys[e.key] = false;
+    if (e.key === 'h' || e.key === 'H') state.hyper = false;
+  });
 }
 
-// =====================================================
-// SAVED SETTINGS DISPLAY
-// =====================================================
+let lastTime = null;
+function tick(clock) {
+  const now = performance.now();
+  const dt = lastTime ? Math.min((now - lastTime) / 1000, 0.1) : 0;
+  lastTime = now;
+  if (dt <= 0) return;
 
-function updateSavedDisplay(
-    onOffAngle,
-    onOffTimes,
-    offOnAngle,
-    offOnTimes
-) {
+  // --- pitch ---
+  if (state.keys['ArrowUp'])   state.pitch += PITCH_RATE * dt;
+  if (state.keys['ArrowDown']) state.pitch -= PITCH_RATE * dt;
+  state.pitch = Cesium.Math.clamp(state.pitch, -85, 85);
 
-    document.getElementById(
-        "savedValues"
-    ).innerHTML =
+  // --- roll (self-leveling) + coordinated yaw ---
+  if (state.keys['ArrowRight']) state.roll += TURN_RATE * dt;
+  else if (state.keys['ArrowLeft']) state.roll -= TURN_RATE * dt;
+  else {
+    if (state.roll > 0) state.roll = Math.max(0, state.roll - ROLL_SELF_LEVEL * dt);
+    else if (state.roll < 0) state.roll = Math.min(0, state.roll + ROLL_SELF_LEVEL * dt);
+  }
+  state.roll = Cesium.Math.clamp(state.roll, -60, 60);
+  state.heading += state.roll * TURN_COEFF * dt;
 
-        "ON → OFF: " +
-        onOffAngle +
-        "° × " +
-        onOffTimes +
-        "<br><br>" +
+  // --- hypersonic ramp ---
+  if (state.hyper) state.hyperT = Math.min(1, state.hyperT + dt * 1.4);
+  else state.hyperT = Math.max(0, state.hyperT - dt * 1.0);
 
-        "OFF → ON: " +
-        offOnAngle +
-        "° × " +
-        offOnTimes;
+  const baseSpeed = state.maxSpeed * (1 - state.throttle);
+  const speed = baseSpeed + (state.hyperMaxSpeed - state.maxSpeed) * state.hyperT * (1 - state.throttle * 0.3);
+
+  // --- move forward along heading/pitch ---
+  const headingRad = Cesium.Math.toRadians(state.heading);
+  const pitchRad = Cesium.Math.toRadians(state.pitch);
+  const distFlat = speed * dt * Math.cos(pitchRad);
+  const dHeight  = speed * dt * Math.sin(pitchRad);
+
+  const R = 6378137;
+  const dLat = (distFlat * Math.cos(headingRad)) / R;
+  const dLon = (distFlat * Math.sin(headingRad)) / (R * Math.cos(Cesium.Math.toRadians(state.lat)));
+  state.lat += Cesium.Math.toDegrees(dLat);
+  state.lon += Cesium.Math.toDegrees(dLon);
+  state.height = Math.max(50, state.height + dHeight);
+
+  camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(state.lon, state.lat, state.height),
+    orientation: {
+      heading: headingRad,
+      pitch: pitchRad,
+      roll: Cesium.Math.toRadians(state.roll)
+    }
+  });
+
+  // FOV punch during hypersonic
+  camera.frustum.fov = Cesium.Math.toRadians(60 + state.hyperT * 22);
+
+  updateHud(speed);
+  maybeFetchBoundaries();
 }
 
-// =====================================================
-// DISCONNECT DETECTION
-// =====================================================
+function buildStaticHudSvg() {
+  const svg = document.getElementById('hudSvg');
+  const alt = document.getElementById('altTicks');
+  const spd = document.getElementById('spdTicks');
+  for (let i = -5; i <= 5; i++) {
+    const y = 500 + i * 34;
+    const la = document.createElementNS('http://www.w3.org/2000/svg','line');
+    la.setAttribute('x1','120'); la.setAttribute('x2','140');
+    la.setAttribute('y1',y); la.setAttribute('y2',y);
+    la.setAttribute('class', i===0 ? 'hud-line' : 'hud-line-dim');
+    alt.appendChild(la);
 
-function disconnected() {
+    const ls = document.createElementNS('http://www.w3.org/2000/svg','line');
+    ls.setAttribute('x1','860'); ls.setAttribute('x2','880');
+    ls.setAttribute('y1',y); ls.setAttribute('y2',y);
+    ls.setAttribute('class', i===0 ? 'hud-line' : 'hud-line-dim');
+    spd.appendChild(ls);
+  }
+  const altLine = document.createElementNS('http://www.w3.org/2000/svg','line');
+  altLine.setAttribute('x1','140'); altLine.setAttribute('x2','140');
+  altLine.setAttribute('y1','330'); altLine.setAttribute('y2','670');
+  altLine.setAttribute('class','hud-line-dim');
+  alt.appendChild(altLine);
 
-    setStatus(
-        "ESP32 disconnected"
-    );
+  const spdLine = document.createElementNS('http://www.w3.org/2000/svg','line');
+  spdLine.setAttribute('x1','860'); spdLine.setAttribute('x2','860');
+  spdLine.setAttribute('y1','330'); spdLine.setAttribute('y2','670');
+  spdLine.setAttribute('class','hud-line-dim');
+  spd.appendChild(spdLine);
+
+  const ladder = document.getElementById('pitchLadder');
+  for (let i = -4; i <= 4; i++) {
+    if (i === 0) continue;
+    const y = 500 - i * 40;
+    const w = i % 2 === 0 ? 90 : 50;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', 500 - w); line.setAttribute('x2', 500 - w + w*0.3);
+    line.setAttribute('y1', y); line.setAttribute('y2', y);
+    line.setAttribute('class','hud-line-dim');
+    ladder.appendChild(line);
+    const line2 = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line2.setAttribute('x1', 500 + w - w*0.3); line2.setAttribute('x2', 500 + w);
+    line2.setAttribute('y1', y); line2.setAttribute('y2', y);
+    line2.setAttribute('class','hud-line-dim');
+    ladder.appendChild(line2);
+  }
+  const horizon = document.createElementNS('http://www.w3.org/2000/svg','line');
+  horizon.setAttribute('id','horizonLine');
+  horizon.setAttribute('x1','260'); horizon.setAttribute('x2','740');
+  horizon.setAttribute('y1','500'); horizon.setAttribute('y2','500');
+  horizon.setAttribute('class','hud-line');
+  ladder.appendChild(horizon);
 }
 
+function updateHud(speed) {
+  document.getElementById('latVal').textContent = state.lat.toFixed(4) + '°';
+  document.getElementById('lonVal').textContent = state.lon.toFixed(4) + '°';
+  document.getElementById('hdgVal').textContent = ((state.heading % 360 + 360) % 360).toFixed(0) + '°';
+  document.getElementById('altValTop').textContent = state.height.toFixed(0) + ' M';
+  document.getElementById('spdValTop').textContent = speed.toFixed(0) + ' M/S';
+
+  const hyperFlag = document.getElementById('hyperFlag');
+  hyperFlag.classList.toggle('on', state.hyperT > 0.05);
+  document.getElementById('warpLayer').classList.toggle('on', state.hyperT > 0.05);
+
+  // pitch ladder: translate by pitch, rotate by roll, around screen center
+  const ladder = document.getElementById('pitchLadder');
+  const pxPerDeg = 5.2;
+  ladder.setAttribute('transform',
+    `rotate(${-state.roll} 500 500) translate(0 ${state.pitch * pxPerDeg})`);
+}
 </script>
-
 </body>
 </html>
