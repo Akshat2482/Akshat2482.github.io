@@ -33,9 +33,9 @@
   /* ---------- HUD overlay ---------- */
   #hud{position:absolute;inset:0;pointer-events:none;z-index:20;display:none;}
   #hud svg{position:absolute;inset:0;width:100%;height:100%;}
-  .hud-line{stroke:var(--cy);stroke-width:1;fill:none;opacity:0.9;}
-  .hud-line-dim{stroke:var(--cy);stroke-width:0.6;fill:none;opacity:0.4;}
-  .hud-text{fill:var(--cy);font-family:inherit;font-size:11px;}
+  .hud-line{stroke:var(--cy);stroke-width:1.8;fill:none;opacity:0.95;}
+  .hud-line-dim{stroke:var(--cy);stroke-width:1.2;fill:none;opacity:0.6;}
+  .hud-text{fill:var(--cy);font-family:inherit;font-size:12px;}
   .hud-text-lg{fill:var(--cy);font-family:inherit;font-size:15px;font-weight:600;}
 
   #cornerTL,#cornerTR,#cornerBL,#cornerBR{position:absolute;width:36px;height:36px;opacity:0.8;}
@@ -106,6 +106,7 @@
   <div id="modeBox">
     <div><span class="lbl">ALT</span><span id="altValTop">-- M</span></div>
     <div><span class="lbl">SPD</span><span id="spdValTop">-- M/S</span></div>
+    <div><span class="lbl">BND</span><span id="boundaryCount">0</span></div>
     <div id="hyperFlag">HYPERSONIC</div>
   </div>
 
@@ -140,8 +141,8 @@ let state = {
   lon: 8.0362, lat: 46.6244, height: 3500,   // start over Grindelwald, matching the reference view
   heading: 30, pitch: -5, roll: 0,
   throttle: 1.0,          // 1 = idle, 0 = max power (per spec)
-  maxSpeed: 260,          // m/s at throttle 0, normal (non-hyper) ceiling
-  hyperMaxSpeed: 2300,    // m/s during hypersonic boost
+  maxSpeed: 600,           // m/s at throttle 0 — ~Mach 1.8, matches F/A-18 top speed
+  hyperMaxSpeed: 3400,     // m/s during hypersonic boost — ~Mach 10
   hyper: false, hyperT: 0,
   keys: {}
 };
@@ -151,8 +152,37 @@ const PITCH_RATE = 35;    // deg/sec
 const ROLL_SELF_LEVEL = 55; // deg/sec return to level when no roll input
 const TURN_COEFF = 0.55;  // how much roll angle contributes to yaw (coordinated turn)
 
+// ---------- token persistence (IndexedDB) ----------
+const TOKEN_DB = 'flightSimDB', TOKEN_STORE = 'settings', TOKEN_KEY = 'cesiumToken';
+function openTokenDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(TOKEN_DB, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(TOKEN_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function saveToken(token) {
+  try {
+    const db = await openTokenDB();
+    db.transaction(TOKEN_STORE, 'readwrite').objectStore(TOKEN_STORE).put(token, TOKEN_KEY);
+  } catch (e) { console.warn('token save failed', e); }
+}
+async function loadToken() {
+  try {
+    const db = await openTokenDB();
+    return await new Promise(resolve => {
+      const req = db.transaction(TOKEN_STORE, 'readonly').objectStore(TOKEN_STORE).get(TOKEN_KEY);
+      req.onsuccess = () => resolve(req.result || '');
+      req.onerror = () => resolve('');
+    });
+  } catch (e) { return ''; }
+}
+loadToken().then(t => { if (t) document.getElementById('tokenInput').value = t; });
+
 document.getElementById('launchBtn').addEventListener('click', () => {
   const token = document.getElementById('tokenInput').value.trim();
+  saveToken(token);
   document.getElementById('startScreen').style.display = 'none';
   document.getElementById('hud').style.display = 'block';
   init(token);
@@ -202,7 +232,7 @@ async function init(token) {
     }
   }
 
-  addCityLabels();
+  // city labels disabled per request — boundaries only for now
   buildStaticHudSvg();
   setupInput();
   viewer.clock.onTick.addEventListener(tick);
@@ -266,8 +296,11 @@ async function fetchBoundaries(lat, lon, height) {
   try {
     const res = await fetch(`${BOUNDARY_SERVICE}?${params.toString()}`);
     const gj = await res.json();
-    if (!gj.features) return;
-    gj.features.forEach(addBoundaryFeature);
+    if (!gj.features) { console.warn('boundary response had no features field', gj); return; }
+    gj.features.forEach(f => {
+      try { addBoundaryFeature(f); } catch (e) { console.warn('skipped a boundary feature', e); }
+    });
+    document.getElementById('boundaryCount').textContent = boundaryCache.size;
   } catch (e) {
     console.warn('boundary fetch failed', e);
   }
@@ -370,8 +403,8 @@ function tick(clock) {
   state.heading += state.roll * TURN_COEFF * dt;
 
   // --- hypersonic ramp ---
-  if (state.hyper) state.hyperT = Math.min(1, state.hyperT + dt * 1.4);
-  else state.hyperT = Math.max(0, state.hyperT - dt * 1.0);
+  if (state.hyper) state.hyperT = Math.min(1, state.hyperT + dt * 2.6);
+  else state.hyperT = Math.max(0, state.hyperT - dt * 1.8);
 
   const baseSpeed = state.maxSpeed * (1 - state.throttle);
   const speed = baseSpeed + (state.hyperMaxSpeed - state.maxSpeed) * state.hyperT * (1 - state.throttle * 0.3);
@@ -405,33 +438,85 @@ function tick(clock) {
   maybeFetchBoundaries();
 }
 
+function ns(tag){ return document.createElementNS('http://www.w3.org/2000/svg', tag); }
+
+// Draws a real scrolling tape: rolling numbers + tick marks + boxed exact value at center.
+// side: 'left' or 'right'. tickX/labelX are the tape's tick and text x-position.
+function renderTape(groupEl, value, increment, tickX, labelX, side, decimals) {
+  while (groupEl.firstChild) groupEl.removeChild(groupEl.firstChild);
+  const pxPerTick = 34;
+  const nearest = Math.round(value / increment) * increment;
+  const fracOffset = ((value - nearest) / increment) * pxPerTick;
+
+  for (let i = -4; i <= 4; i++) {
+    const labelValue = nearest + i * increment;
+    if (labelValue < 0) continue;
+    const y = 500 - i * pxPerTick + fracOffset;
+    if (y < 335 || y > 665) continue;
+
+    const tick = ns('line');
+    tick.setAttribute('x1', tickX);
+    tick.setAttribute('x2', side === 'left' ? tickX + 16 : tickX - 16);
+    tick.setAttribute('y1', y); tick.setAttribute('y2', y);
+    tick.setAttribute('class','hud-line-dim');
+    groupEl.appendChild(tick);
+
+    const txt = ns('text');
+    txt.setAttribute('x', labelX);
+    txt.setAttribute('y', y + 4);
+    txt.setAttribute('text-anchor', side === 'left' ? 'end' : 'start');
+    txt.setAttribute('class','hud-text');
+    txt.setAttribute('opacity', '0.65');
+    txt.textContent = labelValue.toFixed(decimals);
+    groupEl.appendChild(txt);
+  }
+
+  // boxed exact current value at center
+  const boxW = 74, boxH = 24;
+  const boxX = side === 'left' ? tickX + 20 : tickX - 20 - boxW;
+  const rect = ns('rect');
+  rect.setAttribute('x', boxX); rect.setAttribute('y', 500 - boxH/2);
+  rect.setAttribute('width', boxW); rect.setAttribute('height', boxH);
+  rect.setAttribute('fill', 'rgba(0,20,24,0.6)');
+  rect.setAttribute('stroke', 'var(--cy)');
+  rect.setAttribute('stroke-width', '1.8');
+  groupEl.appendChild(rect);
+
+  const centerTxt = ns('text');
+  centerTxt.setAttribute('x', boxX + boxW/2);
+  centerTxt.setAttribute('y', 505);
+  centerTxt.setAttribute('text-anchor','middle');
+  centerTxt.setAttribute('class','hud-text-lg');
+  centerTxt.textContent = value.toFixed(decimals);
+  groupEl.appendChild(centerTxt);
+
+  // pointer notch from box toward the tape line
+  const notch = ns('polygon');
+  const nx = side === 'left' ? boxX : boxX + boxW;
+  const tip = side === 'left' ? tickX : tickX;
+  notch.setAttribute('points', `${nx},490 ${nx},510 ${tip + (side==='left'?-10:10)},500`);
+  notch.setAttribute('fill', 'var(--cy)');
+  notch.setAttribute('opacity','0.85');
+  groupEl.appendChild(notch);
+}
+
 function buildStaticHudSvg() {
   const svg = document.getElementById('hudSvg');
-  const alt = document.getElementById('altTicks');
-  const spd = document.getElementById('spdTicks');
-  for (let i = -5; i <= 5; i++) {
-    const y = 500 + i * 34;
-    const la = document.createElementNS('http://www.w3.org/2000/svg','line');
-    la.setAttribute('x1','120'); la.setAttribute('x2','140');
-    la.setAttribute('y1',y); la.setAttribute('y2',y);
-    la.setAttribute('class', i===0 ? 'hud-line' : 'hud-line-dim');
-    alt.appendChild(la);
+  const guides = ns('g');
+  guides.id = 'tapeGuides';
+  svg.appendChild(guides);
+  const alt = guides;
+  const spd = guides;
 
-    const ls = document.createElementNS('http://www.w3.org/2000/svg','line');
-    ls.setAttribute('x1','860'); ls.setAttribute('x2','880');
-    ls.setAttribute('y1',y); ls.setAttribute('y2',y);
-    ls.setAttribute('class', i===0 ? 'hud-line' : 'hud-line-dim');
-    spd.appendChild(ls);
-  }
   const altLine = document.createElementNS('http://www.w3.org/2000/svg','line');
-  altLine.setAttribute('x1','140'); altLine.setAttribute('x2','140');
-  altLine.setAttribute('y1','330'); altLine.setAttribute('y2','670');
+  altLine.setAttribute('x1','150'); altLine.setAttribute('x2','150');
+  altLine.setAttribute('y1','320'); altLine.setAttribute('y2','680');
   altLine.setAttribute('class','hud-line-dim');
   alt.appendChild(altLine);
 
   const spdLine = document.createElementNS('http://www.w3.org/2000/svg','line');
-  spdLine.setAttribute('x1','860'); spdLine.setAttribute('x2','860');
-  spdLine.setAttribute('y1','330'); spdLine.setAttribute('y2','670');
+  spdLine.setAttribute('x1','850'); spdLine.setAttribute('x2','850');
+  spdLine.setAttribute('y1','320'); spdLine.setAttribute('y2','680');
   spdLine.setAttribute('class','hud-line-dim');
   spd.appendChild(spdLine);
 
@@ -465,6 +550,9 @@ function updateHud(speed) {
   document.getElementById('hdgVal').textContent = ((state.heading % 360 + 360) % 360).toFixed(0) + '°';
   document.getElementById('altValTop').textContent = state.height.toFixed(0) + ' M';
   document.getElementById('spdValTop').textContent = speed.toFixed(0) + ' M/S';
+
+  renderTape(document.getElementById('altTicks'), state.height, 100, 150, 130, 'left', 0);
+  renderTape(document.getElementById('spdTicks'), speed, 20, 850, 870, 'right', 0);
 
   const hyperFlag = document.getElementById('hyperFlag');
   hyperFlag.classList.toggle('on', state.hyperT > 0.05);
