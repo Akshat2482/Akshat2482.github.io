@@ -35,8 +35,23 @@
   #hud svg{position:absolute;inset:0;width:100%;height:100%;}
   .hud-line{stroke:var(--cy);stroke-width:1.8;fill:none;opacity:0.95;}
   .hud-line-dim{stroke:var(--cy);stroke-width:1.2;fill:none;opacity:0.6;}
-  .hud-text{fill:var(--cy);font-family:inherit;font-size:12px;}
-  .hud-text-lg{fill:var(--cy);font-family:inherit;font-size:15px;font-weight:600;}
+  .hud-text{fill:var(--cy);font-family:inherit;font-size:13px;font-weight:700;}
+  .hud-text-lg{fill:var(--cy);font-family:inherit;font-size:16px;font-weight:800;}
+  .hud-text-alt{fill:#7dffb0;}
+
+  #sysBox{position:absolute;top:120px;right:16px;width:150px;
+    border:1.5px solid var(--cy);border-radius:0 12px 0 12px;padding:8px 10px;
+    background:rgba(0,16,20,0.35);font-size:11px;font-weight:700;line-height:1.9;}
+  #sysBox .row{display:flex;justify-content:space-between;border-top:1px solid var(--cy-faint);padding-top:3px;margin-top:3px;}
+  #sysBox .row:first-child{border-top:none;margin-top:0;padding-top:0;}
+  #sysBox .lbl{opacity:0.6;letter-spacing:1px;}
+
+  #horizonLockTxt{fill:#eafcff;font-family:inherit;font-size:13px;font-weight:800;
+    letter-spacing:2px;opacity:0;transition:opacity .2s;}
+  #horizonLockTxt.on{opacity:1;}
+
+  .gaugeWrap{position:absolute;bottom:22px;width:78px;height:78px;}
+  .gaugeWrap svg{width:100%;height:100%;}
 
   #cornerTL,#cornerTR,#cornerBL,#cornerBR{position:absolute;width:36px;height:36px;opacity:0.8;}
   #cornerTL{top:14px;left:14px;border-top:1.5px solid var(--cy);border-left:1.5px solid var(--cy);}
@@ -53,10 +68,11 @@
   #hyperFlag{color:var(--red);text-shadow:0 0 10px var(--red);opacity:0;transition:opacity .15s;}
   #hyperFlag.on{opacity:1;}
 
-  #throttleGauge,#rollGauge,#gforceGauge{position:absolute;bottom:22px;width:64px;height:64px;}
-  #throttleGauge{left:70px;} #rollGauge{left:150px;} #gforceGauge{right:70px;}
+  #throttleGauge{left:calc(50% - 190px);} #rollGauge{left:calc(50% - 95px);}
+  #stableGauge{left:calc(50% - 39px);} #headingGauge{left:calc(50% + 56px);}
+  #gforceGauge{left:calc(50% + 151px);}
   .dial-label{position:absolute;bottom:-16px;width:100%;text-align:center;font-size:9px;
-    letter-spacing:1px;opacity:0.6;}
+    letter-spacing:1px;opacity:0.7;font-weight:700;}
 
   #cityLabelTag{position:absolute;padding:4px 10px;border:1px solid var(--cy);
     background:rgba(0,20,24,0.55);font-size:11px;white-space:nowrap;transform:translate(-50%,-130%);
@@ -90,6 +106,7 @@
   <svg id="hudSvg" viewBox="0 0 1000 1000" preserveAspectRatio="none">
     <!-- pitch ladder group: translated/rotated by JS -->
     <g id="pitchLadder"></g>
+    <text id="horizonLockTxt" x="500" y="480" text-anchor="middle">HORIZON LOCK</text>
 
     <!-- left altitude ticks -->
     <g id="altTicks"></g>
@@ -110,9 +127,18 @@
     <div id="hyperFlag">HYPERSONIC</div>
   </div>
 
-  <div id="throttleGauge"></div>
-  <div id="rollGauge"></div>
-  <div id="gforceGauge"></div>
+  <div id="sysBox">
+    <div class="row"><span class="lbl">THR</span><span id="sysThr">--</span></div>
+    <div class="row"><span class="lbl">ROLL</span><span id="sysRoll">--</span></div>
+    <div class="row"><span class="lbl">V/S</span><span id="sysVS">--</span></div>
+    <div class="row"><span class="lbl">G</span><span id="sysG">--</span></div>
+  </div>
+
+  <div id="throttleGauge" class="gaugeWrap"></div>
+  <div id="rollGauge" class="gaugeWrap"></div>
+  <div id="stableGauge" class="gaugeWrap"></div>
+  <div id="headingGauge" class="gaugeWrap"></div>
+  <div id="gforceGauge" class="gaugeWrap"></div>
 
   <div id="cityLabelTag" style="display:none;"></div>
 </div>
@@ -142,7 +168,7 @@ let state = {
   heading: 30, pitch: -5, roll: 0,
   throttle: 1.0,          // 1 = idle, 0 = max power (per spec)
   maxSpeed: 600,           // m/s at throttle 0 — ~Mach 1.8, matches F/A-18 top speed
-  hyperMaxSpeed: 3400,     // m/s during hypersonic boost — ~Mach 10
+  hyperMaxSpeed: 6000,     // m/s during hypersonic boost
   hyper: false, hyperT: 0,
   keys: {}
 };
@@ -387,9 +413,9 @@ function tick(clock) {
   lastTime = now;
   if (dt <= 0) return;
 
-  // --- pitch ---
-  if (state.keys['ArrowUp'])   state.pitch += PITCH_RATE * dt;
-  if (state.keys['ArrowDown']) state.pitch -= PITCH_RATE * dt;
+  // --- pitch (inverted per request: Down = nose up, Up = nose down) ---
+  if (state.keys['ArrowDown']) state.pitch += PITCH_RATE * dt;
+  if (state.keys['ArrowUp'])   state.pitch -= PITCH_RATE * dt;
   state.pitch = Cesium.Math.clamp(state.pitch, -85, 85);
 
   // --- roll (self-leveling) + coordinated yaw ---
@@ -421,6 +447,7 @@ function tick(clock) {
   state.lat += Cesium.Math.toDegrees(dLat);
   state.lon += Cesium.Math.toDegrees(dLon);
   state.height = Math.max(50, state.height + dHeight);
+  state.vspeed = dHeight / dt;
 
   camera.setView({
     destination: Cesium.Cartesian3.fromDegrees(state.lon, state.lat, state.height),
@@ -448,11 +475,11 @@ function renderTape(groupEl, value, increment, tickX, labelX, side, decimals) {
   const nearest = Math.round(value / increment) * increment;
   const fracOffset = ((value - nearest) / increment) * pxPerTick;
 
-  for (let i = -4; i <= 4; i++) {
+  for (let i = -13; i <= 13; i++) {
     const labelValue = nearest + i * increment;
     if (labelValue < 0) continue;
     const y = 500 - i * pxPerTick + fracOffset;
-    if (y < 335 || y > 665) continue;
+    if (y < 30 || y > 970) continue;
 
     const tick = ns('line');
     tick.setAttribute('x1', tickX);
@@ -509,14 +536,14 @@ function buildStaticHudSvg() {
   const spd = guides;
 
   const altLine = document.createElementNS('http://www.w3.org/2000/svg','line');
-  altLine.setAttribute('x1','150'); altLine.setAttribute('x2','150');
-  altLine.setAttribute('y1','320'); altLine.setAttribute('y2','680');
+  altLine.setAttribute('x1','36'); altLine.setAttribute('x2','36');
+  altLine.setAttribute('y1','15'); altLine.setAttribute('y2','985');
   altLine.setAttribute('class','hud-line-dim');
   alt.appendChild(altLine);
 
   const spdLine = document.createElementNS('http://www.w3.org/2000/svg','line');
-  spdLine.setAttribute('x1','850'); spdLine.setAttribute('x2','850');
-  spdLine.setAttribute('y1','320'); spdLine.setAttribute('y2','680');
+  spdLine.setAttribute('x1','964'); spdLine.setAttribute('x2','964');
+  spdLine.setAttribute('y1','15'); spdLine.setAttribute('y2','985');
   spdLine.setAttribute('class','hud-line-dim');
   spd.appendChild(spdLine);
 
@@ -551,8 +578,13 @@ function updateHud(speed) {
   document.getElementById('altValTop').textContent = state.height.toFixed(0) + ' M';
   document.getElementById('spdValTop').textContent = speed.toFixed(0) + ' M/S';
 
-  renderTape(document.getElementById('altTicks'), state.height, 100, 150, 130, 'left', 0);
-  renderTape(document.getElementById('spdTicks'), speed, 20, 850, 870, 'right', 0);
+  renderTape(document.getElementById('altTicks'), state.height, 100, 36, 58, 'left', 0);
+  renderTape(document.getElementById('spdTicks'), speed, 20, 964, 942, 'right', 0);
+
+  const stable = Math.abs(state.pitch) < 1 && Math.abs(state.roll) < 1;
+  document.getElementById('horizonLockTxt').classList.toggle('on', stable);
+
+  renderSysAndGauges(speed);
 
   const hyperFlag = document.getElementById('hyperFlag');
   hyperFlag.classList.toggle('on', state.hyperT > 0.05);
